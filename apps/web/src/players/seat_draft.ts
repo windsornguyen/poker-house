@@ -15,6 +15,8 @@
 // A seat's settings as they are being edited, and how they compare with the
 // settings the server holds.
 
+import * as z from 'zod';
+
 import type {Controller, SeatConfig, SeatView} from '../contract/contract.ts';
 import type {Field, FieldDraft, FieldValue} from '../form/field.ts';
 import {REQUIRED_ERROR, draftOf, readDraft} from '../form/field.ts';
@@ -265,25 +267,18 @@ function readJson(text: string): SettingsReading {
     if (!(e instanceof SyntaxError)) throw e;
     return refuse(`The settings are not JSON: ${e.message}`);
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed) ||
-    !Object.values(parsed).every(isFieldValue)
-  ) {
+  const settings = SETTINGS.safeParse(parsed);
+  if (!settings.success) {
     return refuse(
       'The settings are a JSON object of booleans, finite numbers and strings.',
     );
   }
-  return {ok: true, config: parsed as Config};
+  return {ok: true, config: settings.data};
 }
 
 // JSON.parse reads a number too large for a double, such as 1e400, as
-// Infinity, which JSON.stringify would send as null.
-function isFieldValue(value: unknown): value is FieldValue {
-  return (
-    typeof value === 'boolean' ||
-    typeof value === 'string' ||
-    (typeof value === 'number' && Number.isFinite(value))
-  );
-}
+// Infinity, which JSON.stringify would send as null; z.number() refuses it.
+const SETTINGS = z.record(
+  z.string(),
+  z.union([z.boolean(), z.string(), z.number()]),
+);

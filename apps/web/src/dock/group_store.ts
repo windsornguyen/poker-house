@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as z from 'zod';
+
 // The section open in each panel group, remembered per game in the
 // browser's local storage. Storage this page cannot read is left as it is:
 // the groups then open at their first section and nothing is written.
@@ -42,21 +44,14 @@ function readAll(storage: () => Storage): Stored | null {
   } catch {
     return null;
   }
-  if (!isRecord(stored) || stored['version'] !== GROUPS_VERSION) return null;
-  const games = stored['games'];
-  if (!isRecord(games)) return null;
-  const all: Stored = {};
-  for (const [game, groups] of Object.entries(games)) {
-    if (!isRecord(groups)) return null;
-    const sections: Record<string, string> = {};
-    for (const [group, section] of Object.entries(groups)) {
-      if (typeof section !== 'string') return null;
-      sections[group] = section;
-    }
-    all[game] = sections;
-  }
-  return all;
+  const read = STORED.safeParse(stored);
+  return read.success ? read.data.games : null;
 }
+
+const STORED = z.object({
+  version: z.literal(GROUPS_VERSION),
+  games: z.record(z.string(), z.record(z.string(), z.string())),
+});
 
 /** The open sections remembered for `game`; none when unreadable. */
 export function readActiveSections(
@@ -89,8 +84,4 @@ export function writeActiveSection(
     return false;
   }
   return true;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

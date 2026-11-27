@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import * as z from 'zod';
+
 import type {Frame} from '../contract/contract.ts';
 
 /** Typed text read as a history, or why it cannot be read as one. */
@@ -73,22 +75,19 @@ function parseEpisode(text: string): ParsedHistory {
       problem: 'The object holds no history, actions or sequence list.',
     };
   }
-  const history: number[] = [];
-  for (const action of list) {
-    if (
-      typeof action !== 'number' ||
-      !Number.isSafeInteger(action) ||
-      action < 0
-    ) {
-      return {
-        ok: false,
-        problem: `${JSON.stringify(action)} is not an action id.`,
-      };
-    }
-    history.push(action);
+  const history = ACTION_IDS.safeParse(list);
+  if (!history.success) {
+    const [index] = history.error.issues[0]?.path ?? [];
+    const action: unknown = typeof index === 'number' ? list[index] : list;
+    return {
+      ok: false,
+      problem: `${JSON.stringify(action)} is not an action id.`,
+    };
   }
-  return {ok: true, history};
+  return {ok: true, history: history.data};
 }
+
+const ACTION_IDS = z.array(z.int().nonnegative());
 
 /** `history` as text that `parseHistory` reads back. */
 export function formatHistory(history: readonly number[]): string {
