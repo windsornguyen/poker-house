@@ -50,15 +50,11 @@ class Health:
   """The server's identity and capabilities.
 
   Attributes:
-    contract_version: The contract version the server speaks.
     version: The installed OpenSpiel package's version.
     revision: The source revision the server runs from, or null when unknown.
     capabilities: What the server can do.
   """
 
-  contract_version: contract.ContractVersion = dataclasses.field(
-      default=contract.CONTRACT_VERSION, kw_only=True
-  )
   version: str
   revision: str | None
   capabilities: Capabilities

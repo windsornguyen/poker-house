@@ -249,13 +249,9 @@ class Catalogue:
   """Every game the server knows.
 
   Attributes:
-    contract_version: The contract version the catalogue was built against.
     games: One entry per game, ordered by name.
   """
 
-  contract_version: contract.ContractVersion = dataclasses.field(
-      default=contract.CONTRACT_VERSION, kw_only=True
-  )
   games: tuple[CatalogueEntry, ...]
 
   def __post_init__(self) -> None:

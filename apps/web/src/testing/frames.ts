@@ -48,7 +48,6 @@ export function entries(labels: readonly string[]): HistoryEntry[] {
 export function frame(fields: Partial<Frame> = {}): Frame {
   const history = fields.history ?? [];
   return {
-    contract_version: 10,
     session: {
       id: 'session-1',
       game: 'game',
@@ -110,7 +109,6 @@ export function session(shown: Frame | null, busy = false): Session {
     create: vi.fn(),
     open: vi.fn(),
     refresh: vi.fn(),
-    poll: vi.fn(),
     goTo: vi.fn(),
     step: vi.fn(),
     act: vi.fn(),

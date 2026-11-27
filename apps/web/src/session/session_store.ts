@@ -43,12 +43,6 @@ export interface SessionCommands {
   /** Fetches the shown position again. */
   readonly refresh: () => void;
   /**
-   * Fetches the shown position again, quietly: the session is not marked
-   * busy, and nothing is sent while another command is pending. For waiting
-   * on the server, as while a seat's controller is preparing.
-   */
-  readonly poll: () => void;
-  /**
    * Shows the position after `ply` actions, or the live position when `ply`
    * is past it.
    */
@@ -187,9 +181,22 @@ export class SessionStore implements SessionCommands {
     this.enqueue(this.reload);
   };
 
-  readonly poll = (): void => {
-    if (this.pending > 0 || this.position === null) return;
-    this.enqueue(this.reload, {quiet: true});
+  /**
+   * Takes a live frame the server pushed. A command's own answer wins while
+   * one is pending, and a replay stays shown while new plies arrive.
+   */
+  readonly receive = (frame: Frame): void => {
+    const position = this.position;
+    if (this.pending > 0 || position === null) return;
+    if (position.id !== frame.session.id) return;
+    if (!sameViewer(frame.viewer, this.viewer)) return;
+    const live = position.ply === position.numPlies;
+    this.position = {
+      id: position.id,
+      ply: live ? frame.ply : position.ply,
+      numPlies: frame.num_plies,
+    };
+    if (live) this.update({frame});
   };
 
   readonly goTo = (ply: number): void => {

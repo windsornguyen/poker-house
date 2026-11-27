@@ -49,6 +49,10 @@ MAX_BODY_BYTES = 1 << 20
 
 _BODY_METHODS = frozenset({"POST", "PUT"})
 
+# Seconds between keepalive comments on an idle event stream, under the
+# idle timeouts of the proxies in front of a deployed server.
+_KEEPALIVE_SECONDS = 15.0
+
 _DIGITS = re.compile(r"[0-9]+")
 
 _SECURITY_HEADERS = {
@@ -196,6 +200,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._refuse(refusal)
         return
       body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+    if self.server.api.is_events(self.command, self.path):
+      self._stream_events()
+      return
     try:
       response = self.server.api.handle(self.command, self.path, body)
     except Exception:  # pylint: disable=broad-exception-caught
@@ -206,6 +213,35 @@ class _Handler(http.server.BaseHTTPRequestHandler):
       )
       return
     self._send_json(response.status, response.body)
+
+  def _stream_events(self) -> None:
+    """Streams the viewer's live frame as Server-Sent Events."""
+    try:
+      session, viewer = self.server.api.subscribe(self.path)
+    except errors.RequestError as error:
+      body = error.to_error()
+      self._send_json(body.code.http_status, contract.to_json(body))
+      return
+    self.close_connection = True
+    self.send_response(http.HTTPStatus.OK)
+    self.send_header("Content-Type", "text/event-stream")
+    for name, value in _SECURITY_HEADERS.items():
+      self.send_header(name, value)
+    self.end_headers()
+    version = -1
+    try:
+      while not session.closed:
+        version, frame = session.wait(viewer, version, _KEEPALIVE_SECONDS)
+        if frame is None:
+          self.wfile.write(b": keepalive\n\n")
+        else:
+          data = json.dumps(
+              contract.to_json(frame), allow_nan=False, separators=(",", ":")
+          )
+          self.wfile.write(f"data: {data}\n\n".encode())
+        self.wfile.flush()
+    except (BrokenPipeError, ConnectionResetError):
+      return
 
   def _check_origin(self) -> str | None:
     """Returns why the request's origin is refused, or None."""

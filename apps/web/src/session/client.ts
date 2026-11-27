@@ -105,6 +105,28 @@ export class SessionClient {
     return this.sessionRequest('GET', id, '', viewer);
   }
 
+  /**
+   * Calls `onFrame` with the live position now and after every change to
+   * the session, until the returned function is called. The browser
+   * reconnects a dropped stream itself, and each connection starts with the
+   * current position.
+   */
+  events(
+    id: string,
+    viewer: Viewer,
+    onFrame: (frame: Frame) => void,
+  ): () => void {
+    const source = new EventSource(
+      `${this.origin}/api/sessions/${encodeURIComponent(id)}/events?${query(viewer)}`,
+    );
+    source.onmessage = event => {
+      onFrame(JSON.parse(String(event.data)) as Frame);
+    };
+    return () => {
+      source.close();
+    };
+  }
+
   /** The position after `ply` actions; the session is unchanged. */
   replay(id: string, viewer: Viewer, ply: number): Promise<Frame> {
     return this.sessionRequest('GET', id, `/plies/${String(ply)}`, viewer);

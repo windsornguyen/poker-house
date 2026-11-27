@@ -19,7 +19,6 @@ import type {CatalogueEntry, Viewer} from '../contract/contract.ts';
 import {Dock} from '../dock/dock.tsx';
 import type {SessionClient} from '../session/client.ts';
 import type {SessionCommands} from '../session/session_store.ts';
-import {usePreparingPoll} from '../session/use_preparing_poll.ts';
 import {useSession} from '../session/use_session.ts';
 import {sessionModeOf, useAnalysisViewSeat} from './bottom_seat.ts';
 import {defaultSession, initialViewer} from './game_defaults.ts';
@@ -59,7 +58,6 @@ export function GamePage(props: GamePageProps): JSX.Element {
   const [viewer] = useState<Viewer>(() => initialViewer(entry, props.viewer));
   const session = useSession(client, viewer);
   useStartSession(session.commands, entry, props.session);
-  usePreparingPoll(session);
   const viewSeat = useOpeningViewSeat(entry, viewer, props.viewSeat ?? null);
   const id = session.frame?.session.id ?? null;
   useEffect(() => {

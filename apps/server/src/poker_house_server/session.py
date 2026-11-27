@@ -103,6 +103,9 @@ class Session:
     # How many chance outcomes the session has sampled; never rewound.
     self._draws = 0
     self._lock = threading.RLock()
+    self._changed = threading.Condition(self._lock)
+    self._version = 0
+    self._closed = False
 
   @classmethod
   def create(
@@ -169,6 +172,41 @@ class Session:
     with self._lock:
       self._check_viewer(viewer)
       return self._build(self._state, len(self._plies), viewer)
+
+  @property
+  def closed(self) -> bool:
+    """Whether the session has been closed or evicted."""
+    with self._lock:
+      return self._closed
+
+  def close(self) -> None:
+    """Marks the session closed, ending every `wait`."""
+    with self._lock:
+      self._closed = True
+      self._changed.notify_all()
+
+  def wait(
+      self, viewer: contract.Viewer, version: int, timeout: float
+  ) -> tuple[int, frame_lib.Frame | None]:
+    """Waits until the session changes from `version`.
+
+    Returns:
+      The current version, and the live position as `viewer` may see it, or
+      None if nothing changed within `timeout` or the session is closed.
+    """
+    with self._lock:
+      self._check_viewer(viewer)
+      self._changed.wait_for(
+          lambda: self._version != version or self._closed, timeout
+      )
+      if self._closed or self._version == version:
+        return self._version, None
+      return self._version, self._build(self._state, len(self._plies), viewer)
+
+  def _touch(self) -> None:
+    """Records a change and wakes every `wait`."""
+    self._version += 1
+    self._changed.notify_all()
 
   def replay_frame(self, viewer: contract.Viewer, step: int) -> frame_lib.Frame:
     """Returns the position after `step` plies, as `viewer` may see it.
@@ -316,6 +354,7 @@ class Session:
       self._state, rebuilt = self._rebuild(step)
       self._plies = list(rebuilt)
       self._seats.clear_failures()
+      self._touch()
       return self._build(self._state, step, viewer)
 
   def reset(
@@ -347,6 +386,7 @@ class Session:
       self._plies = list(rebuilt)
       self._seats.clear_failures()
       self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+      self._touch()
       return self._build(self._state, len(self._plies), viewer)
 
   def set_controller(
@@ -385,6 +425,7 @@ class Session:
         raise errors.NotFoundError(f"There is no seat {seat}.", seat=seat)
       self._seats.assign({seat: (spec, autoplay)})
       self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+      self._touch()
       return self._build(self._state, len(self._plies), viewer)
 
   def check_closer(self, viewer: contract.Viewer) -> None:
@@ -412,6 +453,7 @@ class Session:
         return  # Finished in its request, or superseded.
       seat.finish(index, refuse=False)
       self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+      self._touch()
 
   def _position_to_play(
       self, viewer: contract.Viewer, ply: int | None
@@ -445,6 +487,7 @@ class Session:
     self._state, self._plies = state, played
     if branched:
       self._seats.clear_failures()
+    self._touch()
     self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
     self._check_not_paused()
 
@@ -480,6 +523,7 @@ class Session:
   def _apply(self, action: int) -> None:
     """Applies a legal action or chance outcome to the live state."""
     self._plies.append(plies.apply(self._state, action, ply=len(self._plies)))
+    self._touch()
 
   def _resolve_chance(self) -> None:
     """Samples chance outcomes while the `auto` policy has one due."""

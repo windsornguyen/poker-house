@@ -30,7 +30,6 @@ class ErrorTest(absltest.TestCase):
     self.assertEqual(
         contract.to_json(error),
         {
-            "contract_version": contract.CONTRACT_VERSION,
             "code": "not_found",
             "message": "No game.",
             "seat": None,

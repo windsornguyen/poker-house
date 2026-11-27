@@ -33,7 +33,6 @@ class Frame:
   play from a replay, which takes back the plies after it.
 
   Attributes:
-    contract_version: The contract version the frame was built against.
     session: The session's fixed properties.
     viewer: The audience the frame is built for.
     omniscient: Whether the viewer sees the full state: exactly when the
@@ -71,9 +70,6 @@ class Frame:
       viewer; null when no adapter is registered for the game.
   """
 
-  contract_version: contract.ContractVersion = dataclasses.field(
-      default=contract.CONTRACT_VERSION, kw_only=True
-  )
   session: contract.SessionInfo
   viewer: contract.Viewer
   omniscient: bool
@@ -100,11 +96,6 @@ class Frame:
     return self.ply == self.num_plies
 
   def __post_init__(self) -> None:
-    contract.require(
-        self.contract_version == contract.CONTRACT_VERSION,
-        f"Contract version {self.contract_version} is not "
-        f"{contract.CONTRACT_VERSION}.",
-    )
     self._check_seats()
     self._check_history()
     self._check_position()

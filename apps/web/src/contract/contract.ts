@@ -131,10 +131,6 @@ export interface Capabilities {
  */
 export interface Catalogue {
   /**
-   * The contract version the catalogue was built against.
-   */
-  contract_version: 10;
-  /**
    * One entry per game, ordered by name.
    */
   games: CatalogueEntry[];
@@ -310,10 +306,6 @@ export type Dynamics = 'sequential' | 'simultaneous' | 'mean_field';
  */
 export interface Error {
   /**
-   * The contract version the error was built against.
-   */
-  contract_version: 10;
-  /**
    * Why the request was refused.
    */
   code: ErrorCode;
@@ -363,10 +355,6 @@ export type ErrorCode =
  * A frame is live when `ply == num_plies`, and a replay of an earlier position otherwise. A seat acts at the live position; an omniscient viewer may also play from a replay, which takes back the plies after it.
  */
 export interface Frame {
-  /**
-   * The contract version the frame was built against.
-   */
-  contract_version: 10;
   /**
    * The session's fixed properties.
    */
@@ -449,10 +437,6 @@ export interface Frame {
  * The server's identity and capabilities.
  */
 export interface Health {
-  /**
-   * The contract version the server speaks.
-   */
-  contract_version: 10;
   /**
    * The installed OpenSpiel package's version.
    */
@@ -698,10 +682,6 @@ export interface SeatView {
  * The answer to closing a session: the server has forgotten it.
  */
 export interface SessionClosed {
-  /**
-   * The contract version the answer was built against.
-   */
-  contract_version: 10;
   /**
    * The id of the session closed.
    */

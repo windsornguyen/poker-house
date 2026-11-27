@@ -35,6 +35,7 @@ export default defineConfig({
     // Browser tests use jsdom's origin-scoped storage, not Node's file store.
     execArgv: ['--no-experimental-webstorage'],
     include: ['{scripts,src}/**/*_test.{ts,tsx}'],
+    setupFiles: ['src/testing/setup.ts'],
     // Twice app_test's 5 s `until`, so a slow wait reports its failing
     // check rather than the test timeout, and two waits fit in one test.
     testTimeout: 10000,

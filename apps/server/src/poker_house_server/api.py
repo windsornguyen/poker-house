@@ -35,6 +35,7 @@ from poker_house_server import controllers
 from poker_house_server import errors
 from poker_house_server import health as health_lib
 from poker_house_server import request
+from poker_house_server import session as session_lib
 from poker_house_server import store
 from poker_house_server import wire
 
@@ -44,6 +45,8 @@ PREFIX = "/api/"
 _T = TypeVar("_T")
 
 _NON_NEGATIVE_INTEGER = re.compile(r"0|[1-9][0-9]*")
+
+_EVENTS = re.compile(PREFIX + r"sessions/(?P<id>[^/]+)/events")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -176,6 +179,32 @@ class Api:
       return handler(self, _Request(query, body, path))
     except errors.RequestError as error:
       return _refusal(error.to_error())
+
+  def is_events(self, method: str, target: str) -> bool:
+    """Whether the request subscribes to a session's events."""
+    path = urllib.parse.urlsplit(target).path
+    return method == "GET" and _EVENTS.fullmatch(path) is not None
+
+  def subscribe(
+      self, target: str
+  ) -> tuple[session_lib.Session, contract.Viewer]:
+    """Returns the session and viewer an events request subscribes.
+
+    Raises:
+      errors.RequestError: If the session or viewer does not exist.
+    """
+    url = urllib.parse.urlsplit(target)
+    match = _EVENTS.fullmatch(url.path)
+    assert match is not None
+    req = _Request(
+        urllib.parse.parse_qs(url.query, keep_blank_values=True),
+        b"",
+        match.groupdict(),
+    )
+    viewer = req.viewer()
+    session = self._sessions.get(req.session_id)
+    session.frame(viewer)
+    return session, viewer
 
   def _match(self, method: str, path: str) -> tuple[_Handler, dict[str, str]]:
     """Returns the handler for a request and its path parameters."""

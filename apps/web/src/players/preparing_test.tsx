@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {JSX} from 'react';
 import {act} from 'react';
 import {type Root, createRoot} from 'react-dom/client';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -20,20 +19,10 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {playBlocker} from '../actions/play_blocker.ts';
 import type {Frame, SeatConfig, SeatView} from '../contract/contract.ts';
 import {controllerToMove, statusLine} from '../game/gameplay_state.ts';
-import {SessionClient} from '../session/client.ts';
-import {SessionStore} from '../session/session_store.ts';
-import {FakeServer} from '../session/testing/fake_server.ts';
-import {usePreparingPoll} from '../session/use_preparing_poll.ts';
 import {stubResizeObserver} from '../testing/dom.ts';
-import {session as mockSession} from '../testing/frames.ts';
 import {only} from '../testing/render.tsx';
 import {PlayersPanel} from './players_panel.tsx';
-import {
-  PREPARING_POLL_MS,
-  anyPreparing,
-  preparingMover,
-  preparingText,
-} from './preparing.ts';
+import {anyPreparing, preparingMover, preparingText} from './preparing.ts';
 import {CONTROLLERS, RANDOM, frameWith, seatView} from './testing/seats.ts';
 
 const MESSAGE = 'Building Random, for at most 120 seconds.';
@@ -178,88 +167,5 @@ describe('PlayersPanel while a seat prepares', () => {
       [1, {controller: 'random', config: {}, autoplay: false}],
     ]);
     expect(advance).not.toHaveBeenCalled();
-  });
-});
-
-describe('usePreparingPoll', () => {
-  function Poller({
-    frame,
-    busy,
-    poll,
-  }: {
-    readonly frame: Frame;
-    readonly busy: boolean;
-    readonly poll: () => void;
-  }): JSX.Element | null {
-    const shown = mockSession(frame, busy);
-    usePreparingPoll({...shown, commands: {...shown.commands, poll}});
-    return null;
-  }
-
-  function poll(frame: Frame, busy = false): ReturnType<typeof vi.fn> {
-    const polled = vi.fn();
-    act(() => {
-      root.render(<Poller frame={frame} busy={busy} poll={polled} />);
-    });
-    return polled;
-  }
-
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  it('fetches again while a seat prepares, once per answer', () => {
-    const polled = poll(PREPARING);
-    act(() => {
-      vi.advanceTimersByTime(PREPARING_POLL_MS - 1);
-    });
-    expect(polled).not.toHaveBeenCalled();
-    act(() => {
-      vi.advanceTimersByTime(PREPARING_POLL_MS * 5);
-    });
-    expect(polled).toHaveBeenCalledOnce();
-  });
-
-  it('waits for nothing once every seat is ready, or while busy', () => {
-    const ready = poll(READY);
-    const busy = poll(PREPARING, true);
-    act(() => {
-      vi.advanceTimersByTime(PREPARING_POLL_MS * 5);
-    });
-    expect(ready).not.toHaveBeenCalled();
-    expect(busy).not.toHaveBeenCalled();
-  });
-});
-
-describe('SessionStore.poll', () => {
-  it('fetches the position again without marking the session busy', async () => {
-    const server = new FakeServer();
-    const store = new SessionStore(new SessionClient({fetch: server.fetch}), {
-      kind: 'oracle',
-      seat: null,
-    });
-    store.poll();
-    expect(server.received).toEqual([]);
-    store.create({
-      game: 'count',
-      parameters: {},
-      seats: [],
-      chance_policy: 'auto',
-      seed: null,
-    });
-    await vi.waitFor(() => {
-      expect(store.getSnapshot().busy).toBe(false);
-    });
-    const busy: boolean[] = [];
-    store.subscribe(() => {
-      busy.push(store.getSnapshot().busy);
-    });
-    const before = store.getSnapshot().frame;
-    store.poll();
-    await vi.waitFor(() => {
-      expect(store.getSnapshot().frame).not.toBe(before);
-    });
-    expect(busy.every(value => !value)).toBe(true);
-    expect(server.received.at(-1)?.method).toBe('GET');
   });
 });

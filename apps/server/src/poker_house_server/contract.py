@@ -29,16 +29,13 @@ breaks them cannot be built.
 import dataclasses
 import enum
 import math
-from typing import Annotated, Literal
+from typing import Annotated
 
 from poker_house_server import json_value
 
 JsonValue = json_value.JsonValue
 to_json = json_value.to_json
 
-# The contract's version, incremented on every change that breaks clients.
-ContractVersion = Literal[10]
-CONTRACT_VERSION: ContractVersion = 10
 
 # The most characters a seat's `SeatView.notice` holds.
 NOTICE_MAX_LENGTH = 200
@@ -565,13 +562,9 @@ class SessionClosed:
   """The answer to closing a session: the server has forgotten it.
 
   Attributes:
-    contract_version: The contract version the answer was built against.
     id: The id of the session closed.
   """
 
-  contract_version: ContractVersion = dataclasses.field(
-      default=CONTRACT_VERSION, kw_only=True
-  )
   id: str
 
   def __post_init__(self) -> None:

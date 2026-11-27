@@ -21,9 +21,6 @@ import type {
 } from '../contract/contract.ts';
 import {ContractError, TransportError} from './errors.ts';
 
-/** The contract version this client speaks. */
-export const CONTRACT_VERSION: Frame['contract_version'] = 10;
-
 /** The success bodies, by the name a route's caller expects. */
 export interface Bodies {
   frame: Frame;
@@ -96,9 +93,9 @@ export async function decode<K extends keyof Bodies>(
       },
     );
   }
-  if (!isObject(body) || body['contract_version'] !== CONTRACT_VERSION) {
+  if (!isObject(body)) {
     throw new TransportError(
-      `The server does not speak contract version ${String(CONTRACT_VERSION)}.`,
+      'The server answered with JSON that is not an object.',
       response.status,
     );
   }

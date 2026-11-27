@@ -74,7 +74,6 @@ class Error:
   """A refused request.
 
   Attributes:
-    contract_version: The contract version the error was built against.
     code: Why the request was refused.
     message: A human-readable explanation, safe to show the requester: it
       never holds state the requester may not see.
@@ -82,9 +81,6 @@ class Error:
     ply: The index of the history entry the refusal concerns, or null.
   """
 
-  contract_version: contract.ContractVersion = dataclasses.field(
-      default=contract.CONTRACT_VERSION, kw_only=True
-  )
   code: ErrorCode
   message: str
   seat: int | None = None

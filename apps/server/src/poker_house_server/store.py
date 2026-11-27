@@ -91,7 +91,7 @@ class SessionStore:
     with self._lock:
       self._sessions[session.id] = session
       while len(self._sessions) > self._capacity:
-        self._sessions.popitem(last=False)
+        self._sessions.popitem(last=False)[1].close()
     return session
 
   def get(self, session_id: str) -> session_lib.Session:
@@ -122,8 +122,10 @@ class SessionStore:
       errors.NotFoundError: If there is no such session.
     """
     with self._lock:
-      if self._sessions.pop(session_id, None) is None:
-        raise errors.NotFoundError(f"There is no session {session_id!r}.")
+      session = self._sessions.pop(session_id, None)
+    if session is None:
+      raise errors.NotFoundError(f"There is no session {session_id!r}.")
+    session.close()
 
   def __len__(self) -> int:
     with self._lock:

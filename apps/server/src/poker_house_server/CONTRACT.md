@@ -18,26 +18,6 @@ from them by [`schema.py`](schema.py); clients generate their types from it.
 Every object carries every field. `null` is a value: a nullable field is
 present and null, never absent. Objects admit no extra fields.
 
-## Versioning
-
-Every response carries `contract_version`, currently `10`. It increases on any
-change a client could break on: a field added, removed, renamed or retyped,
-an enum value added or removed, or a route changed. The server and the
-client change version together: the client refuses a response of any other
-version.
-
-| Version | Change                                                                                                                                       |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `10`    | `PolicyEntry.action` admits `null` in the schema (withheld moves carry `bot_output: null`, so a policy entry's `action` is always given on the wire) |
-| `9`     | `HistoryEntry.bot_output`, a `BotOutput` (a controller's policy, value and what decided its move), sent to omniscient viewers and to the acting seat's viewer (`null` whenever `HistoryEntry.action` is withheld) |
-| `8`     | `SeatView.notice`, a controller's note about its latest move, sent only to that seat's viewer and to omniscient viewers; `DELETE /api/sessions/{id}`, answered with `SessionClosed` |
-| `7`     | `CatalogueEntry.renderer`: the renderer the game's adapter names, so a client can show which games it draws as a board before opening one |
-| `6`     | `Health.capabilities.cpp_mcts_limits` (`simulations_or_clock` \| `simulations_only`): how the served pyspiel's C++ MCTS bounds a search, which sets MCTS's limits |
-| `5`     | `Health.capabilities.python_game_search` removed: MCTS picks its search by how the game is implemented and plays games implemented in Python as in C++ |
-| `4`     | `SeatView.status` (`ready` \| `preparing` \| `unavailable`) and `SeatView.message`: a seat's controller is built off the request                    |
-| `3`     | `Frame.observation_struct`, a seat's observation as the game's structured JSON; `Frame.presentation`, the game adapter's view for the viewer |
-| `2`     | The current form of every other body                                                                                                         |
-
 ## Routes
 
 Every session route takes the viewer in the required `viewer` query
@@ -52,6 +32,7 @@ path that does not exist, with `not_found`.
 | `GET`  | `/api/games`                      |                      | `Catalogue`       |                                                                                                          |
 | `POST` | `/api/sessions`                   | `CreateSession`      | `Frame`, live     | `bad_request`, `not_found`, `game_unavailable`, `viewer_unavailable`, `controller_unavailable`           |
 | `GET`  | `/api/sessions/{id}`              |                      | `Frame`, live     | `bad_request`, `not_found`, `viewer_unavailable`                                                         |
+| `GET`  | `/api/sessions/{id}/events`       |                      | `Frame` stream    | `bad_request`, `not_found`, `viewer_unavailable`                                                         |
 | `GET`  | `/api/sessions/{id}/plies/{ply}`  |                      | `Frame`, at `ply` | `bad_request`, `not_found`, `viewer_unavailable`                                                         |
 | `POST` | `/api/sessions/{id}/actions`      | `ApplyAction`        | `Frame`, live     | `bad_request`, `not_found`, `viewer_unavailable`, `not_your_turn`, `illegal_action`, `controller_failed` |
 | `POST` | `/api/sessions/{id}/chance`       | `ApplyChanceOutcome` | `Frame`, live     | `bad_request`, `not_found`, `viewer_unavailable`, `not_your_turn`, `illegal_action`, `controller_failed` |
@@ -61,6 +42,10 @@ path that does not exist, with `not_found`.
 | `PUT`  | `/api/sessions/{id}/seats/{seat}` | `SeatConfig`         | `Frame`, live     | `bad_request`, `not_found`, `viewer_unavailable`, `not_your_turn`, `controller_unavailable`              |
 | `DELETE` | `/api/sessions/{id}`            |                      | `SessionClosed`   | `bad_request`, `not_found`, `viewer_unavailable`, `not_your_turn`                                        |
 
+- **Events** is a `text/event-stream` of the viewer's live `Frame`: one
+  `data:` event when it connects, then one after every change to the
+  session, whoever made it. An idle stream carries a comment every 15
+  seconds. The stream ends when the session is closed.
 - **Create** builds the game and returns its initial position, after any
   autoplay seats and `auto` chance nodes have acted.
 - **Actions** plays an action for the seat to move. A seat viewer may act
@@ -105,7 +90,7 @@ path that does not exist, with `not_found`.
   changes a seat; a spectator is refused with `not_your_turn`.
 - **Close** forgets the session; its id is `not_found` from then on. As
   with reset, any viewer but a spectator closes it; a spectator is refused
-  with `not_your_turn`. The answer is `SessionClosed`: `contract_version`
+  with `not_your_turn`. The answer is `SessionClosed`:
   and the `id` closed. Like a change, a close from another origin is
   refused.
 - **Health** identifies the running code, so a client or sweep can refuse a
@@ -172,7 +157,6 @@ and a **replay** of an earlier position otherwise.
 
 | Field                    | Type                                | Meaning                                                      |
 | ------------------------ | ----------------------------------- | ------------------------------------------------------------ |
-| `contract_version`       | `10`                                |                                                              |
 | `session`                | `SessionInfo`                       | the session's fixed properties                               |
 | `viewer`                 | `Viewer`                            | who the frame is for                                         |
 | `omniscient`             | boolean                             | whether the viewer sees the full state                       |
@@ -413,8 +397,8 @@ Otherwise the request answers with the seat **preparing**:
 | `unavailable`     | The build failed or overran the build budget. `failure` names the error, `message` says why to every viewer, and the session is paused. |
 
 A preparing seat becomes `ready` when its build finishes, and autoplay goes
-on from there, with no request: a client that shows a preparing seat fetches
-the live frame again until it is ready. A build has a budget, 120 seconds
+on from there, with no request: the events stream pushes the frame that
+shows it. A build has a budget, 120 seconds
 unless the server is started with `--build-budget-seconds`; one that raises,
 or has not finished within it, leaves its seat `unavailable`. Its `failure`
 is `UnavailableError` for a controller that finds it cannot play after all
@@ -566,7 +550,5 @@ or was not judged.
 Edit the definitions, regenerate the schema with
 `python -m poker_house_server.schema`, regenerate the client's types with
 `npm run generate:contract` in `apps/web`, and update this document. A
-change a client could break on also raises `CONTRACT_VERSION` in
-`contract.py` and in the client's `src/session/decode.ts`, together.
 `schema_test.py` fails while the checked-in schema is stale, and the client's
 contract test while its types are.

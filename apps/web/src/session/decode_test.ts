@@ -26,7 +26,6 @@ function response(
 }
 
 const HEALTH = JSON.stringify({
-  contract_version: 10,
   version: '1.0',
   revision: null,
   capabilities: {
@@ -49,7 +48,6 @@ describe('decode bodies', () => {
 
   it('turns an error body into a ContractError with its code', async () => {
     const body = JSON.stringify({
-      contract_version: 10,
       code: 'illegal_action',
       message: 'Action 9 is not legal.',
       seat: 1,
@@ -77,19 +75,9 @@ describe('decode bodies', () => {
 });
 
 describe('decode failures', () => {
-  it('refuses another contract version', async () => {
-    const body = HEALTH.replace(
-      '"contract_version":10',
-      '"contract_version":6',
-    );
-    await expect(decode(response(body), 'health')).rejects.toThrow(
-      'does not speak contract version 10',
-    );
-  });
-
   it('refuses a JSON value that is not an object', async () => {
     await expect(decode(response('[1]'), 'health')).rejects.toThrow(
-      'does not speak contract version 10',
+      'not an object',
     );
   });
 
@@ -101,7 +89,6 @@ describe('decode failures', () => {
 
   it('refuses an error body outside the contract', async () => {
     const body = JSON.stringify({
-      contract_version: 10,
       code: 'teapot',
       message: 'Refused.',
       seat: null,

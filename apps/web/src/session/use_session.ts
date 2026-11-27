@@ -15,7 +15,7 @@
 import {useEffect, useState, useSyncExternalStore} from 'react';
 
 import type {Viewer} from '../contract/contract.ts';
-import {type SessionClient, sameViewer} from './client.ts';
+import {type SessionClient, sameViewer, viewerParameter} from './client.ts';
 import {
   type SessionCommands,
   type SessionSnapshot,
@@ -46,6 +46,14 @@ export function useSession(client: SessionClient, viewer: Viewer): Session {
     store.setViewer(viewer);
   }, [store, viewer]);
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const id = snapshot.frame?.session.id ?? null;
+  const shown = viewerParameter(viewer);
+  useEffect(() => {
+    if (id === null) return undefined;
+    return client.events(id, viewer, store.receive);
+    // `shown` names the viewer, whose object may change without it changing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, store, id, shown]);
   // Until the effect passes a new viewer on, the store holds the old one's
   // frame.
   const frame =

@@ -136,7 +136,6 @@ export function boardFrame({
 }: FrameOptions = {}): Frame {
   const omniscient = viewer.kind === 'oracle' || !hidesInformation;
   return {
-    contract_version: 10,
     session: {
       id,
       game: 'board',

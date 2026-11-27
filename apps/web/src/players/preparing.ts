@@ -13,12 +13,9 @@
 // limitations under the License.
 
 // A seat whose controller the server is still building: it does not move
-// until it is ready, and the client fetches the frame again until then.
+// until it is ready, and the server pushes the frame that shows it ready.
 
 import type {Controller, Frame, SeatView} from '../contract/contract.ts';
-
-/** How long the client waits between fetches while a seat prepares. */
-export const PREPARING_POLL_MS = 1000;
 
 /** "Preparing MCTS…": what a preparing seat shows in place of its name. */
 export function preparingText(
