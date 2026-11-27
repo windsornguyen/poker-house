@@ -38,6 +38,9 @@ importers:
       dockview-core:
         specifier: 4.13.1
         version: 4.13.1
+      jose:
+        specifier: 6.2.18
+        version: 6.2.18
       react:
         specifier: 19.3.1
         version: 19.3.1
@@ -1971,6 +1974,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  jose@6.2.18:
+    resolution: {integrity: sha512-doV4thUwgkrycJH4yLeqwTGIIZphHl+pk7CPReuMIhYhncmgzdko85MaCG4YQFTxqMFr1/oEH32tZuKKovcDEg==}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -4258,6 +4264,8 @@ snapshots:
   isbot@5.2.4: {}
 
   isexe@2.0.0: {}
+
+  jose@6.2.18: {}
 
   js-tokens@4.0.0: {}
 
