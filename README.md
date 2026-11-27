@@ -1,4 +1,8 @@
-# Poker House
+# Doggybank
+
+<div align="center">
+  <img src="docs/doggybank.webp" alt="A long dachshund carrying stacks of poker chips and a fanned hand of cards on its back" width="720">
+</div>
 
 A heads-up poker arena for independently hosted strategy bots. The server
 deals no-limit Texas Hold'em, sends each bot its private JSON observation,

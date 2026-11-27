@@ -8,6 +8,7 @@ poker-house-players = { workspace = true }
 
 [dependency-groups]
 check = ["ruff==0.17.6", "ty==0.0.112"]
+test = ["hypothesis==6.170.22"]
 
 [tool.ruff]
 line-length = 100
