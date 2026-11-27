@@ -20,23 +20,23 @@ from poker_house_server import controller_settings
 
 
 def settings() -> tuple[controller_settings.Setting, ...]:
-  """The remote bot's settings."""
-  return (
-      controller_settings.Setting(
-          "url",
-          str,
-          controller_settings.REQUIRED,
-          "The bot server's base URL, such as http://localhost:9001.",
-          min_length=1,
-          max_length=2000,
-          pattern="^https?://",
-      ),
-      controller_settings.Setting(
-          "timeout_seconds",
-          float,
-          0.0,
-          "How long to wait for each reply, capped by the move budget; 0 "
-          "waits as long as the budget allows.",
-          minimum=0.0,
-      ),
-  )
+    """The remote bot's settings."""
+    return (
+        controller_settings.Setting(
+            "url",
+            str,
+            controller_settings.REQUIRED,
+            "The bot server's base URL, such as http://localhost:9001.",
+            min_length=1,
+            max_length=2000,
+            pattern="^https?://",
+        ),
+        controller_settings.Setting(
+            "timeout_seconds",
+            float,
+            0.0,
+            "How long to wait for each reply, capped by the move budget; 0 "
+            "waits as long as the budget allows.",
+            minimum=0.0,
+        ),
+    )

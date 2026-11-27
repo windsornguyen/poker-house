@@ -43,7 +43,6 @@ cards in the analysis view, so share it only with trusted players.
 
 ```sh
 uv run --all-packages python -m unittest discover -s apps/server/tests -p '*_test.py'
-uv run pyink --check --config apps/server/pyproject.toml apps/server/src apps/server/tests
-uv run pylint --rcfile apps/server/pyproject.toml apps/server/src/poker_house_server apps/server/tests
-uv run mypy --config-file apps/server/pyproject.toml apps/server/src/poker_house_server apps/server/tests
+uv run ruff format --check && uv run ruff check
+uv run ty check
 ```

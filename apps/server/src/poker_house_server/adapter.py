@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # Modified for Poker House.
-
-
 """The interface of a game adapter, which draws a position for one viewer.
 
 An adapter turns a state into a JSON view for one viewer, holding only what
@@ -23,8 +21,8 @@ builds a frame's presentation from them.
 """
 
 import abc
-from collections.abc import Mapping, Sequence
 import dataclasses
+from collections.abc import Mapping, Sequence
 
 import pyspiel
 
@@ -33,71 +31,67 @@ from poker_house_server import contract
 
 @dataclasses.dataclass(frozen=True)
 class Viewpoint:
-  """Who an adapter presents a position to.
+    """Who an adapter presents a position to.
 
-  Attributes:
-    seat: The viewer's seat; None for the oracle and for a spectator.
-    omniscient: Whether the viewer may see the full state.
-  """
+    Attributes:
+      seat: The viewer's seat; None for the oracle and for a spectator.
+      omniscient: Whether the viewer may see the full state.
+    """
 
-  seat: int | None
-  omniscient: bool
+    seat: int | None
+    omniscient: bool
 
-  def sees_private(self, seat: int) -> bool:
-    """Whether the viewer may see `seat`'s private information."""
-    return self.omniscient or self.seat == seat
+    def sees_private(self, seat: int) -> bool:
+        """Whether the viewer may see `seat`'s private information."""
+        return self.omniscient or self.seat == seat
 
 
 class Adapter(abc.ABC):
-  """Presents one game's positions to its client renderer.
+    """Presents one game's positions to its client renderer.
 
-  Attributes:
-    renderer: The name of the client renderer that draws the view.
-  """
-
-  renderer: str
-
-  def supports(self, game: pyspiel.Game) -> bool:
-    """Whether this adapter draws the game's configured variant."""
-    del game
-    return True
-
-  @abc.abstractmethod
-  def present(
-      self, state: pyspiel.State, viewpoint: Viewpoint
-  ) -> dict[str, contract.JsonValue]:
-    """Returns the view of `state` for `viewpoint`, as JSON-safe values.
-
-    The view holds nothing the viewer may not see.
+    Attributes:
+      renderer: The name of the client renderer that draws the view.
     """
 
-  def describe_actions(
-      self,
-      state: pyspiel.State,
-      actions: Sequence[int],
-      viewpoint: Viewpoint,
-  ) -> Mapping[int, contract.JsonValue]:
-    """Returns a hint for each of `actions` the renderer can place.
+    renderer: str
 
-    Called only when the viewer is given the legal actions, which are the
-    acting seat's. An action left out has no hint; the client still offers
-    it in its list of legal actions.
-    """
-    del state, actions, viewpoint
-    return {}
+    def supports(self, game: pyspiel.Game) -> bool:
+        """Whether this adapter draws the game's configured variant."""
+        del game
+        return True
 
-  # The default hides every action; None is its answer, not a fall-through.
-  # pylint: disable-next=useless-return
-  def public_action_label(
-      self, state: pyspiel.State, action: int
-  ) -> str | None:
-    """Returns what a viewer who may not see `action` may read of it.
+    @abc.abstractmethod
+    def present(self, state: pyspiel.State, viewpoint: Viewpoint) -> dict[str, contract.JsonValue]:
+        """Returns the view of `state` for `viewpoint`, as JSON-safe values.
 
-    Called with the state before `action` (an action or a chance outcome) is
-    applied. The label is shown in place of the withheld action to every
-    viewer but the seat that acted and an omniscient viewer, so it names only
-    what the rules make public: a card discarded face up, a draw from a
-    face-up pile. None, the default, keeps the action hidden.
-    """
-    del state, action
-    return None
+        The view holds nothing the viewer may not see.
+        """
+
+    def describe_actions(
+        self,
+        state: pyspiel.State,
+        actions: Sequence[int],
+        viewpoint: Viewpoint,
+    ) -> Mapping[int, contract.JsonValue]:
+        """Returns a hint for each of `actions` the renderer can place.
+
+        Called only when the viewer is given the legal actions, which are the
+        acting seat's. An action left out has no hint; the client still offers
+        it in its list of legal actions.
+        """
+        del state, actions, viewpoint
+        return {}
+
+    # The default hides every action; None is its answer, not a fall-through.
+
+    def public_action_label(self, state: pyspiel.State, action: int) -> str | None:
+        """Returns what a viewer who may not see `action` may read of it.
+
+        Called with the state before `action` (an action or a chance outcome) is
+        applied. The label is shown in place of the withheld action to every
+        viewer but the seat that acted and an omniscient viewer, so it names only
+        what the rules make public: a card discarded face up, a draw from a
+        face-up pile. None, the default, keeps the action hidden.
+        """
+        del state, action
+        return None

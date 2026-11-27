@@ -22,53 +22,52 @@ what each viewer is shown, and the controllers, which may read the full state,
 decide from `hides_information`.
 """
 
-from poker_house_server import contract
-from poker_house_server import wire
 import pyspiel
+
+from poker_house_server import contract, wire
 
 _PERFECT = pyspiel.GameType.Information.PERFECT_INFORMATION
 
 # Games that declare perfect information although their state holds something
 # a player must not see. They are served as hiding information, and their
 # information state strings, which print the hidden part, are withheld.
-HIDDEN_DESPITE_DECLARATION = frozenset({
-    "python_hangman",  # The state holds the word the guesser looks for.
-})
+HIDDEN_DESPITE_DECLARATION = frozenset(
+    {
+        "python_hangman",  # The state holds the word the guesser looks for.
+    }
+)
 
 
 def hides_information(game_type: pyspiel.GameType) -> bool:
-  """Whether a game of this type may hide part of its state from a player.
+    """Whether a game of this type may hide part of its state from a player.
 
-  Args:
-    game_type: The type of a game as it is served. OpenSpiel's turn-based
-      wrapper declares imperfect information, since it hides the moves made
-      simultaneously, so a wrapped game hides information.
+    Args:
+      game_type: The type of a game as it is served. OpenSpiel's turn-based
+        wrapper declares imperfect information, since it hides the moves made
+        simultaneously, so a wrapped game hides information.
 
-  Returns:
-    True if the type does not declare perfect information or its game is listed
-    in `HIDDEN_DESPITE_DECLARATION`.
-  """
-  return (
-      game_type.information != _PERFECT
-      or game_type.short_name in HIDDEN_DESPITE_DECLARATION
-  )
+    Returns:
+      True if the type does not declare perfect information or its game is listed
+      in `HIDDEN_DESPITE_DECLARATION`.
+    """
+    return game_type.information != _PERFECT or game_type.short_name in HIDDEN_DESPITE_DECLARATION
 
 
 def observation_struct(state: pyspiel.State, seat: int) -> contract.JsonValue:
-  """Returns the seat's structured observation, or None when withheld.
+    """Returns the seat's structured observation, or None when withheld.
 
-  The game's observation API supplies only that player's view. A game that
-  does not implement it raises SpielError; callers decide whether absence
-  is acceptable for their consumer.
-  """
-  struct = state.to_observation_struct(seat)
-  observed = contract.to_json(wire.parse(struct.to_json().encode("utf-8")))
-  # STRUCT-GLUE(hearts ObservationStruct): passing can reveal received cards
-  # before the seat's own pass; no consumer may see this struct in that phase.
-  if (
-      state.get_game().get_type().short_name == "hearts"
-      and isinstance(observed, dict)
-      and observed["phase"] == "Pass"
-  ):
-    return None
-  return observed
+    The game's observation API supplies only that player's view. A game that
+    does not implement it raises SpielError; callers decide whether absence
+    is acceptable for their consumer.
+    """
+    struct = state.to_observation_struct(seat)
+    observed = contract.to_json(wire.parse(struct.to_json().encode("utf-8")))
+    # STRUCT-GLUE(hearts ObservationStruct): passing can reveal received cards
+    # before the seat's own pass; no consumer may see this struct in that phase.
+    if (
+        state.get_game().get_type().short_name == "hearts"
+        and isinstance(observed, dict)
+        and observed["phase"] == "Pass"
+    ):
+        return None
+    return observed

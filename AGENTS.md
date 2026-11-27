@@ -11,7 +11,7 @@ observations and return engine-supplied legal action IDs.
 - `packages/python/engine`: OpenSpiel adapter around PokerKit.
 
 Preserve upstream Apache-2.0 notices and record copied code in `NOTICE`.
-Python uses two-space indentation and pyink. TypeScript uses strict types
+Python follows the Dedalus python.mdx style, enforced by ruff. TypeScript uses strict types
 and the client ESLint/Prettier configuration. New functions are typed.
 Use the existing typed JSON contract; regenerate client types from the
 Python schema. Test privacy, legal actions, and payouts before changing them.

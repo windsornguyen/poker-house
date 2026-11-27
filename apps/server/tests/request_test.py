@@ -17,34 +17,28 @@
 
 from absl.testing import absltest
 
-from poker_house_server import contract
-from poker_house_server import request
+from poker_house_server import contract, request
 
 
 class RequestTest(absltest.TestCase):
+    def test_a_human_seat_cannot_autoplay(self) -> None:
+        with self.assertRaisesRegex(ValueError, "human seat"):
+            request.SeatConfig(contract.HUMAN, {}, True)
+        self.assertTrue(request.SeatConfig("mcts", {}, True).autoplay)
 
-  def test_a_human_seat_cannot_autoplay(self) -> None:
-    with self.assertRaisesRegex(ValueError, "human seat"):
-      request.SeatConfig(contract.HUMAN, {}, True)
-    self.assertTrue(request.SeatConfig("mcts", {}, True).autoplay)
+    def test_a_seed_is_not_negative(self) -> None:
+        with self.assertRaisesRegex(ValueError, "seed -1"):
+            request.CreateSession("kuhn_poker", {}, (), contract.ChancePolicy.AUTO, -1)
+        request.CreateSession("kuhn_poker", {}, (), contract.ChancePolicy.AUTO, 0)
 
-  def test_a_seed_is_not_negative(self) -> None:
-    with self.assertRaisesRegex(ValueError, "seed -1"):
-      request.CreateSession(
-          "kuhn_poker", {}, (), contract.ChancePolicy.AUTO, -1
-      )
-    request.CreateSession("kuhn_poker", {}, (), contract.ChancePolicy.AUTO, 0)
-
-  def test_an_advance_applies_a_bounded_number_of_actions(self) -> None:
-    with self.assertRaisesRegex(ValueError, "at most 0"):
-      request.Advance(max_plies=0)
-    with self.assertRaisesRegex(ValueError, "from 1 to 1000"):
-      request.Advance(max_plies=request.MAX_ADVANCE_PLIES + 1)
-    self.assertEqual(request.Advance(max_plies=1).limit, 1)
-    self.assertEqual(
-        request.Advance(max_plies=None).limit, request.MAX_ADVANCE_PLIES
-    )
+    def test_an_advance_applies_a_bounded_number_of_actions(self) -> None:
+        with self.assertRaisesRegex(ValueError, "at most 0"):
+            request.Advance(max_plies=0)
+        with self.assertRaisesRegex(ValueError, "from 1 to 1000"):
+            request.Advance(max_plies=request.MAX_ADVANCE_PLIES + 1)
+        self.assertEqual(request.Advance(max_plies=1).limit, 1)
+        self.assertEqual(request.Advance(max_plies=None).limit, request.MAX_ADVANCE_PLIES)
 
 
 if __name__ == "__main__":
-  absltest.main()
+    absltest.main()

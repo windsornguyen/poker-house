@@ -22,39 +22,37 @@ from poker_house_server import contract
 
 @dataclasses.dataclass(frozen=True)
 class Capabilities:
-  """What the server can do, independent of any one game.
+    """What the server can do, independent of any one game.
 
-  Attributes:
-    controllers: Every registered controller, starting with the human one.
-    chance_policies: The chance policies the server accepts.
-    cpp_mcts_limits: How the served pyspiel's C++ MCTS bounds a search, and
-      so which limits MCTS plays with.
-  """
+    Attributes:
+      controllers: Every registered controller, starting with the human one.
+      chance_policies: The chance policies the server accepts.
+      cpp_mcts_limits: How the served pyspiel's C++ MCTS bounds a search, and
+        so which limits MCTS plays with.
+    """
 
-  controllers: tuple[contract.Controller, ...]
-  chance_policies: tuple[contract.ChancePolicy, ...]
-  cpp_mcts_limits: contract.MctsLimits
+    controllers: tuple[contract.Controller, ...]
+    chance_policies: tuple[contract.ChancePolicy, ...]
+    cpp_mcts_limits: contract.MctsLimits
 
-  def __post_init__(self) -> None:
-    contract.require(
-        bool(self.controllers) and self.controllers[0].name == contract.HUMAN,
-        "The human controller is listed first.",
-    )
-    contract.require(
-        bool(self.chance_policies), "The server accepts a chance policy."
-    )
+    def __post_init__(self) -> None:
+        contract.require(
+            bool(self.controllers) and self.controllers[0].name == contract.HUMAN,
+            "The human controller is listed first.",
+        )
+        contract.require(bool(self.chance_policies), "The server accepts a chance policy.")
 
 
 @dataclasses.dataclass(frozen=True)
 class Health:
-  """The server's identity and capabilities.
+    """The server's identity and capabilities.
 
-  Attributes:
-    version: The installed OpenSpiel package's version.
-    revision: The source revision the server runs from, or null when unknown.
-    capabilities: What the server can do.
-  """
+    Attributes:
+      version: The installed OpenSpiel package's version.
+      revision: The source revision the server runs from, or null when unknown.
+      capabilities: What the server can do.
+    """
 
-  version: str
-  revision: str | None
-  capabilities: Capabilities
+    version: str
+    revision: str | None
+    capabilities: Capabilities

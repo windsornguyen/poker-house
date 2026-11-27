@@ -24,180 +24,176 @@ refusal the same way: `to_error()` gives the body, and its code the status.
 import dataclasses
 import enum
 import http
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from poker_house_server import contract
 
 
 class ErrorCode(enum.StrEnum):
-  """Why a request was refused.
+    """Why a request was refused.
 
-  Attributes:
-    BAD_REQUEST: The request is malformed.
-    NOT_FOUND: The session, game, seat or ply does not exist.
-    METHOD_NOT_ALLOWED: The path exists but does not accept the method.
-    GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.
-    VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.
-    NOT_YOUR_TURN: The viewer may not choose the next action.
-    ILLEGAL_ACTION: The action is not legal at the position.
-    CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its
-      settings do not satisfy its `config_schema`.
-    CONTROLLER_FAILED: A seat's controller failed and the session is paused.
-    NOTHING_TO_UNDO: The live game has no action to undo.
-  """
+    Attributes:
+      BAD_REQUEST: The request is malformed.
+      NOT_FOUND: The session, game, seat or ply does not exist.
+      METHOD_NOT_ALLOWED: The path exists but does not accept the method.
+      GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.
+      VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.
+      NOT_YOUR_TURN: The viewer may not choose the next action.
+      ILLEGAL_ACTION: The action is not legal at the position.
+      CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its
+        settings do not satisfy its `config_schema`.
+      CONTROLLER_FAILED: A seat's controller failed and the session is paused.
+      NOTHING_TO_UNDO: The live game has no action to undo.
+    """
 
-  BAD_REQUEST = "bad_request"
-  NOT_FOUND = "not_found"
-  METHOD_NOT_ALLOWED = "method_not_allowed"
-  GAME_UNAVAILABLE = "game_unavailable"
-  VIEWER_UNAVAILABLE = "viewer_unavailable"
-  NOT_YOUR_TURN = "not_your_turn"
-  ILLEGAL_ACTION = "illegal_action"
-  CONTROLLER_UNAVAILABLE = "controller_unavailable"
-  CONTROLLER_FAILED = "controller_failed"
-  NOTHING_TO_UNDO = "nothing_to_undo"
+    BAD_REQUEST = "bad_request"
+    NOT_FOUND = "not_found"
+    METHOD_NOT_ALLOWED = "method_not_allowed"
+    GAME_UNAVAILABLE = "game_unavailable"
+    VIEWER_UNAVAILABLE = "viewer_unavailable"
+    NOT_YOUR_TURN = "not_your_turn"
+    ILLEGAL_ACTION = "illegal_action"
+    CONTROLLER_UNAVAILABLE = "controller_unavailable"
+    CONTROLLER_FAILED = "controller_failed"
+    NOTHING_TO_UNDO = "nothing_to_undo"
 
-  @property
-  def http_status(self) -> http.HTTPStatus:
-    """The HTTP status a response with this code carries."""
-    if self == ErrorCode.BAD_REQUEST:
-      return http.HTTPStatus.BAD_REQUEST
-    if self == ErrorCode.NOT_FOUND:
-      return http.HTTPStatus.NOT_FOUND
-    if self == ErrorCode.METHOD_NOT_ALLOWED:
-      return http.HTTPStatus.METHOD_NOT_ALLOWED
-    return http.HTTPStatus.CONFLICT
+    @property
+    def http_status(self) -> http.HTTPStatus:
+        """The HTTP status a response with this code carries."""
+        if self == ErrorCode.BAD_REQUEST:
+            return http.HTTPStatus.BAD_REQUEST
+        if self == ErrorCode.NOT_FOUND:
+            return http.HTTPStatus.NOT_FOUND
+        if self == ErrorCode.METHOD_NOT_ALLOWED:
+            return http.HTTPStatus.METHOD_NOT_ALLOWED
+        return http.HTTPStatus.CONFLICT
 
 
 @dataclasses.dataclass(frozen=True)
 class Error:
-  """A refused request.
+    """A refused request.
 
-  Attributes:
-    code: Why the request was refused.
-    message: A human-readable explanation, safe to show the requester: it
-      never holds state the requester may not see.
-    seat: The seat the refusal concerns, or null.
-    ply: The index of the history entry the refusal concerns, or null.
-  """
+    Attributes:
+      code: Why the request was refused.
+      message: A human-readable explanation, safe to show the requester: it
+        never holds state the requester may not see.
+      seat: The seat the refusal concerns, or null.
+      ply: The index of the history entry the refusal concerns, or null.
+    """
 
-  code: ErrorCode
-  message: str
-  seat: int | None = None
-  ply: int | None = None
+    code: ErrorCode
+    message: str
+    seat: int | None = None
+    ply: int | None = None
 
-  def __post_init__(self) -> None:
-    contract.require(
-        self.seat is None or self.seat >= 0,
-        f"An error cannot concern seat {self.seat}.",
-    )
-    contract.require(
-        self.ply is None or self.ply >= 0,
-        f"An error cannot concern ply {self.ply}.",
-    )
+    def __post_init__(self) -> None:
+        contract.require(
+            self.seat is None or self.seat >= 0,
+            f"An error cannot concern seat {self.seat}.",
+        )
+        contract.require(
+            self.ply is None or self.ply >= 0,
+            f"An error cannot concern ply {self.ply}.",
+        )
 
 
 class RequestError(Exception):
-  """A refused request; subclasses fix the contract's code.
+    """A refused request; subclasses fix the contract's code.
 
-  `RequestError` itself has no code and cannot be raised; every subclass
-  declares one, which is checked when the subclass is defined.
+    `RequestError` itself has no code and cannot be raised; every subclass
+    declares one, which is checked when the subclass is defined.
 
-  Attributes:
-    code: Why the request was refused.
-    seat: The seat the refusal concerns, or None.
-    ply: The index of the history entry the refusal concerns, or None.
-  """
+    Attributes:
+      code: Why the request was refused.
+      seat: The seat the refusal concerns, or None.
+      ply: The index of the history entry the refusal concerns, or None.
+    """
 
-  code: ClassVar[ErrorCode]
+    code: ClassVar[ErrorCode]
 
-  def __init_subclass__(cls, **kwargs: Any) -> None:
-    super().__init_subclass__(**kwargs)
-    if not isinstance(getattr(cls, "code", None), ErrorCode):
-      raise TypeError(f"{cls.__name__} declares no ErrorCode `code`.")
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        if not isinstance(getattr(cls, "code", None), ErrorCode):
+            raise TypeError(f"{cls.__name__} declares no ErrorCode `code`.")
 
-  def __init__(
-      self, message: str, *, seat: int | None = None, ply: int | None = None
-  ) -> None:
-    if not isinstance(getattr(self, "code", None), ErrorCode):
-      raise TypeError("Raise a subclass of RequestError, which has a code.")
-    super().__init__(message)
-    self.seat = seat
-    self.ply = ply
+    def __init__(self, message: str, *, seat: int | None = None, ply: int | None = None) -> None:
+        if not isinstance(getattr(self, "code", None), ErrorCode):
+            raise TypeError("Raise a subclass of RequestError, which has a code.")
+        super().__init__(message)
+        self.seat = seat
+        self.ply = ply
 
-  def to_error(self) -> Error:
-    """Returns the refusal as the contract's error body."""
-    return Error(
-        code=self.code, message=str(self), seat=self.seat, ply=self.ply
-    )
+    def to_error(self) -> Error:
+        """Returns the refusal as the contract's error body."""
+        return Error(code=self.code, message=str(self), seat=self.seat, ply=self.ply)
 
 
 class BadRequestError(RequestError):
-  """The request is malformed."""
+    """The request is malformed."""
 
-  code = ErrorCode.BAD_REQUEST
+    code = ErrorCode.BAD_REQUEST
 
 
 class NotFoundError(RequestError):
-  """The session, game, seat or ply does not exist."""
+    """The session, game, seat or ply does not exist."""
 
-  code = ErrorCode.NOT_FOUND
+    code = ErrorCode.NOT_FOUND
 
 
 class MethodNotAllowedError(RequestError):
-  """The path exists but does not accept the method."""
+    """The path exists but does not accept the method."""
 
-  code = ErrorCode.METHOD_NOT_ALLOWED
+    code = ErrorCode.METHOD_NOT_ALLOWED
 
 
 class GameUnavailableError(RequestError):
-  """The game cannot be served."""
+    """The game cannot be served."""
 
-  code = ErrorCode.GAME_UNAVAILABLE
+    code = ErrorCode.GAME_UNAVAILABLE
 
 
 class ViewerUnavailableError(RequestError):
-  """The game cannot build a frame for the viewer."""
+    """The game cannot build a frame for the viewer."""
 
-  code = ErrorCode.VIEWER_UNAVAILABLE
+    code = ErrorCode.VIEWER_UNAVAILABLE
 
 
 class NotYourTurnError(RequestError):
-  """The viewer may not choose the next action."""
+    """The viewer may not choose the next action."""
 
-  code = ErrorCode.NOT_YOUR_TURN
+    code = ErrorCode.NOT_YOUR_TURN
 
 
 class IllegalActionError(RequestError):
-  """The action is not legal at the position."""
+    """The action is not legal at the position."""
 
-  code = ErrorCode.ILLEGAL_ACTION
+    code = ErrorCode.ILLEGAL_ACTION
 
 
 class ControllerUnavailableError(RequestError):
-  """The controller cannot play the game with the given settings."""
+    """The controller cannot play the game with the given settings."""
 
-  code = ErrorCode.CONTROLLER_UNAVAILABLE
+    code = ErrorCode.CONTROLLER_UNAVAILABLE
 
 
 class ControllerFailedError(RequestError):
-  """A seat's controller failed, so the session is paused.
+    """A seat's controller failed, so the session is paused.
 
-  The message names only the seat: what the controller raised may describe
-  private state, so it reaches only an omniscient viewer, as the seat's
-  `failure.message` in a frame.
-  """
+    The message names only the seat: what the controller raised may describe
+    private state, so it reaches only an omniscient viewer, as the seat's
+    `failure.message` in a frame.
+    """
 
-  code = ErrorCode.CONTROLLER_FAILED
+    code = ErrorCode.CONTROLLER_FAILED
 
-  def __init__(self, *, seat: int) -> None:
-    super().__init__(
-        f"Seat {seat}'s controller failed; undo, reset or change it.",
-        seat=seat,
-    )
+    def __init__(self, *, seat: int) -> None:
+        super().__init__(
+            f"Seat {seat}'s controller failed; undo, reset or change it.",
+            seat=seat,
+        )
 
 
 class NothingToUndoError(RequestError):
-  """The live game has no action to undo."""
+    """The live game has no action to undo."""
 
-  code = ErrorCode.NOTHING_TO_UNDO
+    code = ErrorCode.NOTHING_TO_UNDO

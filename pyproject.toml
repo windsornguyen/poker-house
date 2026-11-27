@@ -6,10 +6,25 @@ poker-house-engine = { workspace = true }
 poker-house-server = { workspace = true }
 
 [dependency-groups]
-check = ["mypy==2.4.0", "pyink==24.10.1", "pylint==4.1.3"]
+check = ["ruff==0.17.6", "ty==0.0.112"]
 
-[tool.pyink]
-line-length = 80
-unstable = true
-pyink-indentation = 2
-pyink-use-majority-quotes = true
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ANN", "RET"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["poker_house_engine", "poker_house_server"]
+
+[tool.ty.environment]
+python = "./.venv"
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"

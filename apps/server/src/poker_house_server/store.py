@@ -25,108 +25,106 @@ new session displaces the one used least recently.
 """
 
 import collections
-from collections.abc import Mapping, Sequence
 import threading
+from collections.abc import Mapping, Sequence
 
-from poker_house_server import contract
+from poker_house_server import contract, errors
 from poker_house_server import controllers as controllers_lib
-from poker_house_server import errors
 from poker_house_server import session as session_lib
-
 
 # The most sessions a store keeps, far more than the tabs one person opens.
 DEFAULT_CAPACITY = 256
 
 
 class SessionStore:
-  """The sessions a server holds, keyed by id, least recently used first."""
+    """The sessions a server holds, keyed by id, least recently used first."""
 
-  def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
-    """Starts an empty store that keeps at most `capacity` sessions."""
-    if capacity < 1:
-      raise ValueError(f"A store keeps at least one session, not {capacity}.")
-    self._capacity = capacity
-    self._sessions: collections.OrderedDict[str, session_lib.Session] = (
-        collections.OrderedDict()
-    )
-    self._lock = threading.Lock()
+    def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
+        """Starts an empty store that keeps at most `capacity` sessions."""
+        if capacity < 1:
+            raise ValueError(f"A store keeps at least one session, not {capacity}.")
+        self._capacity = capacity
+        self._sessions: collections.OrderedDict[str, session_lib.Session] = (
+            collections.OrderedDict()
+        )
+        self._lock = threading.Lock()
 
-  def create(
-      self,
-      game_name: str,
-      parameters: Mapping[str, contract.ParameterValue],
-      *,
-      seed: int | None = None,
-      chance_policy: contract.ChancePolicy,
-      controllers: Sequence[controllers_lib.Spec],
-      autoplay: Sequence[bool] = (),
-  ) -> session_lib.Session:
-    """Starts a session and stores it; see `session.Session.create`.
+    def create(
+        self,
+        game_name: str,
+        parameters: Mapping[str, contract.ParameterValue],
+        *,
+        seed: int | None = None,
+        chance_policy: contract.ChancePolicy,
+        controllers: Sequence[controllers_lib.Spec],
+        autoplay: Sequence[bool] = (),
+    ) -> session_lib.Session:
+        """Starts a session and stores it; see `session.Session.create`.
 
-    When the store is full, the session used least recently is forgotten.
+        When the store is full, the session used least recently is forgotten.
 
-    Args:
-      game_name: A registered short name.
-      parameters: Game parameters; omitted ones take their defaults.
-      seed: Seeds every chance outcome and controller; None: a random seed.
-      chance_policy: How chance nodes are resolved.
-      controllers: Who plays each seat, in seat order.
-      autoplay: Whether each seat's controller plays as soon as it is to move,
-        in seat order; empty for none.
+        Args:
+          game_name: A registered short name.
+          parameters: Game parameters; omitted ones take their defaults.
+          seed: Seeds every chance outcome and controller; None: a random seed.
+          chance_policy: How chance nodes are resolved.
+          controllers: Who plays each seat, in seat order.
+          autoplay: Whether each seat's controller plays as soon as it is to move,
+            in seat order; empty for none.
 
-    Returns:
-      The session started.
+        Returns:
+          The session started.
 
-    Raises:
-      errors.RequestError: If the session cannot be started.
-    """
-    session = session_lib.Session.create(
-        game_name,
-        parameters,
-        seed=seed,
-        chance_policy=chance_policy,
-        controllers=controllers,
-        autoplay=autoplay,
-    )
-    with self._lock:
-      self._sessions[session.id] = session
-      while len(self._sessions) > self._capacity:
-        self._sessions.popitem(last=False)[1].close()
-    return session
+        Raises:
+          errors.RequestError: If the session cannot be started.
+        """
+        session = session_lib.Session.create(
+            game_name,
+            parameters,
+            seed=seed,
+            chance_policy=chance_policy,
+            controllers=controllers,
+            autoplay=autoplay,
+        )
+        with self._lock:
+            self._sessions[session.id] = session
+            while len(self._sessions) > self._capacity:
+                self._sessions.popitem(last=False)[1].close()
+        return session
 
-  def get(self, session_id: str) -> session_lib.Session:
-    """Returns the session with id `session_id`.
+    def get(self, session_id: str) -> session_lib.Session:
+        """Returns the session with id `session_id`.
 
-    Args:
-      session_id: The id of the session.
+        Args:
+          session_id: The id of the session.
 
-    Raises:
-      errors.NotFoundError: If there is no such session, or it was forgotten
-        to make room for newer ones.
-    """
-    with self._lock:
-      session = self._sessions.get(session_id)
-      if session is not None:
-        self._sessions.move_to_end(session_id)
-    if session is None:
-      raise errors.NotFoundError(f"There is no session {session_id!r}.")
-    return session
+        Raises:
+          errors.NotFoundError: If there is no such session, or it was forgotten
+            to make room for newer ones.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is not None:
+                self._sessions.move_to_end(session_id)
+        if session is None:
+            raise errors.NotFoundError(f"There is no session {session_id!r}.")
+        return session
 
-  def delete(self, session_id: str) -> None:
-    """Forgets the session with id `session_id`.
+    def delete(self, session_id: str) -> None:
+        """Forgets the session with id `session_id`.
 
-    Args:
-      session_id: The id of the session.
+        Args:
+          session_id: The id of the session.
 
-    Raises:
-      errors.NotFoundError: If there is no such session.
-    """
-    with self._lock:
-      session = self._sessions.pop(session_id, None)
-    if session is None:
-      raise errors.NotFoundError(f"There is no session {session_id!r}.")
-    session.close()
+        Raises:
+          errors.NotFoundError: If there is no such session.
+        """
+        with self._lock:
+            session = self._sessions.pop(session_id, None)
+        if session is None:
+            raise errors.NotFoundError(f"There is no session {session_id!r}.")
+        session.close()
 
-  def __len__(self) -> int:
-    with self._lock:
-      return len(self._sessions)
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._sessions)

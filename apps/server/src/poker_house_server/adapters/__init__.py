@@ -22,13 +22,15 @@ adapter listed. An adapter stands alone, so a game can replace its adapter
 without touching another.
 """
 
-from collections.abc import Mapping
 import types
+from collections.abc import Mapping
 
 from poker_house_server import adapter
 from poker_house_server.adapters import pokerkit_adapter
 
-ADAPTERS: Mapping[str, adapter.Adapter] = types.MappingProxyType({
-    pokerkit_adapter.GAME: pokerkit_adapter.ADAPTER,
-    pokerkit_adapter.ACPC_GAME: pokerkit_adapter.ADAPTER,
-})
+ADAPTERS: Mapping[str, adapter.Adapter] = types.MappingProxyType(
+    {
+        pokerkit_adapter.GAME: pokerkit_adapter.ADAPTER,
+        pokerkit_adapter.ACPC_GAME: pokerkit_adapter.ADAPTER,
+    }
+)

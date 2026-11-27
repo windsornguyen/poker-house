@@ -43,10 +43,10 @@ GUI's own source. The reference remote bot server imports its bot's module
 through `import_named` too.
 """
 
-from collections.abc import Callable, Sequence
 import importlib
 import importlib.metadata
 import types
+from collections.abc import Callable, Sequence
 
 from absl import logging
 
@@ -63,128 +63,119 @@ RegisterInto = Callable[[types.ModuleType], object]
 
 
 class PluginError(Exception):
-  """A controller plugin could not be loaded or could not register."""
+    """A controller plugin could not be loaded or could not register."""
 
 
 def parse(value: str) -> tuple[str, ...]:
-  """Returns the plugin names in a `--controllers` value.
+    """Returns the plugin names in a `--controllers` value.
 
-  Args:
-    value: Comma-separated module names, `auto` among them if wanted.
+    Args:
+      value: Comma-separated module names, `auto` among them if wanted.
 
-  Raises:
-    PluginError: If a name is empty.
-  """
-  names = tuple(name.strip() for name in value.split(","))
-  if not all(names):
-    raise PluginError(
-        f"--controllers {value!r} has an empty name; give module names "
-        "separated by commas."
-    )
-  return names
+    Raises:
+      PluginError: If a name is empty.
+    """
+    names = tuple(name.strip() for name in value.split(","))
+    if not all(names):
+        raise PluginError(
+            f"--controllers {value!r} has an empty name; give module names separated by commas."
+        )
+    return names
 
 
 def load(names: Sequence[str]) -> tuple[str, ...]:
-  """Loads the plugins `names` gives, in order, each registering its bots.
+    """Loads the plugins `names` gives, in order, each registering its bots.
 
-  Args:
-    names: Module names, or `AUTO` for every plugin in ENTRY_POINT_GROUP.
+    Args:
+      names: Module names, or `AUTO` for every plugin in ENTRY_POINT_GROUP.
 
-  Returns:
-    The names of the controllers the plugins registered, in order.
+    Returns:
+      The names of the controllers the plugins registered, in order.
 
-  Raises:
-    PluginError: If a plugin cannot be imported, has no `register_into`, or
-      its `register_into` raises.
-  """
-  before = set(controllers.kinds())
-  for name in names:
-    if name == AUTO:
-      _load_entry_points()
-    else:
-      _register(f"module {name!r}", _module_hook(name))
-  added = tuple(kind for kind in controllers.kinds() if kind not in before)
-  logging.info("Controller plugins registered: %s", ", ".join(added) or "none")
-  return added
+    Raises:
+      PluginError: If a plugin cannot be imported, has no `register_into`, or
+        its `register_into` raises.
+    """
+    before = set(controllers.kinds())
+    for name in names:
+        if name == AUTO:
+            _load_entry_points()
+        else:
+            _register(f"module {name!r}", _module_hook(name))
+    added = tuple(kind for kind in controllers.kinds() if kind not in before)
+    logging.info("Controller plugins registered: %s", ", ".join(added) or "none")
+    return added
 
 
-def import_named(
-    name: str, what: str = "Controller plugin module"
-) -> types.ModuleType:
-  """Imports the module `name`, given on a command line.
+def import_named(name: str, what: str = "Controller plugin module") -> types.ModuleType:
+    """Imports the module `name`, given on a command line.
 
-  Besides controller plugins, the reference remote bot server
-  (`remote_bot_server --bot MODULE:FACTORY`) imports its bot's module here.
+    Besides controller plugins, the reference remote bot server
+    (`remote_bot_server --bot MODULE:FACTORY`) imports its bot's module here.
 
-  Args:
-    name: The module's dotted name.
-    what: What the module is, for the error.
+    Args:
+      name: The module's dotted name.
+      what: What the module is, for the error.
 
-  Raises:
-    PluginError: If the module cannot be imported, naming it.
-  """
-  try:
-    return importlib.import_module(name)
-  except Exception as e:
-    raise PluginError(
-        f"{what} {name!r} cannot be imported: {type(e).__name__}: {e}"
-    ) from e
+    Raises:
+      PluginError: If the module cannot be imported, naming it.
+    """
+    try:
+        return importlib.import_module(name)
+    except Exception as e:
+        raise PluginError(f"{what} {name!r} cannot be imported: {type(e).__name__}: {e}") from e
 
 
 def _module_hook(name: str) -> RegisterInto:
-  """Imports the plugin module `name` and returns its `register_into`."""
-  return _hook_of(import_named(name), f"module {name!r}")
+    """Imports the plugin module `name` and returns its `register_into`."""
+    return _hook_of(import_named(name), f"module {name!r}")
 
 
 def _hook_of(loaded: object, plugin: str) -> RegisterInto:
-  """Returns the `register_into` of a loaded module, or the callable itself."""
-  if isinstance(loaded, types.ModuleType):
-    hook = getattr(loaded, "register_into", None)
-    if not callable(hook):
-      raise PluginError(
-          f"Controller plugin {plugin} has no function register_into"
-          "(controllers)."
-      )
-    return hook  # type: ignore[no-any-return]
-  if not callable(loaded):
-    raise PluginError(
-        f"Controller plugin {plugin} is neither a module nor a callable "
-        f"register_into, but {type(loaded).__name__}."
-    )
-  return loaded
+    """Returns the `register_into` of a loaded module, or the callable itself."""
+    if isinstance(loaded, types.ModuleType):
+        hook = getattr(loaded, "register_into", None)
+        if not callable(hook):
+            raise PluginError(
+                f"Controller plugin {plugin} has no function register_into(controllers)."
+            )
+        return hook  # type: ignore[no-any-return]
+    if not callable(loaded):
+        raise PluginError(
+            f"Controller plugin {plugin} is neither a module nor a callable "
+            f"register_into, but {type(loaded).__name__}."
+        )
+    return loaded
 
 
 def _load_entry_points() -> None:
-  """Loads every plugin in ENTRY_POINT_GROUP, in name order."""
-  points = sorted(
-      importlib.metadata.entry_points(group=ENTRY_POINT_GROUP),
-      key=lambda point: (point.name, point.value),
-  )
-  if not points:
-    logging.warning(
-        "--controllers %s: no installed distribution declares an entry "
-        "point in %s.",
-        AUTO,
-        ENTRY_POINT_GROUP,
+    """Loads every plugin in ENTRY_POINT_GROUP, in name order."""
+    points = sorted(
+        importlib.metadata.entry_points(group=ENTRY_POINT_GROUP),
+        key=lambda point: (point.name, point.value),
     )
-  for point in points:
-    plugin = f"entry point {point.name!r} ({point.value})"
-    try:
-      loaded = point.load()
-    except Exception as e:
-      raise PluginError(
-          f"Controller plugin {plugin} cannot be loaded: "
-          f"{type(e).__name__}: {e}"
-      ) from e
-    _register(plugin, _hook_of(loaded, plugin))
+    if not points:
+        logging.warning(
+            "--controllers %s: no installed distribution declares an entry point in %s.",
+            AUTO,
+            ENTRY_POINT_GROUP,
+        )
+    for point in points:
+        plugin = f"entry point {point.name!r} ({point.value})"
+        try:
+            loaded = point.load()
+        except Exception as e:
+            raise PluginError(
+                f"Controller plugin {plugin} cannot be loaded: {type(e).__name__}: {e}"
+            ) from e
+        _register(plugin, _hook_of(loaded, plugin))
 
 
 def _register(plugin: str, hook: RegisterInto) -> None:
-  """Calls a plugin's `register_into` with the `controllers` module."""
-  try:
-    hook(controllers)
-  except Exception as e:
-    raise PluginError(
-        f"Controller plugin {plugin} failed to register: "
-        f"{type(e).__name__}: {e}"
-    ) from e
+    """Calls a plugin's `register_into` with the `controllers` module."""
+    try:
+        hook(controllers)
+    except Exception as e:
+        raise PluginError(
+            f"Controller plugin {plugin} failed to register: {type(e).__name__}: {e}"
+        ) from e

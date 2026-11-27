@@ -28,10 +28,10 @@ game that hides information sees only what is public, and an omniscient
 viewer sees everything.
 """
 
-from collections.abc import Mapping, Sequence
 import json
 import threading
 import types
+from collections.abc import Mapping, Sequence
 
 import pyspiel
 
@@ -47,68 +47,68 @@ _REGISTRY_LOCK = threading.Lock()
 
 
 def register(game: str, adapter: Adapter) -> None:
-  """Registers `adapter` for the game with the short name `game`.
+    """Registers `adapter` for the game with the short name `game`.
 
-  Raises:
-    ValueError: If an adapter is already registered for `game`, or the
-      adapter names no renderer.
-  """
-  if not getattr(adapter, "renderer", "").strip():
-    raise ValueError(f"The adapter for {game!r} names no renderer.")
-  with _REGISTRY_LOCK:
-    if game in _REGISTRY:
-      raise ValueError(f"An adapter is already registered for {game!r}.")
-    _REGISTRY[game] = adapter
+    Raises:
+      ValueError: If an adapter is already registered for `game`, or the
+        adapter names no renderer.
+    """
+    if not getattr(adapter, "renderer", "").strip():
+        raise ValueError(f"The adapter for {game!r} names no renderer.")
+    with _REGISTRY_LOCK:
+        if game in _REGISTRY:
+            raise ValueError(f"An adapter is already registered for {game!r}.")
+        _REGISTRY[game] = adapter
 
 
 def unregister(game: str) -> None:
-  """Removes the adapter registered for `game`.
+    """Removes the adapter registered for `game`.
 
-  Raises:
-    ValueError: If no adapter is registered for `game`.
-  """
-  with _REGISTRY_LOCK:
-    if _REGISTRY.pop(game, None) is None:
-      raise ValueError(f"No adapter is registered for {game!r}.")
+    Raises:
+      ValueError: If no adapter is registered for `game`.
+    """
+    with _REGISTRY_LOCK:
+        if _REGISTRY.pop(game, None) is None:
+            raise ValueError(f"No adapter is registered for {game!r}.")
 
 
 def adapters() -> Mapping[str, Adapter]:
-  """Returns every registered adapter by game short name; read-only."""
-  with _REGISTRY_LOCK:
-    return types.MappingProxyType(dict(_REGISTRY))
+    """Returns every registered adapter by game short name; read-only."""
+    with _REGISTRY_LOCK:
+        return types.MappingProxyType(dict(_REGISTRY))
 
 
 def adapter_for(game: str) -> Adapter | None:
-  """Returns the adapter registered for `game`, or None."""
-  return adapters().get(game)
+    """Returns the adapter registered for `game`, or None."""
+    return adapters().get(game)
 
 
 def public_action_label(state: pyspiel.State, action: int) -> str | None:
-  """Returns what a viewer who may not see `action` may read of it.
+    """Returns what a viewer who may not see `action` may read of it.
 
-  Asks the adapter of `state`'s game (`Adapter.public_action_label`), with
-  the state before the action; None when the action is hidden from such a
-  viewer, and for a game with no adapter.
+    Asks the adapter of `state`'s game (`Adapter.public_action_label`), with
+    the state before the action; None when the action is hidden from such a
+    viewer, and for a game with no adapter.
 
-  Raises:
-    TypeError: If the adapter's label is not a str.
-  """
-  adapter = adapter_for(str(state.get_game().get_type().short_name))
-  if adapter is None or not adapter.supports(state.get_game()):
-    return None
-  label = adapter.public_action_label(state, action)
-  if label is not None and not isinstance(label, str):
-    raise TypeError(f"A public action label is a str, not {label!r}.")
-  return label
+    Raises:
+      TypeError: If the adapter's label is not a str.
+    """
+    adapter = adapter_for(str(state.get_game().get_type().short_name))
+    if adapter is None or not adapter.supports(state.get_game()):
+        return None
+    label = adapter.public_action_label(state, action)
+    if label is not None and not isinstance(label, str):
+        raise TypeError(f"A public action label is a str, not {label!r}.")
+    return label
 
 
 def _checked_json(value: object, what: str) -> contract.JsonValue:
-  """Returns `value` after checking that it encodes as strict JSON."""
-  try:
-    json.dumps(value, allow_nan=False)
-  except (TypeError, ValueError) as e:
-    raise TypeError(f"{what} is not JSON: {e}") from e
-  return value  # type: ignore[return-value]
+    """Returns `value` after checking that it encodes as strict JSON."""
+    try:
+        json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError) as e:
+        raise TypeError(f"{what} is not JSON: {e}") from e
+    return value  # type: ignore[return-value]
 
 
 def present(
@@ -117,37 +117,37 @@ def present(
     viewpoint: Viewpoint,
     legal_actions: Sequence[int] | None,
 ) -> contract.Presentation | None:
-  """Returns the adapter's presentation of `state`; None with no adapter.
+    """Returns the adapter's presentation of `state`; None with no adapter.
 
-  Args:
-    game: The game's short name.
-    state: The position to present.
-    viewpoint: Who the presentation is for.
-    legal_actions: The legal actions the viewer is given, or None when it is
-      given none; only these are described.
+    Args:
+      game: The game's short name.
+      state: The position to present.
+      viewpoint: Who the presentation is for.
+      legal_actions: The legal actions the viewer is given, or None when it is
+        given none; only these are described.
 
-  Raises:
-    TypeError: If the adapter returns anything that is not JSON.
-  """
-  adapter = adapter_for(game)
-  if adapter is None or not adapter.supports(state.get_game()):
-    return None
-  view = adapter.present(state, viewpoint)
-  if not isinstance(view, dict):
-    raise TypeError(f"The {game} adapter's view is not a JSON object.")
-  hints: tuple[contract.ActionHint, ...] | None = None
-  if legal_actions is not None:
-    described = adapter.describe_actions(state, legal_actions, viewpoint)
-    hints = tuple(
-        contract.ActionHint(
-            id=action,
-            hint=_checked_json(described[action], f"The {game} hint"),
+    Raises:
+      TypeError: If the adapter returns anything that is not JSON.
+    """
+    adapter = adapter_for(game)
+    if adapter is None or not adapter.supports(state.get_game()):
+        return None
+    view = adapter.present(state, viewpoint)
+    if not isinstance(view, dict):
+        raise TypeError(f"The {game} adapter's view is not a JSON object.")
+    hints: tuple[contract.ActionHint, ...] | None = None
+    if legal_actions is not None:
+        described = adapter.describe_actions(state, legal_actions, viewpoint)
+        hints = tuple(
+            contract.ActionHint(
+                id=action,
+                hint=_checked_json(described[action], f"The {game} hint"),
+            )
+            for action in legal_actions
+            if action in described
         )
-        for action in legal_actions
-        if action in described
+    return contract.Presentation(
+        renderer=adapter.renderer,
+        view=_checked_json(view, f"The {game} view"),
+        actions=hints,
     )
-  return contract.Presentation(
-      renderer=adapter.renderer,
-      view=_checked_json(view, f"The {game} view"),
-      actions=hints,
-  )

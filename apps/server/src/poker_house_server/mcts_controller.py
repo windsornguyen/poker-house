@@ -47,16 +47,18 @@ Each search ends every simulation in a uniformly random rollout and is
 seeded afresh for the ply it moves at.
 """
 
-from collections.abc import Mapping
 import dataclasses
+from collections.abc import Mapping
 
 import pyspiel
 
-from poker_house_server import contract
-from poker_house_server import controller_registry
-from poker_house_server import controller_settings
-from poker_house_server import mcts_search
-from poker_house_server import move_budget
+from poker_house_server import (
+    contract,
+    controller_registry,
+    controller_settings,
+    mcts_search,
+    move_budget,
+)
 
 # The name MCTS is registered under.
 NAME = "mcts"
@@ -64,15 +66,15 @@ NAME = "mcts"
 
 @dataclasses.dataclass(frozen=True)
 class Simulations:
-  """The `max_simulations` setting's default and maximum.
+    """The `max_simulations` setting's default and maximum.
 
-  Attributes:
-    default: The simulations a move runs unless the client says otherwise.
-    maximum: The most simulations a move may run.
-  """
+    Attributes:
+      default: The simulations a move runs unless the client says otherwise.
+      maximum: The most simulations a move may run.
+    """
 
-  default: int
-  maximum: int
+    default: int
+    maximum: int
 
 
 # `max_simulations` under each behaviour of the C++ search. With
@@ -92,171 +94,165 @@ BACKSTOP_MARGIN_SECONDS = 1.0
 
 
 def backstop_seconds(budget: float) -> float:
-  """Returns the C++ search's wall-clock time under a `budget` second budget.
+    """Returns the C++ search's wall-clock time under a `budget` second budget.
 
-  `BACKSTOP_MARGIN_SECONDS` inside the budget, or half the budget when that
-  is shorter than twice the margin.
-  """
-  if budget <= 0:
-    raise ValueError(f"The move budget must be positive, not {budget}.")
-  return budget - min(BACKSTOP_MARGIN_SECONDS, budget / 2)
+    `BACKSTOP_MARGIN_SECONDS` inside the budget, or half the budget when that
+    is shorter than twice the margin.
+    """
+    if budget <= 0:
+        raise ValueError(f"The move budget must be positive, not {budget}.")
+    return budget - min(BACKSTOP_MARGIN_SECONDS, budget / 2)
 
 
 class Mcts:
-  """Plays the move preferred by OpenSpiel's Monte Carlo tree search.
+    """Plays the move preferred by OpenSpiel's Monte Carlo tree search.
 
-  See the module docstring for the two searches and their limits.
-  """
+    See the module docstring for the two searches and their limits.
+    """
 
-  def __init__(
-      self,
-      game: pyspiel.Game,
-      seed: int,
-      *,
-      limits: contract.MctsLimits,
-      max_simulations: int,
-      uct_c: float,
-      solve: bool,
-  ) -> None:
-    self._game = game
-    self._seed = seed
-    self._limits = limits
-    self._max_simulations = max_simulations
-    self._uct_c = uct_c
-    self._solve = solve
-    self._python = mcts_search.implemented_in_python(game)
+    def __init__(
+        self,
+        game: pyspiel.Game,
+        seed: int,
+        *,
+        limits: contract.MctsLimits,
+        max_simulations: int,
+        uct_c: float,
+        solve: bool,
+    ) -> None:
+        self._game = game
+        self._seed = seed
+        self._limits = limits
+        self._max_simulations = max_simulations
+        self._uct_c = uct_c
+        self._solve = solve
+        self._python = mcts_search.implemented_in_python(game)
 
-  def choose_action(self, state: pyspiel.State, seat: int) -> int:
-    """Returns the action the search prefers for `seat`."""
-    del seat  # The search plays for the player to move, which is `seat`.
-    seed = controller_registry.choice_seed(self._seed, state)
-    if self._python:
-      return mcts_search.python_search(
-          self._game,
-          state,
-          seed=seed,
-          max_simulations=self._max_simulations,
-          uct_c=self._uct_c,
-          solve=self._solve,
-      )
-    clock = None
-    if self._limits == contract.MctsLimits.SIMULATIONS_OR_CLOCK:
-      clock = backstop_seconds(move_budget.seconds())
-    return mcts_search.cpp_search(
-        self._game,
-        state,
-        seed=seed,
-        max_simulations=self._max_simulations,
-        uct_c=self._uct_c,
-        solve=self._solve,
-        max_wall_clock_time=clock,
-    )
+    def choose_action(self, state: pyspiel.State, seat: int) -> int:
+        """Returns the action the search prefers for `seat`."""
+        del seat  # The search plays for the player to move, which is `seat`.
+        seed = controller_registry.choice_seed(self._seed, state)
+        if self._python:
+            return mcts_search.python_search(
+                self._game,
+                state,
+                seed=seed,
+                max_simulations=self._max_simulations,
+                uct_c=self._uct_c,
+                solve=self._solve,
+            )
+        clock = None
+        if self._limits == contract.MctsLimits.SIMULATIONS_OR_CLOCK:
+            clock = backstop_seconds(move_budget.seconds())
+        return mcts_search.cpp_search(
+            self._game,
+            state,
+            seed=seed,
+            max_simulations=self._max_simulations,
+            uct_c=self._uct_c,
+            solve=self._solve,
+            max_wall_clock_time=clock,
+        )
 
 
 def refusal(game: pyspiel.Game) -> str | None:
-  """Returns why MCTS cannot play `game`, or None if it can.
+    """Returns why MCTS cannot play `game`, or None if it can.
 
-  The search plays forward from a clone of the full state, so it reads the
-  full state (see `Kind.reads_full_state`), and in a game whose state samples
-  its own chance outcomes it would foresee them.
-  """
-  game_type = game.get_type()
-  name = game_type.short_name
-  if game_type.dynamics != pyspiel.GameType.Dynamics.SEQUENTIAL:
-    return f"MCTS needs a sequential game, and {name} is not one."
-  if game_type.chance_mode == pyspiel.GameType.ChanceMode.SAMPLED_STOCHASTIC:
-    return (
-        f"MCTS would foresee the chance outcomes of {name}, whose state "
-        "samples them itself."
-    )
-  if game_type.reward_model != pyspiel.GameType.RewardModel.TERMINAL:
-    return (
-        f"MCTS needs rewards at the end of the game only, and {name} does not "
-        "give them so."
-    )
-  return None
+    The search plays forward from a clone of the full state, so it reads the
+    full state (see `Kind.reads_full_state`), and in a game whose state samples
+    its own chance outcomes it would foresee them.
+    """
+    game_type = game.get_type()
+    name = game_type.short_name
+    if game_type.dynamics != pyspiel.GameType.Dynamics.SEQUENTIAL:
+        return f"MCTS needs a sequential game, and {name} is not one."
+    if game_type.chance_mode == pyspiel.GameType.ChanceMode.SAMPLED_STOCHASTIC:
+        return f"MCTS would foresee the chance outcomes of {name}, whose state samples them itself."
+    if game_type.reward_model != pyspiel.GameType.RewardModel.TERMINAL:
+        return f"MCTS needs rewards at the end of the game only, and {name} does not give them so."
+    return None
 
 
 def settings(
     limits: contract.MctsLimits,
 ) -> tuple[controller_settings.Setting, ...]:
-  """Returns MCTS's settings under `limits`."""
-  simulations = SIMULATIONS[limits]
-  return (
-      controller_settings.Setting(
-          "max_simulations",
-          int,
-          simulations.default,
-          "Simulations per move, each ending in a random rollout.",
-          minimum=1,
-          maximum=simulations.maximum,
-      ),
-      controller_settings.Setting(
-          "uct_c",
-          float,
-          2.0,
-          "The exploration constant of the UCT selection rule.",
-          minimum=0.0,
-          maximum=100.0,
-      ),
-      controller_settings.Setting(
-          "solve",
-          bool,
-          True,
-          "Whether proven wins and losses are backed up the search tree.",
-      ),
-  )
+    """Returns MCTS's settings under `limits`."""
+    simulations = SIMULATIONS[limits]
+    return (
+        controller_settings.Setting(
+            "max_simulations",
+            int,
+            simulations.default,
+            "Simulations per move, each ending in a random rollout.",
+            minimum=1,
+            maximum=simulations.maximum,
+        ),
+        controller_settings.Setting(
+            "uct_c",
+            float,
+            2.0,
+            "The exploration constant of the UCT selection rule.",
+            minimum=0.0,
+            maximum=100.0,
+        ),
+        controller_settings.Setting(
+            "solve",
+            bool,
+            True,
+            "Whether proven wins and losses are backed up the search tree.",
+        ),
+    )
 
 
 def kind(limits: contract.MctsLimits) -> controller_registry.Kind:
-  """Returns MCTS as it is registered under `limits`."""
+    """Returns MCTS as it is registered under `limits`."""
 
-  def build(
-      game: pyspiel.Game,
-      config: Mapping[str, contract.ParameterValue],
-      seed: int,
-  ) -> controller_registry.Controller:
-    """Builds the MCTS controller from its parsed settings."""
-    return Mcts(
-        game,
-        seed,
-        limits=limits,
-        max_simulations=int(config["max_simulations"]),
-        uct_c=float(config["uct_c"]),
-        solve=bool(config["solve"]),
+    def build(
+        game: pyspiel.Game,
+        config: Mapping[str, contract.ParameterValue],
+        seed: int,
+    ) -> controller_registry.Controller:
+        """Builds the MCTS controller from its parsed settings."""
+        return Mcts(
+            game,
+            seed,
+            limits=limits,
+            max_simulations=int(config["max_simulations"]),
+            uct_c=float(config["uct_c"]),
+            solve=bool(config["solve"]),
+        )
+
+    return controller_registry.Kind(
+        "MCTS",
+        settings(limits),
+        reads_full_state=True,
+        build=build,
+        refusal=refusal,
     )
-
-  return controller_registry.Kind(
-      "MCTS",
-      settings(limits),
-      reads_full_state=True,
-      build=build,
-      refusal=refusal,
-  )
 
 
 @dataclasses.dataclass
 class _Configured:
-  """The limits MCTS is registered with; see `configure`."""
+    """The limits MCTS is registered with; see `configure`."""
 
-  limits: contract.MctsLimits = contract.MctsLimits.SIMULATIONS_ONLY
+    limits: contract.MctsLimits = contract.MctsLimits.SIMULATIONS_ONLY
 
 
 _CONFIGURED = _Configured()
 
 
 def configure(limits: contract.MctsLimits) -> None:
-  """Registers MCTS again, with the limits `limits` calls for.
+    """Registers MCTS again, with the limits `limits` calls for.
 
-  Call it before serving, as `controller_registry.register` says.
+    Call it before serving, as `controller_registry.register` says.
 
-  Raises:
-    ValueError: If MCTS is not registered.
-  """
-  controller_registry.replace(NAME, kind(limits))
-  _CONFIGURED.limits = limits
+    Raises:
+      ValueError: If MCTS is not registered.
+    """
+    controller_registry.replace(NAME, kind(limits))
+    _CONFIGURED.limits = limits
 
 
 def configured_limits() -> contract.MctsLimits:
-  """Returns the limits MCTS is registered with."""
-  return _CONFIGURED.limits
+    """Returns the limits MCTS is registered with."""
+    return _CONFIGURED.limits

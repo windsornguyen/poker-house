@@ -22,6 +22,7 @@
     "test:web": "pnpm --filter @poker-house/web test",
     "test": "pnpm test:engine && pnpm test:server && pnpm test:web",
     "check": "pnpm --filter @poker-house/web check && pnpm check:server && pnpm test && pnpm build",
-    "check:server": "uv run --all-packages --group check pyink --check --config apps/server/pyproject.toml apps/server/src apps/server/tests && uv run --all-packages --group check pylint --rcfile apps/server/pyproject.toml apps/server/src/poker_house_server apps/server/tests && uv run --all-packages --group check mypy --config-file apps/server/pyproject.toml apps/server/src/poker_house_server apps/server/tests"
+    "check:server": "uv run --all-packages --group check ruff format --check && uv run --all-packages --group check ruff check",
+    "typecheck": "uv run --all-packages --group check ty check"
   }
 }

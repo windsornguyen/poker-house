@@ -21,9 +21,7 @@ import importlib.metadata
 import pathlib
 import subprocess
 
-from poker_house_server import contract
-from poker_house_server import controllers
-from poker_house_server import health
+from poker_house_server import contract, controllers, health
 
 # The version reported when Poker House runs from a source tree, uninstalled.
 UNKNOWN_VERSION = "unknown"
@@ -35,58 +33,58 @@ _PACKAGE_PATH = pathlib.Path("apps", "server", "src", "poker_house_server")
 
 
 def build() -> health.Health:
-  """Returns the server's health report."""
-  return health.Health(
-      version=_version(),
-      revision=_own_revision(),
-      capabilities=health.Capabilities(
-          controllers=controllers.registered(),
-          chance_policies=tuple(contract.ChancePolicy),
-          cpp_mcts_limits=controllers.mcts_limits(),
-      ),
-  )
+    """Returns the server's health report."""
+    return health.Health(
+        version=_version(),
+        revision=_own_revision(),
+        capabilities=health.Capabilities(
+            controllers=controllers.registered(),
+            chance_policies=tuple(contract.ChancePolicy),
+            cpp_mcts_limits=controllers.mcts_limits(),
+        ),
+    )
 
 
 @functools.cache
 def _version() -> str:
-  """Returns the installed Poker House server package's version."""
-  try:
-    return importlib.metadata.version("poker-house-server")
-  except importlib.metadata.PackageNotFoundError:
-    return UNKNOWN_VERSION
+    """Returns the installed Poker House server package's version."""
+    try:
+        return importlib.metadata.version("poker-house-server")
+    except importlib.metadata.PackageNotFoundError:
+        return UNKNOWN_VERSION
 
 
 @functools.cache
 def _own_revision() -> str | None:
-  """Returns the commit of the source tree this package runs from, if any."""
-  return revision(_SOURCE_DIR)
+    """Returns the commit of the source tree this package runs from, if any."""
+    return revision(_SOURCE_DIR)
 
 
 def revision(source_dir: pathlib.Path) -> str | None:
-  """Returns the commit of the Poker House source tree the server runs from.
+    """Returns the commit of the Poker House source tree the server runs from.
 
-  Args:
-    source_dir: This package's directory.
+    Args:
+      source_dir: This package's directory.
 
-  Returns:
-    The commit, or None unless `source_dir` is the monorepo
-    `apps/server/src/poker_house_server` directory. An installed package
-    inside another repository reports no revision.
-  """
-  try:
-    result = subprocess.run(
-        ["git", "-C", str(source_dir), "rev-parse", "--show-toplevel", "HEAD"],
-        capture_output=True,
-        text=True,
-        timeout=10,
-        check=True,
-    )
-  except (OSError, subprocess.SubprocessError):
-    return None
-  lines = result.stdout.splitlines()
-  if len(lines) != 2:
-    return None
-  toplevel, commit = lines
-  if pathlib.Path(toplevel).resolve() / _PACKAGE_PATH != source_dir:
-    return None
-  return commit
+    Returns:
+      The commit, or None unless `source_dir` is the monorepo
+      `apps/server/src/poker_house_server` directory. An installed package
+      inside another repository reports no revision.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(source_dir), "rev-parse", "--show-toplevel", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    lines = result.stdout.splitlines()
+    if len(lines) != 2:
+        return None
+    toplevel, commit = lines
+    if pathlib.Path(toplevel).resolve() / _PACKAGE_PATH != source_dir:
+        return None
+    return commit

@@ -48,18 +48,21 @@ moves at, so a seat moves the same way at the same position however often it
 is asked: after an undo, and when a game's history is replayed.
 """
 
-from collections.abc import Callable, Mapping
 import dataclasses
 import random
+from collections.abc import Callable, Mapping
 
-from poker_house_server import contract
-from poker_house_server import controller_registry
-from poker_house_server import controller_settings
-from poker_house_server import errors
-from poker_house_server import mcts_controller
-from poker_house_server import move_budget as move_budget_lib
-from poker_house_server import remote_bot
 import pyspiel
+
+from poker_house_server import (
+    contract,
+    controller_registry,
+    controller_settings,
+    errors,
+    mcts_controller,
+    remote_bot,
+)
+from poker_house_server import move_budget as move_budget_lib
 
 HUMAN = contract.HUMAN
 RANDOM = "random"
@@ -97,66 +100,66 @@ move_budget = move_budget_lib.seconds
 
 
 class ControllerError(errors.ControllerFailedError):
-  """A seat's controller failed to choose a legal action.
+    """A seat's controller failed to choose a legal action.
 
-  As a refusal it names only the seat. What went wrong may describe private
-  state, so `detail` reaches only an omniscient viewer, through `failure`.
+    As a refusal it names only the seat. What went wrong may describe private
+    state, so `detail` reaches only an omniscient viewer, through `failure`.
 
-  Attributes:
-    seat: The seat whose controller failed.
-    error: The name of the failure: the exception the controller raised, or
-      `IllegalAction` when it returned something that is not a legal action.
-    detail: What went wrong, which may describe private state.
-  """
-
-  def __init__(self, seat: int, error: str, detail: str) -> None:
-    super().__init__(seat=seat)
-    self.error = error
-    self.detail = detail
-
-  def failure(self, visible: bool) -> contract.ControllerFailure:
-    """Returns the failure as a viewer sees it.
-
-    Args:
-      visible: Whether the viewer may see the failing seat's private state.
+    Attributes:
+      seat: The seat whose controller failed.
+      error: The name of the failure: the exception the controller raised, or
+        `IllegalAction` when it returned something that is not a legal action.
+      detail: What went wrong, which may describe private state.
     """
-    return contract.ControllerFailure(
-        error=self.error, message=self.detail if visible else None
-    )
+
+    def __init__(self, seat: int, error: str, detail: str) -> None:
+        super().__init__(seat=seat)
+        self.error = error
+        self.detail = detail
+
+    def failure(self, visible: bool) -> contract.ControllerFailure:
+        """Returns the failure as a viewer sees it.
+
+        Args:
+          visible: Whether the viewer may see the failing seat's private state.
+        """
+        return contract.ControllerFailure(
+            error=self.error, message=self.detail if visible else None
+        )
 
 
 @dataclasses.dataclass(frozen=True)
 class Spec:
-  """A request for a controller.
+    """A request for a controller.
 
-  Attributes:
-    kind: The name the controller is registered under, such as `HUMAN`,
-      `RANDOM` or `MCTS`.
-    config: The controller's settings, satisfying its `config_schema`. A
-      setting left out takes its default.
-  """
+    Attributes:
+      kind: The name the controller is registered under, such as `HUMAN`,
+        `RANDOM` or `MCTS`.
+      config: The controller's settings, satisfying its `config_schema`. A
+        setting left out takes its default.
+    """
 
-  kind: str
-  config: Config = dataclasses.field(default_factory=dict)
+    kind: str
+    config: Config = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
 class Descriptor:
-  """A controller, and whether it can play a particular game.
+    """A controller, and whether it can play a particular game.
 
-  Attributes:
-    controller: The controller as the contract describes it.
-    unavailable_reason: Why the controller cannot play the game; None when it
-      can.
-  """
+    Attributes:
+      controller: The controller as the contract describes it.
+      unavailable_reason: Why the controller cannot play the game; None when it
+        can.
+    """
 
-  controller: contract.Controller
-  unavailable_reason: str | None
+    controller: contract.Controller
+    unavailable_reason: str | None
 
-  @property
-  def available(self) -> bool:
-    """Whether the controller can play the game."""
-    return self.unavailable_reason is None
+    @property
+    def available(self) -> bool:
+        """Whether the controller can play the game."""
+        return self.unavailable_reason is None
 
 
 # The request for a seat the client plays.
@@ -164,40 +167,40 @@ HUMAN_SPEC = Spec(kind=HUMAN)
 
 
 class Human:
-  """Leaves a seat's moves to the client; `choose` refuses to ask it."""
+    """Leaves a seat's moves to the client; `choose` refuses to ask it."""
 
-  def choose_action(self, state: pyspiel.State, seat: int) -> int:
-    """Never called: `choose` refuses a human seat before asking."""
-    del state
-    raise AssertionError(f"Seat {seat} is played by a person.")
+    def choose_action(self, state: pyspiel.State, seat: int) -> int:
+        """Never called: `choose` refuses a human seat before asking."""
+        del state
+        raise AssertionError(f"Seat {seat} is played by a person.")
 
 
 class Random:
-  """Plays a uniformly random legal action, reproducibly from its seed."""
+    """Plays a uniformly random legal action, reproducibly from its seed."""
 
-  def __init__(self, seed: int) -> None:
-    self._seed = seed
+    def __init__(self, seed: int) -> None:
+        self._seed = seed
 
-  def choose_action(self, state: pyspiel.State, seat: int) -> int:
-    """Returns one of `seat`'s legal actions, drawn uniformly."""
-    rng = random.Random(controller_registry.choice_seed(self._seed, state))
-    return int(rng.choice(state.legal_actions(seat)))
+    def choose_action(self, state: pyspiel.State, seat: int) -> int:
+        """Returns one of `seat`'s legal actions, drawn uniformly."""
+        rng = random.Random(controller_registry.choice_seed(self._seed, state))
+        return int(rng.choice(state.legal_actions(seat)))
 
 
 def _build_human(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue], seed: int
 ) -> Controller:
-  """Builds the human controller, which takes no settings and no seed."""
-  del game, config, seed
-  return Human()
+    """Builds the human controller, which takes no settings and no seed."""
+    del game, config, seed
+    return Human()
 
 
 def _build_random(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue], seed: int
 ) -> Controller:
-  """Builds the random controller, which takes no settings."""
-  del game, config
-  return Random(seed)
+    """Builds the random controller, which takes no settings."""
+    del game, config
+    return Random(seed)
 
 
 register(
@@ -218,249 +221,226 @@ register(REMOTE, remote_bot.kind())
 
 
 def _describe(name: str, kind: Kind) -> contract.Controller:
-  """Returns the contract's description of the controller `name`."""
-  return contract.Controller(
-      name=name, label=kind.label, config_schema=kind.config_schema()
-  )
+    """Returns the contract's description of the controller `name`."""
+    return contract.Controller(name=name, label=kind.label, config_schema=kind.config_schema())
 
 
 def registered() -> tuple[contract.Controller, ...]:
-  """Returns every controller, `human` first."""
-  return tuple(_describe(name, kind) for name, kind in kinds().items())
+    """Returns every controller, `human` first."""
+    return tuple(_describe(name, kind) for name, kind in kinds().items())
 
 
 def descriptors(game: pyspiel.Game) -> tuple[Descriptor, ...]:
-  """Describes every controller, and whether it can play `game`.
+    """Describes every controller, and whether it can play `game`.
 
-  Args:
-    game: The game as it is served, after any turn-based wrapping.
+    Args:
+      game: The game as it is served, after any turn-based wrapping.
 
-  Returns:
-    One descriptor per controller, `human` first.
-  """
-  return tuple(
-      Descriptor(_describe(name, kind), kind.unavailable_reason(game))
-      for name, kind in kinds().items()
-  )
+    Returns:
+      One descriptor per controller, `human` first.
+    """
+    return tuple(
+        Descriptor(_describe(name, kind), kind.unavailable_reason(game))
+        for name, kind in kinds().items()
+    )
 
 
 def available(game: pyspiel.Game) -> tuple[contract.Controller, ...]:
-  """Returns the controllers that can play `game`, `human` first."""
-  return tuple(
-      descriptor.controller
-      for descriptor in descriptors(game)
-      if descriptor.available
-  )
+    """Returns the controllers that can play `game`, `human` first."""
+    return tuple(descriptor.controller for descriptor in descriptors(game) if descriptor.available)
 
 
 def builder(spec: Spec, game: pyspiel.Game) -> Callable[[int], Controller]:
-  """Checks `spec` against `game`, and returns what builds its controller.
+    """Checks `spec` against `game`, and returns what builds its controller.
 
-  Everything a client can get wrong is checked here, at once; the build
-  itself, which may take a while (a trained model loading and warming up),
-  is left to the returned call, which a session makes on a thread of its own
-  (`builds`).
+    Everything a client can get wrong is checked here, at once; the build
+    itself, which may take a while (a trained model loading and warming up),
+    is left to the returned call, which a session makes on a thread of its own
+    (`builds`).
 
-  Args:
-    spec: The controller and its settings.
-    game: The game as it is served, after any turn-based wrapping.
+    Args:
+      spec: The controller and its settings.
+      game: The game as it is served, after any turn-based wrapping.
 
-  Returns:
-    A call that builds the controller from the seed of its random choices.
-    It raises `UnavailableError` if the controller finds it cannot play after
-    all (a checkpoint that does not load), and whatever else its builder
-    raises.
+    Returns:
+      A call that builds the controller from the seed of its random choices.
+      It raises `UnavailableError` if the controller finds it cannot play after
+      all (a checkpoint that does not load), and whatever else its builder
+      raises.
 
-  Raises:
-    UnavailableError: If the controller is unknown, cannot play `game`, or is
-      given invalid settings.
-  """
-  registry = kinds()
-  kind = registry.get(spec.kind)
-  if kind is None:
-    raise UnavailableError(
-        f"There is no controller {controller_settings.shown(spec.kind)}; the "
-        "controllers are "
-        f"{', '.join(registry)}."
-    )
-  reason = kind.unavailable_reason(game)
-  if reason is not None:
-    raise UnavailableError(reason)
-  config = kind.parse(spec.config)
-  reason = kind.seat_refusal(game, config)
-  if reason is not None:
-    raise UnavailableError(reason)
-  return lambda seed: kind.build(game, config, seed)
+    Raises:
+      UnavailableError: If the controller is unknown, cannot play `game`, or is
+        given invalid settings.
+    """
+    registry = kinds()
+    kind = registry.get(spec.kind)
+    if kind is None:
+        raise UnavailableError(
+            f"There is no controller {controller_settings.shown(spec.kind)}; the "
+            "controllers are "
+            f"{', '.join(registry)}."
+        )
+    reason = kind.unavailable_reason(game)
+    if reason is not None:
+        raise UnavailableError(reason)
+    config = kind.parse(spec.config)
+    reason = kind.seat_refusal(game, config)
+    if reason is not None:
+        raise UnavailableError(reason)
+    return lambda seed: kind.build(game, config, seed)
 
 
-def seat_notice(
-    spec: Spec, game: pyspiel.Game, notice: str | None
-) -> str | None:
-  """Returns the notice a seat played as `spec` shows, from its controller's.
+def seat_notice(spec: Spec, game: pyspiel.Game, notice: str | None) -> str | None:
+    """Returns the notice a seat played as `spec` shows, from its controller's.
 
-  Every notice passes through `controller_registry.full_state_notice`, the
-  state policy's say over what the viewer of a seat that reads the full
-  state is shown. A controller no longer registered counts as reading it.
-  """
-  if notice is None:
-    return None
-  kind = kinds().get(spec.kind)
-  reads_full_state = kind is None or kind.seat_reads_full_state(
-      kind.parse(spec.config)
-  )
-  return controller_registry.full_state_notice(game, reads_full_state, notice)
+    Every notice passes through `controller_registry.full_state_notice`, the
+    state policy's say over what the viewer of a seat that reads the full
+    state is shown. A controller no longer registered counts as reading it.
+    """
+    if notice is None:
+        return None
+    kind = kinds().get(spec.kind)
+    reads_full_state = kind is None or kind.seat_reads_full_state(kind.parse(spec.config))
+    return controller_registry.full_state_notice(game, reads_full_state, notice)
 
 
 def seat_output(
     spec: Spec, game: pyspiel.Game, output: contract.BotOutput | None
 ) -> contract.BotOutput | None:
-  """Returns the bot output a seat played as `spec` keeps, from its own.
+    """Returns the bot output a seat played as `spec` keeps, from its own.
 
-  As `seat_notice`, through `controller_registry.full_state_output`.
-  """
-  if output is None:
-    return None
-  kind = kinds().get(spec.kind)
-  reads_full_state = kind is None or kind.seat_reads_full_state(
-      kind.parse(spec.config)
-  )
-  return controller_registry.full_state_output(game, reads_full_state, output)
+    As `seat_notice`, through `controller_registry.full_state_output`.
+    """
+    if output is None:
+        return None
+    kind = kinds().get(spec.kind)
+    reads_full_state = kind is None or kind.seat_reads_full_state(kind.parse(spec.config))
+    return controller_registry.full_state_output(game, reads_full_state, output)
 
 
 def label(name: str) -> str:
-  """Returns the label of the controller registered as `name`, or `name`."""
-  kind = kinds().get(name)
-  return name if kind is None else kind.label
+    """Returns the label of the controller registered as `name`, or `name`."""
+    kind = kinds().get(name)
+    return name if kind is None else kind.label
 
 
 def create(spec: Spec, game: pyspiel.Game, *, seed: int) -> Controller:
-  """Builds the controller `spec` asks for, to play a seat of `game`.
+    """Builds the controller `spec` asks for, to play a seat of `game`.
 
-  Args:
-    spec: The controller and its settings.
-    game: The game as it is served, after any turn-based wrapping.
-    seed: Seeds every random choice the controller makes.
+    Args:
+      spec: The controller and its settings.
+      game: The game as it is served, after any turn-based wrapping.
+      seed: Seeds every random choice the controller makes.
 
-  Returns:
-    The controller.
+    Returns:
+      The controller.
 
-  Raises:
-    UnavailableError: If the controller is unknown, cannot play
-      `game`, or is given invalid settings.
-  """
-  return builder(spec, game)(seed)
+    Raises:
+      UnavailableError: If the controller is unknown, cannot play
+        `game`, or is given invalid settings.
+    """
+    return builder(spec, game)(seed)
 
 
 def choose(controller: Controller, state: pyspiel.State, seat: int) -> int:
-  """Asks `controller` for `seat`'s action at `state`, within the budget.
+    """Asks `controller` for `seat`'s action at `state`, within the budget.
 
-  As `choose_with_notice`, without the notice.
-  """
-  return choose_with_notice(controller, state, seat)[0]
+    As `choose_with_notice`, without the notice.
+    """
+    return choose_with_notice(controller, state, seat)[0]
 
 
 def choose_with_notice(
     controller: Controller, state: pyspiel.State, seat: int
 ) -> tuple[int, str | None]:
-  """Asks `controller` for `seat`'s action at `state`, within the budget.
+    """Asks `controller` for `seat`'s action at `state`, within the budget.
 
-  As `choose_with_output`, without the bot output.
-  """
-  action, notice, _ = choose_with_output(controller, state, seat)
-  return action, notice
+    As `choose_with_output`, without the bot output.
+    """
+    action, notice, _ = choose_with_output(controller, state, seat)
+    return action, notice
 
 
 def choose_with_output(
     controller: Controller, state: pyspiel.State, seat: int
 ) -> tuple[int, str | None, contract.BotOutput | None]:
-  """Asks `controller` for `seat`'s action at `state`, within the budget.
+    """Asks `controller` for `seat`'s action at `state`, within the budget.
 
-  Args:
-    controller: The controller playing `seat`.
-    state: The position, where `seat` is to move. The controller is given a
-      copy, on a thread of its own, so `state` does not change.
-    seat: The seat to move.
+    Args:
+      controller: The controller playing `seat`.
+      state: The position, where `seat` is to move. The controller is given a
+        copy, on a thread of its own, so `state` does not change.
+      seat: The seat to move.
 
-  Returns:
-    One of `seat`'s legal actions, the controller's notice about the choice
-    and its bot output: its `last_notice` and `last_output` attributes, read
-    on the controller's thread right after it chose, each None if it has
-    none.
+    Returns:
+      One of `seat`'s legal actions, the controller's notice about the choice
+      and its bot output: its `last_notice` and `last_output` attributes, read
+      on the controller's thread right after it chose, each None if it has
+      none.
 
-  Raises:
-    ValueError: If `seat` is not to move at `state`, or `controller` is a
-      human's, whose moves come from the client and never from here.
-    ControllerError: If the controller raises, returns anything but one of
-      `seat`'s legal actions, gives a notice that is not text of at most
-      `contract.NOTICE_MAX_LENGTH` characters, gives a bot output that is
-      not a `contract.BotOutput` whose policy names only legal actions, or
-      does not return within the move budget.
-  """
-  if isinstance(controller, Human):
-    raise ValueError(
-        f"Seat {seat} is played by a person, whose moves come from the client."
-    )
-  if state.current_player() != seat:
-    raise ValueError(
-        f"Seat {seat} is not to move; player {state.current_player()} is."
-    )
-  legal = state.legal_actions(seat)
-  # A copy: the controller may play on it, and the position stays as it is.
-  copy = state.clone()
+    Raises:
+      ValueError: If `seat` is not to move at `state`, or `controller` is a
+        human's, whose moves come from the client and never from here.
+      ControllerError: If the controller raises, returns anything but one of
+        `seat`'s legal actions, gives a notice that is not text of at most
+        `contract.NOTICE_MAX_LENGTH` characters, gives a bot output that is
+        not a `contract.BotOutput` whose policy names only legal actions, or
+        does not return within the move budget.
+    """
+    if isinstance(controller, Human):
+        raise ValueError(f"Seat {seat} is played by a person, whose moves come from the client.")
+    if state.current_player() != seat:
+        raise ValueError(f"Seat {seat} is not to move; player {state.current_player()} is.")
+    legal = state.legal_actions(seat)
+    # A copy: the controller may play on it, and the position stays as it is.
+    copy = state.clone()
 
-  def ask() -> tuple[object, object, object]:
-    action = controller.choose_action(copy, seat)
-    return (
-        action,
-        getattr(controller, "last_notice", None),
-        getattr(controller, "last_output", None),
-    )
+    def ask() -> tuple[object, object, object]:
+        action = controller.choose_action(copy, seat)
+        return (
+            action,
+            getattr(controller, "last_notice", None),
+            getattr(controller, "last_output", None),
+        )
 
-  try:
-    action, notice, output = move_budget_lib.run(
-        ask, name=f"controller-seat-{seat}"
-    )
-  except move_budget_lib.OverBudgetError as e:
-    raise ControllerError(
-        seat,
-        TIMEOUT,
-        f"Seat {seat}'s controller did not choose a move within the "
-        f"{e.seconds:g} second move budget.",
-    ) from e
-  except Exception as e:
-    # Whatever the failure, the seat pauses; nothing retries or covers for it.
-    raise ControllerError(seat, type(e).__name__, str(e)) from e
-  if (
-      isinstance(action, bool)
-      or not isinstance(action, int)
-      or action not in legal
-  ):
-    raise ControllerError(
-        seat,
-        "IllegalAction",
-        f"Seat {seat}'s controller chose {action!r}, which is not one of its "
-        "legal actions.",
-    )
-  if notice is not None and (
-      not isinstance(notice, str)
-      or not notice.strip()
-      or len(notice) > contract.NOTICE_MAX_LENGTH
-  ):
-    raise ControllerError(
-        seat,
-        "InvalidNotice",
-        f"Seat {seat}'s controller gave the notice "
-        f"{controller_settings.shown(notice)}, which is not non-blank text "
-        f"of at most {contract.NOTICE_MAX_LENGTH} characters.",
-    )
-  if output is not None and (
-      not isinstance(output, contract.BotOutput)
-      or any(entry.action not in legal for entry in output.policy)
-  ):
-    raise ControllerError(
-        seat,
-        "InvalidBotOutput",
-        f"Seat {seat}'s controller gave a bot output that is not a policy, "
-        "value and decided_by over its legal actions.",
-    )
-  return action, notice, output
+    try:
+        action, notice, output = move_budget_lib.run(ask, name=f"controller-seat-{seat}")
+    except move_budget_lib.OverBudgetError as e:
+        raise ControllerError(
+            seat,
+            TIMEOUT,
+            f"Seat {seat}'s controller did not choose a move within the "
+            f"{e.seconds:g} second move budget.",
+        ) from e
+    except Exception as e:
+        # Whatever the failure, the seat pauses; nothing retries or covers for it.
+        raise ControllerError(seat, type(e).__name__, str(e)) from e
+    if isinstance(action, bool) or not isinstance(action, int) or action not in legal:
+        raise ControllerError(
+            seat,
+            "IllegalAction",
+            f"Seat {seat}'s controller chose {action!r}, which is not one of its legal actions.",
+        )
+    if notice is not None and (
+        not isinstance(notice, str)
+        or not notice.strip()
+        or len(notice) > contract.NOTICE_MAX_LENGTH
+    ):
+        raise ControllerError(
+            seat,
+            "InvalidNotice",
+            f"Seat {seat}'s controller gave the notice "
+            f"{controller_settings.shown(notice)}, which is not non-blank text "
+            f"of at most {contract.NOTICE_MAX_LENGTH} characters.",
+        )
+    if output is not None and (
+        not isinstance(output, contract.BotOutput)
+        or any(entry.action not in legal for entry in output.policy)
+    ):
+        raise ControllerError(
+            seat,
+            "InvalidBotOutput",
+            f"Seat {seat}'s controller gave a bot output that is not a policy, "
+            "value and decided_by over its legal actions.",
+        )
+    return action, notice, output
