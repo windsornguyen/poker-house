@@ -14,3 +14,4 @@ test-results/
 
 # The built docs site (docs/build.mts)
 docs/dist/
+.wrangler/

@@ -1,7 +1,13 @@
 // Renders the docs into docs/dist as a static site, with the Scalar CLI's own renderer:
 // the same pages Scalar would host, served from our own domain at no cost.
 import {execFileSync} from 'node:child_process';
-import {cpSync, mkdtempSync, rmSync} from 'node:fs';
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import {homedir} from 'node:os';
 import {join, resolve} from 'node:path';
 
@@ -39,6 +45,15 @@ try {
   });
   rmSync(output, {recursive: true, force: true});
   cpSync(join(build, 'dist'), output, {recursive: true});
+
+  // Scalar also writes rules for URL fragments, which never reach a server. Cloudflare
+  // reads each as its bare path and refuses the duplicates, so only path rules are kept.
+  const redirects = join(output, '_redirects');
+  const rules = readFileSync(redirects, 'utf8').split('\n');
+  writeFileSync(
+    redirects,
+    rules.filter(rule => !rule.split(' ')[0]?.includes('#')).join('\n'),
+  );
 } finally {
   rmSync(build, {recursive: true, force: true});
 }
