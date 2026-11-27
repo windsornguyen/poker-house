@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
 from poker_house_server import catalogue as catalogue_lib
-from poker_house_server import contract, controllers, errors, request, store
+from poker_house_server import contract, controllers, errors, moves, request, store
 from poker_house_server import health as health_lib
 from poker_house_server import session as session_lib
 
@@ -323,6 +323,14 @@ class Api:
         body = req.decode(request.ApplyAction)
         return ok(session.apply_action(viewer, body.action, ply=body.ply))
 
+    def move(self, req: _Request) -> Response:
+        """Plays a move named by its kind and amount, resolved to its action id."""
+        session, viewer = self.seated(req)
+        body = req.decode(request.PlayMove)
+
+        action = moves.resolve(session.frame(viewer).observation_struct, body)
+        return ok(session.apply_action(viewer, action))
+
     def chance(self, req: _Request) -> Response:
         """Chooses a chance outcome."""
         session, viewer = self.seated(req)
@@ -368,6 +376,7 @@ class Api:
         route("DELETE", "sessions/{id}", close),
         route("GET", "sessions/{id}/plies/{ply}", replay),
         route("POST", "sessions/{id}/actions", action),
+        route("POST", "sessions/{id}/moves", move),
         route("POST", "sessions/{id}/chance", chance),
         route("POST", "sessions/{id}/advance", advance),
         route("POST", "sessions/{id}/undo", undo),

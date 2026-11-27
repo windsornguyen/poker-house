@@ -782,6 +782,16 @@
     "JsonValue": {
       "description": "Any JSON value."
     },
+    "MoveKind": {
+      "enum": [
+        "fold",
+        "check",
+        "call",
+        "bet",
+        "raise"
+      ],
+      "type": "string"
+    },
     "MoverKind": {
       "description": "Who acts at a position.\n\nAttributes:\n  SEAT: A seat chooses the next action.\n  CHANCE: Chance chooses the next action.\n  TERMINAL: The game is over and nobody acts.",
       "enum": [
@@ -907,6 +917,29 @@
         "string"
       ],
       "type": "string"
+    },
+    "PlayMove": {
+      "additionalProperties": false,
+      "description": "Plays a move by what it does, as a person or an LLM names it.\n\nAttributes:\n  kind: fold, check, call, bet or raise.\n  amount: For a bet or a raise, the total the seat's bet rises to, as the\n    seat's observation lists it. Null for the other kinds.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MoveKind"
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
     },
     "PolicyEntry": {
       "additionalProperties": false,

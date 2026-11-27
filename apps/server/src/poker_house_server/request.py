@@ -20,6 +20,8 @@ see CONTRACT.md for the routes. Constructors enforce each body's invariants;
 the request decoder answers a body that breaks them with `bad_request`.
 """
 
+from typing import Literal
+
 import pydantic.dataclasses
 
 from poker_house_server import contract
@@ -90,6 +92,23 @@ class ApplyAction:
 
     action: int
     ply: int | None
+
+
+type MoveKind = Literal["fold", "check", "call", "bet", "raise"]
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
+class PlayMove:
+    """Plays a move by what it does, as a person or an LLM names it.
+
+    Attributes:
+      kind: fold, check, call, bet or raise.
+      amount: For a bet or a raise, the total the seat's bet rises to, as the
+        seat's observation lists it. Null for the other kinds.
+    """
+
+    kind: MoveKind
+    amount: int | None = None
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)

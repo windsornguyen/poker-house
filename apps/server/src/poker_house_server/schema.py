@@ -49,6 +49,7 @@ type ResponseBody = (
 type RequestBody = (
     request.CreateSession
     | request.ApplyAction
+    | request.PlayMove
     | request.ApplyChanceOutcome
     | request.Advance
     | request.Reset

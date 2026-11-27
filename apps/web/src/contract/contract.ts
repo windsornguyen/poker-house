@@ -733,6 +733,23 @@ export const Health = z.strictObject({
 });
 export type Health = z.infer<typeof Health>;
 
+export const MoveKind = z.enum(['fold', 'check', 'call', 'bet', 'raise']);
+export type MoveKind = z.infer<typeof MoveKind>;
+
+/**
+ * Plays a move by what it does, as a person or an LLM names it.
+ *
+ * Attributes:
+ *   kind: fold, check, call, bet or raise.
+ *   amount: For a bet or a raise, the total the seat's bet rises to, as the
+ *     seat's observation lists it. Null for the other kinds.
+ */
+export const PlayMove = z.strictObject({
+  kind: MoveKind,
+  amount: z.int().nullable().exactOptional(),
+});
+export type PlayMove = z.infer<typeof PlayMove>;
+
 /**
  * Restarts the live game, keeping the session's seats.
  *

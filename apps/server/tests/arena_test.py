@@ -263,6 +263,24 @@ class ArenaTest(absltest.TestCase):
             self.assertEqual((response.status, response.read()), (200, body), path)
             connection.close()
 
+    def test_a_move_by_meaning_resolves_or_lists_the_legal_moves(self) -> None:
+        frame = self.create()
+        session_id = frame["session"]["id"]
+        self.assertEqual(self.join(frame)[0], 200)
+        target = f"/api/sessions/{session_id}/moves?viewer=1"
+
+        status, refused = self.request("POST", target, {"kind": "raise"}, player=GUEST)
+        self.assertEqual((status, refused["code"]), (409, "illegal_action"))
+        self.assertIn("Name the amount", refused["message"])
+
+        status, refused = self.request("POST", target, {"kind": "check"}, player=GUEST)
+        self.assertEqual((status, refused["code"]), (409, "illegal_action"))
+        self.assertIn("Legal moves: fold, call", refused["message"])
+
+        status, called = self.request("POST", target, {"kind": "call"}, player=GUEST)
+        self.assertEqual(status, 200, called)
+        self.assertEqual(len(called["history"]), len(frame["history"]) + 1)
+
     def test_an_unknown_code_finds_no_room(self) -> None:
         status, error = self.request("POST", "/api/rooms/ZZZZZZ/join", player=GUEST)
         self.assertEqual((status, error["code"]), (404, "not_found"))
