@@ -16,12 +16,12 @@ import {createContext, type JSX, useContext} from 'react';
 import {NoFrame} from '../actions/note.tsx';
 import type {Frame} from '../contract/contract.ts';
 import {CompactText, CopyableText} from '../controls/copy_button.tsx';
-import {PanelGroup} from '../dock/panel_group.tsx';
 import type {
   PanelGroupDefinition,
   SectionDefinition,
-} from '../dock/panel_groups.ts';
+} from '../game/sections.ts';
 import {GameContext} from '../game/game_context.ts';
+import {SectionTabs} from '../game/section-tabs.tsx';
 import type {StateBlock, StateBlockId} from './state_blocks.ts';
 import {stateBlocks} from './state_blocks.ts';
 
@@ -80,6 +80,10 @@ function blockSection(id: StateBlockId, title: string): SectionDefinition {
       );
     },
     Label: () => find(useStateFrame())?.title ?? title,
+    Shown: () => {
+      const frame = useStateFrame();
+      return frame === null ? id === 'text' : find(frame) !== undefined;
+    },
   };
 }
 
@@ -103,7 +107,7 @@ export const STATE_GROUP: PanelGroupDefinition = {
 export function StatePanel({frame}: {frame: Frame}): JSX.Element {
   return (
     <StateFrame value={frame}>
-      <PanelGroup group={STATE_GROUP} />
+      <SectionTabs group={STATE_GROUP} />
     </StateFrame>
   );
 }

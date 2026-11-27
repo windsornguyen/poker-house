@@ -19,7 +19,7 @@ import {type JSX, type ReactNode, useEffect, useState} from 'react';
 import {routeOf, sessionPath} from './app/route.ts';
 import {type CatalogueState, useCatalogue} from './app/use_catalogue.ts';
 import {SettingsMenu} from './controls/settings_menu.tsx';
-import {HeaderActionsContext} from './dock/header_actions.ts';
+import {HeaderActionsContext} from './app/header-actions.ts';
 import {GamePage} from './game/game_page.tsx';
 import {PokerLobby} from './lobby.tsx';
 import {SessionClient} from './session/client.ts';

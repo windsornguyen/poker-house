@@ -27,7 +27,6 @@ import {
 import './styles/theme.css';
 import './styles/tokens.css';
 import './styles/base.css';
-import './styles/dock.css';
 
 /** Applies the stored theme before the first paint, as ThemeProvider resolves it. */
 export const FIRST_PAINT_THEME = `      (() => {

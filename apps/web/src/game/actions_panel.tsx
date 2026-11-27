@@ -16,12 +16,9 @@ import type {JSX} from 'react';
 import {History} from '../actions/history.tsx';
 import {HistoryText} from '../actions/history_text.tsx';
 import {LegalActions, legalLabel} from '../actions/legal_actions.tsx';
-import {
-  type PanelGroupDefinition,
-  usePaneHidden,
-} from '../dock/panel_groups.ts';
 import {ReplayControl} from '../state/replay_control.tsx';
 import {useGame} from './game_context.ts';
+import type {PanelGroupDefinition} from './sections.ts';
 
 import './game.css';
 
@@ -45,7 +42,7 @@ function HistoryFooter(): JSX.Element | null {
 }
 
 function LegalContent(): JSX.Element {
-  return <LegalActions session={useGame().session} hidden={usePaneHidden()} />;
+  return <LegalActions session={useGame().session} />;
 }
 
 function LegalLabel(): string {

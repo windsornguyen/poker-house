@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {createContext, useContext} from 'react';
+import {act} from 'react';
 
-/**
- * The element at the right of the page's header that a page fills with its
- * own controls; null where the page has no header, as in a test that renders
- * a dock alone.
- */
-export const HeaderActionsContext = createContext<HTMLElement | null>(null);
-
-/** The header's actions element, or null where there is none. */
-export function useHeaderActions(): HTMLElement | null {
-  return useContext(HeaderActionsContext);
+/** Opens `tab`, which a Radix tab does on a primary mouse press, not a click. */
+export function chooseTab(tab: Element): void {
+  act(() => {
+    tab.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, button: 0}));
+  });
 }

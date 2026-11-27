@@ -13,11 +13,9 @@
 // limitations under the License.
 
 import type {JSX} from 'react';
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 
 import type {Frame, SeatConfig} from '../contract/contract.ts';
-import {usePaneHidden} from '../dock/panel_groups.ts';
-import {requirePixels} from '../styles/pixels.ts';
 import {SeatRow} from './seat_row.tsx';
 
 import './players.css';
@@ -44,12 +42,6 @@ export interface PlayersPanelProps {
   /** Whether a request is in flight. */
   readonly busy: boolean;
   readonly commands: PlayersCommands;
-  /**
-   * Told how many pixels taller than its scroll the seat list is, all seats
-   * collapsed, while the panel is shown, and null while it is not, so its
-   * dock group can keep every seat in view; or undefined.
-   */
-  readonly onSeatsOverflow?: ((pixels: number | null) => void) | undefined;
 }
 
 /**
@@ -60,11 +52,10 @@ export function PlayersPanel({
   frame,
   busy,
   commands,
-  onSeatsOverflow,
 }: PlayersPanelProps): JSX.Element {
   const {session} = frame;
   const spectator = frame.viewer.kind === 'spectator';
-  const {short, scrollRef} = useSeatList(onSeatsOverflow);
+  const {short, scrollRef} = useSeatList();
   return (
     <div className="players">
       <header className="players__header">
@@ -102,16 +93,12 @@ export function PlayersPanel({
   );
 }
 
-// Watches the seat list's scroll: whether it is short, and how far the
-// collapsed seats overflow it, which `onSeatsOverflow` hears while the
-// panel is shown.
-function useSeatList(onSeatsOverflow?: (pixels: number | null) => void): {
+// Watches whether the seat list's scroll is short.
+function useSeatList(): {
   short: boolean;
   scrollRef: (element: HTMLDivElement | null) => void;
 } {
-  const shown = !usePaneHidden();
   const [short, setShort] = useState(false);
-  const [overflow, setOverflow] = useState<number | null>(null);
   const observer = useRef<ResizeObserver | null>(null);
   const scrollRef = useCallback((element: HTMLDivElement | null) => {
     observer.current?.disconnect();
@@ -119,7 +106,6 @@ function useSeatList(onSeatsOverflow?: (pixels: number | null) => void): {
     if (element === null) return;
     const measure = (): void => {
       setShort(element.clientHeight < SHORT_SCROLL);
-      setOverflow(seatsOverflow(element));
     };
     const watching = new ResizeObserver(measure);
     watching.observe(element);
@@ -127,34 +113,5 @@ function useSeatList(onSeatsOverflow?: (pixels: number | null) => void): {
     if (list !== null) watching.observe(list);
     observer.current = watching;
   }, []);
-  useEffect(() => {
-    onSeatsOverflow?.(shown ? overflow : null);
-  }, [onSeatsOverflow, shown, overflow]);
   return {short, scrollRef};
-}
-
-// How many pixels taller than `scroll` its seats are with every one
-// collapsed, the list's own padding included, or null while it has no
-// layout.
-function seatsOverflow(scroll: HTMLElement): number | null {
-  const list = scroll.querySelector<HTMLElement>('.players__seats');
-  if (list === null || scroll.clientHeight <= 0) return null;
-  let height = 0;
-  for (const item of Array.from(list.children)) {
-    const row = item.querySelector<HTMLElement>('.seat__row');
-    if (row === null || row.offsetHeight <= 0) return null;
-    const style = window.getComputedStyle(item);
-    height +=
-      row.offsetHeight +
-      requirePixels(style.paddingTop) +
-      requirePixels(style.paddingBottom) +
-      requirePixels(style.borderTopWidth) +
-      requirePixels(style.borderBottomWidth);
-  }
-  const listStyle = window.getComputedStyle(list);
-  height +=
-    requirePixels(listStyle.rowGap) * Math.max(0, list.children.length - 1) +
-    requirePixels(listStyle.paddingTop) +
-    requirePixels(listStyle.paddingBottom);
-  return Math.ceil(height - scroll.clientHeight);
 }

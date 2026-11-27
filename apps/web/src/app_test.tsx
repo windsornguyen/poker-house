@@ -23,6 +23,7 @@ import {FakeServer} from './session/testing/fake_server.ts';
 import {fakeColorScheme} from './testing/color_scheme.ts';
 import {enter, labelled} from './testing/input.ts';
 import {render, type Rendered} from './testing/render.tsx';
+import {chooseTab} from './testing/tabs.ts';
 import {ThemeProvider} from './theme/theme_provider.tsx';
 
 /** A ResizeObserver that never reports: the dock keeps its first layout. */
@@ -76,35 +77,49 @@ function click(element: HTMLElement): void {
   });
 }
 
-/** The legal action labelled `label`, in Actions › Legal, which it opens. */
-function legal(container: HTMLElement, label: string): HTMLElement {
-  const tab = [...container.querySelectorAll<HTMLElement>('[role="tab"]')].find(
-    candidate => candidate.textContent.startsWith('Legal'),
+/** Opens the panels sheet, if it is closed, at the tool titled `title`. */
+function tool(title: string): void {
+  if (document.querySelector('[role="dialog"]') === null) {
+    const opener = document.querySelector<HTMLElement>(
+      'button[aria-label="Panels"]',
+    );
+    if (opener === null) throw new Error('No Panels button.');
+    click(opener);
+  }
+  openTab(title);
+}
+
+/** Opens the tab whose label starts with `title`, anywhere on the page. */
+function openTab(title: string): void {
+  const tab = [...document.querySelectorAll<HTMLElement>('[role="tab"]')].find(
+    candidate => candidate.textContent.startsWith(title),
   );
-  if (tab === undefined) throw new Error('No Legal tab.');
-  if (tab.getAttribute('aria-selected') !== 'true') click(tab);
+  if (tab === undefined) throw new Error(`No ${title} tab.`);
+  if (tab.getAttribute('aria-selected') !== 'true') chooseTab(tab);
+}
+
+/** The legal action labelled `label`, in Actions › Legal, which it opens. */
+function legal(label: string): HTMLElement {
+  tool('Actions');
+  openTab('Legal');
   const row = [
-    ...container.querySelectorAll<HTMLElement>('button.legal__row'),
+    ...document.querySelectorAll<HTMLElement>('button.legal__row'),
   ].find(candidate => candidate.textContent.endsWith(label));
   if (row === undefined) throw new Error(`No legal action ${label}.`);
   return row;
 }
 
-/** Brings the View panel forward. */
-function perspectiveTab(): void {
-  const tab = [...document.querySelectorAll('.dv-tab')].find(
-    candidate => candidate.textContent === 'View',
-  );
-  if (tab === undefined) throw new Error('No View tab.');
-  act(() => {
-    tab.dispatchEvent(new MouseEvent('pointerdown', {bubbles: true}));
-  });
+/** The text of Actions › History, which it opens. */
+function historyText(): string | undefined {
+  tool('Actions');
+  openTab('History');
+  return document.querySelector('.history')?.textContent;
 }
 
 /** The Perspective list, in the View panel, which it brings forward. */
-function perspective(container: HTMLElement): HTMLSelectElement {
-  perspectiveTab();
-  return labelled(container, 'Perspective') as HTMLSelectElement;
+function perspective(): HTMLSelectElement {
+  tool('View');
+  return labelled(document.body, 'Perspective') as HTMLSelectElement;
 }
 
 /** Every viewer the page sent a session request as, once each. */
@@ -176,11 +191,13 @@ describe('App', () => {
 });
 
 describe('App, its header', () => {
-  it('holds the title, then the dock’s controls, then the settings', async () => {
+  it('holds the title, then the panels button, then the settings', async () => {
     const container = open('/game/count');
     await until(() => {
       expect(
-        container.querySelector('.app__page-actions .layouts'),
+        container.querySelector(
+          '.app__page-actions button[aria-label="Panels"]',
+        ),
       ).not.toBeNull();
     });
     const header = container.querySelector('header');
@@ -189,8 +206,7 @@ describe('App, its header', () => {
       ...(header?.querySelectorAll('.app__actions button[aria-haspopup]') ??
         []),
     ].map(control => control.getAttribute('aria-label') ?? control.textContent);
-    expect(controls).toEqual(['Layouts ▾', 'Panel options', 'Settings']);
-    expect(container.querySelector('.dock-toolbar, .dock__actions')).toBeNull();
+    expect(controls).toEqual(['Panels', 'Settings']);
   });
 
   it('names Poker House, then a bullet hidden from readers, then the title', () => {
@@ -210,20 +226,18 @@ describe('App, its header', () => {
 
 describe('App, on a game page', () => {
   it('starts a game, plays it, and keeps its session in the address', async () => {
-    const container = open('/game/count');
+    open('/game/count');
     await until(() => {
-      expect(legal(container, 'zero')).toBeDefined();
+      expect(legal('zero')).toBeDefined();
     });
     const create = server.received.find(({method}) => method === 'POST');
     expect(create?.body).toMatchObject({
       game: 'count',
       seats: [{controller: 'human'}, {controller: 'human'}],
     });
-    click(legal(container, 'one'));
+    click(legal('one'));
     await until(() => {
-      expect(container.querySelector('.history')?.textContent).toContain(
-        '#1one',
-      );
+      expect(historyText()).toContain('#1one');
     });
     const url = new URL(window.location.href);
     expect(url.pathname).toBe('/game/count');
@@ -237,11 +251,11 @@ describe('App, on a game page', () => {
 describe('App, analysis and a game', () => {
   it('opens in analysis, offering every seat and nothing else', async () => {
     server = new FakeServer({hidesInformation: true});
-    const container = open('/game/count');
+    open('/game/count');
     await until(() => {
-      expect(legal(container, 'zero')).toBeDefined();
+      expect(legal('zero')).toBeDefined();
     });
-    const select = perspective(container);
+    const select = perspective();
     expect([...select.options].map(option => option.textContent)).toEqual([
       'Select a seat',
       'Seat 0',
@@ -256,13 +270,13 @@ describe('App, analysis and a game', () => {
 
   it('sits at another seat without a request, and keeps it in the address', async () => {
     server = new FakeServer({hidesInformation: true});
-    const container = open('/game/count');
+    open('/game/count');
     await until(() => {
-      expect(legal(container, 'zero')).toBeDefined();
+      expect(legal('zero')).toBeDefined();
     });
     const requests = server.received.length;
-    enter(perspective(container), '1');
-    expect(perspective(container).value).toBe('1');
+    enter(perspective(), '1');
+    expect(perspective().value).toBe('1');
     await until(() => {
       expect(new URL(window.location.href).searchParams.get('viewSeat')).toBe(
         '1',
@@ -272,28 +286,26 @@ describe('App, analysis and a game', () => {
   });
 
   it('opens analysis at the seat its address names', async () => {
-    const container = open('/game/count?viewSeat=1');
+    open('/game/count?viewSeat=1');
     await until(() => {
-      expect(legal(container, 'zero')).toBeDefined();
+      expect(legal('zero')).toBeDefined();
     });
-    expect(perspective(container).value).toBe('1');
+    expect(perspective().value).toBe('1');
   });
 
   it('plays every seat in analysis, with no hand-over', async () => {
     server = new FakeServer({hidesInformation: true});
     const container = open('/game/count');
     await until(() => {
-      expect(legal(container, 'zero')).toBeDefined();
+      expect(legal('zero')).toBeDefined();
     });
-    click(legal(container, 'zero'));
+    click(legal('zero'));
     await until(() => {
-      expect(legal(container, 'one')).toBeDefined();
+      expect(legal('one')).toBeDefined();
     });
-    click(legal(container, 'one'));
+    click(legal('one'));
     await until(() => {
-      expect(container.querySelector('.history')?.textContent).toContain(
-        '#2one',
-      );
+      expect(historyText()).toContain('#2one');
     });
     expect(document.querySelector('[aria-modal]')).toBeNull();
     expect(container.textContent).not.toContain('Hand over');
@@ -307,8 +319,8 @@ describe('App, a game at a seat or spectating', () => {
     await until(() => {
       expect(container.querySelector('.gameplay__status')).not.toBeNull();
     });
-    perspectiveTab();
-    expect(lockedPerspective(container)).toEqual([
+    tool('View');
+    expect(lockedPerspective(document.body)).toEqual([
       'Seat 1 (you)',
       'Locked to your seat during a game',
     ]);
@@ -325,8 +337,8 @@ describe('App, a game at a seat or spectating', () => {
         'Turn 0 · Player 0 · Spectating',
       );
     });
-    perspectiveTab();
-    expect(lockedPerspective(container)).toEqual([
+    tool('View');
+    expect(lockedPerspective(document.body)).toEqual([
       'Spectating',
       'Spectating: the perspective is fixed during a game',
     ]);
@@ -342,8 +354,8 @@ describe('App, a game at a seat or spectating', () => {
           'Turn 0 · Player 0 · Spectating',
         );
       });
-      perspectiveTab();
-      expect(lockedPerspective(container)).toEqual([
+      tool('View');
+      expect(lockedPerspective(document.body)).toEqual([
         'Spectating',
         'Spectating: the perspective is fixed during a game',
       ]);

@@ -189,7 +189,7 @@ export default defineConfig({
           'shadcn/no-raw-colors': 'error',
           'shadcn/no-arbitrary-values': 'error',
           'shadcn/require-static-classes': 'error',
-          'shadcn/no-restyle': 'error',
+          'shadcn/no-restyle': ['error', {allow: ['layout']}],
         },
       },
       {

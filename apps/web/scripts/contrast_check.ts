@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // The contrast gate, part of `pnpm check`. In both themes it resolves the
-// design tokens and the dock's variables to colours and measures each pair
+// design tokens to colours and measures each pair
 // that is drawn one on the other against WCAG 2.2's minimum contrast ratio:
 // 4.5:1 for text (success criterion 1.4.3) and 3:1 for the focus ring and a
 // control's edge (1.4.11).
@@ -49,13 +49,12 @@ export interface Measurement extends Pair {
 }
 
 /** The stylesheets that define the variables, relative to the client root. */
-export const STYLESHEETS = ['src/styles/tokens.css', 'src/styles/dock.css'];
+export const STYLESHEETS = ['src/styles/tokens.css'];
 
 // The selectors those stylesheets may use, and the themes each applies to.
 const SCOPES: Record<string, readonly Theme[]> = {
   ':root': ['light', 'dark'],
   ":root[data-theme='dark']": ['dark'],
-  '.dockview-theme-open-spiel': ['light', 'dark'],
 };
 
 const TEXT_MINIMUM = 4.5;
@@ -75,9 +74,6 @@ const TEXTS = [
   '--color-danger',
 ];
 const MARKS = ['--color-focus', '--color-border-strong'];
-const TABS = ['activegroup', 'inactivegroup'].flatMap(group =>
-  ['visiblepanel', 'hiddenpanel'].map(panel => `--dv-${group}-${panel}-tab`),
-);
 
 function onSurfaces(colours: string[], minimum: number): Pair[] {
   return colours.flatMap(foreground =>
@@ -120,11 +116,6 @@ export const PAIRS: readonly Pair[] = [
       minimum: MARK_MINIMUM,
     })),
   ),
-  ...TABS.map(tab => ({
-    foreground: `${tab}-color`,
-    background: `${tab}-background-color`,
-    minimum: TEXT_MINIMUM,
-  })),
 ];
 
 /** Each theme's custom properties, as the stylesheets declare them. */

@@ -20,7 +20,8 @@ import {TransportError} from '../session/errors.ts';
 import type {Session} from '../session/use_session.ts';
 import {entries, frame, session} from '../testing/frames.ts';
 import {type Rendered, button, only, render} from '../testing/render.tsx';
-import {PanelGroup} from '../dock/panel_group.tsx';
+import {chooseTab} from '../testing/tabs.ts';
+import {SectionTabs} from './section-tabs.tsx';
 import {ACTIONS_GROUP} from './actions_panel.tsx';
 import {type Game, GameContext} from './game_context.ts';
 import {GameplayPanel} from './gameplay_panel.tsx';
@@ -133,7 +134,7 @@ describe('ACTIONS_GROUP', () => {
     rendered?.unmount();
     rendered = render(
       <GameContext value={value}>
-        <PanelGroup group={ACTIONS_GROUP} />
+        <SectionTabs group={ACTIONS_GROUP} />
       </GameContext>,
     );
     return rendered.container;
@@ -147,15 +148,14 @@ describe('ACTIONS_GROUP', () => {
       tab => tab.textContent,
     );
     expect(tabs).toEqual(['History', 'Legal (2)', 'Text']);
-    const footer = only(container, '.panel-group__footer');
     act(() => {
-      only(footer, 'button[aria-label="Previous move"]').click();
+      only(container, 'button[aria-label="Previous move"]').click();
     });
     expect(shown.commands.goTo).toHaveBeenCalledExactlyOnceWith(2);
-    expect(only(footer, 'label').textContent).toBe('Skip chance');
-    act(() => {
-      button('Text', container).click();
-    });
-    expect(container.querySelector('.panel-group__footer')).toBeNull();
+    expect(container.textContent).toContain('Skip chance');
+    chooseTab(button('Text', container));
+    expect(
+      container.querySelector('button[aria-label="Previous move"]'),
+    ).toBeNull();
   });
 });

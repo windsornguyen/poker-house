@@ -91,7 +91,7 @@ describe('themeVariables', () => {
   it('layers the dark theme over the light one', () => {
     const {light, dark} = themeVariables([
       ":root { --a: #fff; --b: #000; }\n:root[data-theme='dark'] { --a: #111; }",
-      '.dockview-theme-open-spiel { --c: var(--a); }',
+      ':root { --c: var(--a); }',
     ]);
     expect([...light]).toEqual([
       ['--a', '#fff'],

@@ -11,29 +11,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import {createContext, type JSX, useContext, useState} from 'react';
+import {type JSX, useState} from 'react';
 
 import {NoFrame} from '../actions/note.tsx';
-import {PanelGroup} from '../dock/panel_group.tsx';
-import type {PanelGroupDefinition} from '../dock/panel_groups.ts';
 import {useGame} from '../game/game_context.ts';
+import {SectionTabs} from '../game/section-tabs.tsx';
+import type {PanelGroupDefinition} from '../game/sections.ts';
 import {PlayersPanel} from '../players/players_panel.tsx';
 import {setupRefusal} from './access.ts';
 import {GameOptions} from './game_options.tsx';
 import {setupParameters} from './parameters.ts';
 import {Position} from './position.tsx';
 
-import '../dock/panel_group.css';
 import './setup.css';
-
-/**
- * Told how far the Players seat list overflows its scroll while Players is
- * the open section, and null otherwise; see `PlayersPanel`. Provided by the
- * Setup dock panel, so that its dock group grows to fit the seats.
- */
-export const SeatsOverflowContext = createContext<
-  ((pixels: number | null) => void) | undefined
->(undefined);
 
 // Setup › Game options; nothing for a game that offers no parameters.
 function GameOptionsContent(): JSX.Element | null {
@@ -74,16 +64,8 @@ function PositionContent(): JSX.Element | null {
 // Setup › Players: every seat and its controller.
 function PlayersContent(): JSX.Element {
   const {frame, busy, commands} = useGame().session;
-  const onSeatsOverflow = useContext(SeatsOverflowContext);
   if (frame === null) return <NoFrame />;
-  return (
-    <PlayersPanel
-      frame={frame}
-      busy={busy}
-      commands={commands}
-      onSeatsOverflow={onSeatsOverflow}
-    />
-  );
+  return <PlayersPanel frame={frame} busy={busy} commands={commands} />;
 }
 
 /**
@@ -96,8 +78,21 @@ export const SETUP_GROUP: PanelGroupDefinition = {
   id: 'setup',
   title: 'Setup',
   sections: [
-    {id: 'options', title: 'Game options', Content: GameOptionsContent},
-    {id: 'position', title: 'Position', Content: PositionContent},
+    {
+      id: 'options',
+      title: 'Game options',
+      Content: GameOptionsContent,
+      Shown: () => setupParameters(useGame().entry).length > 0,
+    },
+    {
+      id: 'position',
+      title: 'Position',
+      Content: PositionContent,
+      Shown: () => {
+        const {frame} = useGame().session;
+        return frame === null || setupRefusal(frame) === null;
+      },
+    },
     {id: 'players', title: 'Players', Content: PlayersContent},
   ],
 };
@@ -110,9 +105,7 @@ export function SetupPanel(): JSX.Element {
   const {frame, error} = useGame().session;
   // A session, once open, stays open: a new one replaces it.
   const [opened, setOpened] = useState(false);
-  // Kept here, so that outside a dock the open section survives a change of
-  // viewer, while which the frame is fetched again and the group is not
-  // drawn. Inside one the dock remembers it.
+  // Kept here, so the open section survives a change of viewer.
   const [chosen, setChosen] = useState<string | undefined>(undefined);
   if (frame !== null && !opened) setOpened(true);
   if (frame === null) {
@@ -127,6 +120,6 @@ export function SetupPanel(): JSX.Element {
     );
   }
   return (
-    <PanelGroup group={SETUP_GROUP} chosen={chosen} onChoose={setChosen} />
+    <SectionTabs group={SETUP_GROUP} chosen={chosen} onChoose={setChosen} />
   );
 }

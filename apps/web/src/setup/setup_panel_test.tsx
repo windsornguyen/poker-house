@@ -106,7 +106,14 @@ async function click(container: HTMLElement, text: string): Promise<void> {
   );
   if (button === undefined) throw new Error(`No button reads ${text}.`);
   await act(async () => {
-    button.click();
+    // A Radix tab opens on a primary mouse press, not a click.
+    if (button.getAttribute('role') === 'tab') {
+      button.dispatchEvent(
+        new MouseEvent('mousedown', {bubbles: true, button: 0}),
+      );
+    } else {
+      button.click();
+    }
     await new Promise(resolve => setTimeout(resolve, 0));
   });
 }

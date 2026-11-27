@@ -66,7 +66,6 @@ describe('lintClient', () => {
       await client({
         'src/page.html': '<p>\n</p><p style="font-size: 10px"></p>',
         'src/styles/tokens.css': ':root { --text-small: 10px; }',
-        'src/styles/dock.css': '',
         'src/panel/small.css': 'a { font-size: var(--text-small); }',
         'src/panel/panel.css':
           'a {\n  color: var(--color-text);\n}\nb { color: red; }',
@@ -88,7 +87,6 @@ describe('lintClient', () => {
   it('rejects a stylesheet it cannot read', async () => {
     const unbalanced = await client({
       'src/styles/tokens.css': '',
-      'src/styles/dock.css': '',
       'src/broken.css': 'a { color: var(--color-text);',
     });
     await expect(lintClient(unbalanced)).rejects.toThrow('Unclosed {');

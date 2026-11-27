@@ -18,6 +18,7 @@ import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 import type {Rendered} from '../testing/render.tsx';
 import {only, render} from '../testing/render.tsx';
 import {restoreProperties, stubProperty} from '../testing/stub_property.ts';
+import {chooseTab} from '../testing/tabs.ts';
 import {StatePanel} from './state_panel.tsx';
 import {recordedFrame} from './testing/recorded_frames.ts';
 
@@ -46,9 +47,7 @@ function openTab(container: HTMLElement, title: string): HTMLElement {
     container.querySelectorAll<HTMLElement>('[role="tab"]'),
   ).find(candidate => candidate.textContent === title);
   if (tab === undefined) throw new Error(`No tab ${title}.`);
-  act(() => {
-    tab.click();
-  });
+  chooseTab(tab);
   return only(container, '[role="tabpanel"]:not([hidden])');
 }
 

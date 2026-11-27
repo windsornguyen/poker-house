@@ -17,7 +17,7 @@ import type {JSX} from 'react';
 import {NoFrame} from '../actions/note.tsx';
 import type {Frame} from '../contract/contract.ts';
 import {CopyableText} from '../controls/copy_button.tsx';
-import type {PanelGroupDefinition} from '../dock/panel_groups.ts';
+import type {PanelGroupDefinition} from './sections.ts';
 import {useGame} from './game_context.ts';
 import {modeLabel} from './game_defaults.ts';
 

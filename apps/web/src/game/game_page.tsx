@@ -16,15 +16,13 @@ import {type JSX, useEffect, useLayoutEffect, useRef, useState} from 'react';
 
 import {sessionPath} from '../app/route.ts';
 import type {CatalogueEntry, Viewer} from '../contract/contract.ts';
-import {Dock} from '../dock/dock.tsx';
 import type {SessionClient} from '../session/client.ts';
 import type {SessionCommands} from '../session/session_store.ts';
 import {useSession} from '../session/use_session.ts';
 import {sessionModeOf, useAnalysisViewSeat} from './bottom_seat.ts';
 import {defaultSession, initialViewer} from './game_defaults.ts';
 import {type Game, GameContext} from './game_context.ts';
-import {GAME_PANELS} from './game_panels.ts';
-import {PANEL_COMPONENTS, PANEL_GROUPS, PanelFrame} from './panels.tsx';
+import {GameLayout} from './game-layout.tsx';
 
 import './game.css';
 
@@ -74,13 +72,7 @@ export function GamePage(props: GamePageProps): JSX.Element {
   return (
     <GameContext value={game}>
       <div className="game-page">
-        <Dock
-          panels={GAME_PANELS}
-          components={PANEL_COMPONENTS}
-          groups={PANEL_GROUPS}
-          game={entry.name}
-          frame={PanelFrame}
-        />
+        <GameLayout />
       </div>
     </GameContext>
   );

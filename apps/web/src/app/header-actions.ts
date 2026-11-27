@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// <reference types="node" />
+import {createContext, useContext} from 'react';
 
-import {readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {describe, expect, it} from 'vite-plus/test';
+/**
+ * The element at the right of the page's header that a page fills with its
+ * own controls; null where the page has no header.
+ */
+export const HeaderActionsContext = createContext<HTMLElement | null>(null);
 
-import {DOCK_TOKENS} from './dock_theme.ts';
-
-describe('dock.css', () => {
-  it('reads exactly the theme tokens the dock declares', async () => {
-    const css = await readFile(
-      resolve(import.meta.dirname, 'dock.css'),
-      'utf8',
-    );
-    const read = new Set(
-      [...css.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token),
-    );
-    expect(read).toEqual(new Set(DOCK_TOKENS));
-  });
-});
+/** The header's actions element, or null where there is none. */
+export function useHeaderActions(): HTMLElement | null {
+  return useContext(HeaderActionsContext);
+}

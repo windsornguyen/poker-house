@@ -28,7 +28,7 @@ import type {
   Frame,
   SeatConfig,
 } from '../../contract/contract.ts';
-import type {SectionDefinition} from '../../dock/panel_groups.ts';
+import type {SectionDefinition} from '../../game/sections.ts';
 import {GameContext} from '../../game/game_context.ts';
 import type {RendererEntry, RendererProps} from '../../renderers/renderer.ts';
 import type {SessionCommands} from '../../session/session_store.ts';

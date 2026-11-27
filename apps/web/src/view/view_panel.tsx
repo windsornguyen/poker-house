@@ -16,7 +16,7 @@ import type {JSX} from 'react';
 import type {
   PanelGroupDefinition,
   SectionDefinition,
-} from '../dock/panel_groups.ts';
+} from '../game/sections.ts';
 import {useGame} from '../game/game_context.ts';
 import {BOARD_VIEW_SECTIONS} from '../renderers/registry.ts';
 import {Perspective} from './perspective.tsx';

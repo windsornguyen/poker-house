@@ -19,7 +19,7 @@
 // adapter uses a shared renderer ("grid", "cards") adds nothing.
 
 import {POKER_RENDERER} from '../games/poker/poker_renderer.tsx';
-import type {SectionDefinition} from '../dock/panel_groups.ts';
+import type {SectionDefinition} from '../game/sections.ts';
 import {
   type Renderer,
   type RendererEntry,
