@@ -47,6 +47,10 @@ class ErrorCode(enum.StrEnum):
       NOTHING_TO_UNDO: The live game has no action to undo.
       UNAUTHORIZED: The request names no signed-in player.
       ROOM_FULL: Every human seat of the room is taken.
+      FORBIDDEN: The player may not make the request.
+      INSUFFICIENT_CHIPS: The account holds fewer chips than the request moves.
+      TABLE_NOT_READY: The room cannot deal its next hand yet.
+      LEDGER_UNAVAILABLE: The server keeps no ledger, so it cannot stake chips.
     """
 
     http_status: http.HTTPStatus
@@ -70,6 +74,10 @@ class ErrorCode(enum.StrEnum):
     NOTHING_TO_UNDO = "nothing_to_undo", http.HTTPStatus.CONFLICT
     UNAUTHORIZED = "unauthorized", http.HTTPStatus.UNAUTHORIZED
     ROOM_FULL = "room_full", http.HTTPStatus.CONFLICT
+    FORBIDDEN = "forbidden", http.HTTPStatus.FORBIDDEN
+    INSUFFICIENT_CHIPS = "insufficient_chips", http.HTTPStatus.PAYMENT_REQUIRED
+    TABLE_NOT_READY = "table_not_ready", http.HTTPStatus.CONFLICT
+    LEDGER_UNAVAILABLE = "ledger_unavailable", http.HTTPStatus.SERVICE_UNAVAILABLE
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
@@ -212,3 +220,27 @@ class RoomFullError(RequestError):
     """Every human seat of the room is taken."""
 
     code = ErrorCode.ROOM_FULL
+
+
+class ForbiddenError(RequestError):
+    """The player may not make the request."""
+
+    code = ErrorCode.FORBIDDEN
+
+
+class InsufficientChipsError(RequestError):
+    """The account holds fewer chips than the request moves."""
+
+    code = ErrorCode.INSUFFICIENT_CHIPS
+
+
+class TableNotReadyError(RequestError):
+    """The room cannot deal its next hand yet."""
+
+    code = ErrorCode.TABLE_NOT_READY
+
+
+class LedgerUnavailableError(RequestError):
+    """The server keeps no ledger, so it cannot stake chips."""
+
+    code = ErrorCode.LEDGER_UNAVAILABLE

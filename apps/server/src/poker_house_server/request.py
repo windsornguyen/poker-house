@@ -165,3 +165,19 @@ class Reset:
     """
 
     history: tuple[int, ...] | None
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
+class Grant:
+    """Gives a player chips from the treasury.
+
+    Attributes:
+      email: The player's email.
+      amount: The chips to give, at least 1.
+    """
+
+    email: str
+    amount: int
+
+    def __post_init__(self) -> None:
+        contract.require(self.amount >= 1, f"A grant gives at least 1 chip, not {self.amount}.")

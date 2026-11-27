@@ -35,9 +35,10 @@ import pydantic
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
+from poker_house_server import accounts, contract, controllers, errors, moves, request, store
 from poker_house_server import catalogue as catalogue_lib
-from poker_house_server import contract, controllers, errors, moves, request, store
 from poker_house_server import health as health_lib
+from poker_house_server import ledger as ledger_lib
 from poker_house_server import session as session_lib
 
 # The path prefix of every API route.
@@ -47,6 +48,7 @@ _T = TypeVar("_T")
 
 # The header the Worker names the signed-in account in, signed with the player key.
 PLAYER_HEADER = "X-Poker-Player"
+ADMIN_KIND = "internal"
 PLAYER_KEY_ENV = "POKER_HOUSE_PLAYER_KEY"
 
 
@@ -274,6 +276,35 @@ class Api:
         """Answers with the catalogue."""
         return ok(self._catalogue_of())
 
+    def me(self, req: _Request) -> Response:
+        """Answers with the signed-in player's balance and kind."""
+        player = req.signed_in()
+        chips = self._sessions.ledger()
+        return ok(accounts.Me(balance=chips.balance(player), kind=chips.kind(player)))
+
+    def admin(self, req: _Request) -> ledger_lib.Ledger:
+        """The ledger, for a player whose listing is internal.
+
+        Raises:
+          errors.ForbiddenError: If the player's listing is not internal.
+        """
+        chips = self._sessions.ledger()
+        if chips.kind(req.signed_in()) != ADMIN_KIND:
+            raise errors.ForbiddenError("Only an internal account may manage chips.")
+        return chips
+
+    def list_accounts(self, req: _Request) -> Response:
+        """Answers with every account, for an admin."""
+        return ok(self.admin(req).holdings())
+
+    def grant(self, req: _Request) -> Response:
+        """Gives a player chips from the treasury, for an admin, and answers with every account."""
+        chips = self.admin(req)
+        body = req.decode(request.Grant)
+
+        chips.grant(body.email, body.amount)
+        return ok(chips.holdings())
+
     def seated(self, req: _Request) -> tuple[session_lib.Session, contract.Viewer]:
         """The session the request concerns, and the viewer its player may take there."""
         viewer, player = req.viewer(), req.signed_in()
@@ -370,6 +401,9 @@ class Api:
     _ROUTES: tuple[_Route, ...] = (
         route("GET", "health", health),
         route("GET", "games", catalogue),
+        route("GET", "me", me),
+        route("GET", "admin/accounts", list_accounts),
+        route("POST", "admin/grants", grant),
         route("POST", "sessions", create),
         route("POST", "rooms/{code}/join", join),
         route("GET", "sessions/{id}", get_frame),

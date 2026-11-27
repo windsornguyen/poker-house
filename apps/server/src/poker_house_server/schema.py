@@ -23,7 +23,7 @@ import pathlib
 
 import pydantic
 
-from poker_house_server import catalogue, contract, errors, frame, health, request
+from poker_house_server import accounts, catalogue, contract, errors, frame, health, request
 
 SCHEMA_PATH = pathlib.Path(__file__).with_name("contract.schema.json")
 
@@ -44,7 +44,13 @@ KEYWORDS = frozenset(
 )
 
 type ResponseBody = (
-    frame.Frame | catalogue.Catalogue | health.Health | contract.SessionClosed | errors.Error
+    frame.Frame
+    | catalogue.Catalogue
+    | health.Health
+    | contract.SessionClosed
+    | errors.Error
+    | accounts.Me
+    | accounts.Accounts
 )
 type RequestBody = (
     request.CreateSession
@@ -54,6 +60,7 @@ type RequestBody = (
     | request.Advance
     | request.Reset
     | request.SeatConfig
+    | request.Grant
 )
 
 

@@ -44,3 +44,21 @@ create table if not exists poker.ply (
     bot_output jsonb,
     primary key (session_id, ply)
 );
+
+-- Every chip there is: the treasury's opening balance is the whole supply, and
+-- chips only move between accounts, so the balances always sum to it.
+create table if not exists poker.account (
+    id text primary key,
+    balance bigint not null check (balance >= 0)
+);
+
+insert into poker.account (id, balance) values ('treasury', 1000000) on conflict do nothing;
+
+create table if not exists poker.transfer (
+    id bigint generated always as identity primary key,
+    from_account text not null references poker.account,
+    to_account text not null references poker.account,
+    amount bigint not null check (amount > 0),
+    reason text not null check (reason in ('grant', 'buy_in', 'cash_out', 'purchase')),
+    created_at timestamptz not null default now()
+);

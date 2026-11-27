@@ -17,9 +17,74 @@
     },
     {
       "$ref": "#/$defs/Error"
+    },
+    {
+      "$ref": "#/$defs/Me"
+    },
+    {
+      "$ref": "#/$defs/Accounts"
     }
   ],
   "$defs": {
+    "Account": {
+      "additionalProperties": false,
+      "description": "One holder of chips.\n\nAttributes:\n  id: The player's id, `treasury`, or `room:<code>` for a table.\n  email: The player's email; null for the treasury and tables.\n  kind: The player's listing kind; null for the treasury and tables.\n  balance: The chips it holds.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "balance": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "kind",
+        "balance"
+      ],
+      "type": "object"
+    },
+    "Accounts": {
+      "additionalProperties": false,
+      "description": "Every holder of chips, the largest balance first.\n\nAttributes:\n  supply: Every chip there is, which the balances always sum to.\n  accounts: The holders.",
+      "properties": {
+        "supply": {
+          "type": "integer"
+        },
+        "accounts": {
+          "items": {
+            "$ref": "#/$defs/Account"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "supply",
+        "accounts"
+      ],
+      "type": "object"
+    },
     "Action": {
       "additionalProperties": false,
       "description": "A legal action at a position.\n\nAttributes:\n  id: The OpenSpiel action id, which a client sends to play it.\n  label: The game's text for the action.",
@@ -488,7 +553,7 @@
       "type": "object"
     },
     "ErrorCode": {
-      "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.\n  UNAUTHORIZED: The request names no signed-in player.\n  ROOM_FULL: Every human seat of the room is taken.",
+      "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.\n  UNAUTHORIZED: The request names no signed-in player.\n  ROOM_FULL: Every human seat of the room is taken.\n  FORBIDDEN: The player may not make the request.\n  INSUFFICIENT_CHIPS: The account holds fewer chips than the request moves.\n  TABLE_NOT_READY: The room cannot deal its next hand yet.\n  LEDGER_UNAVAILABLE: The server keeps no ledger, so it cannot stake chips.",
       "enum": [
         "bad_request",
         "not_found",
@@ -501,7 +566,11 @@
         "controller_failed",
         "nothing_to_undo",
         "unauthorized",
-        "room_full"
+        "room_full",
+        "forbidden",
+        "insufficient_chips",
+        "table_not_ready",
+        "ledger_unavailable"
       ],
       "type": "string"
     },
@@ -664,6 +733,23 @@
       ],
       "type": "object"
     },
+    "Grant": {
+      "additionalProperties": false,
+      "description": "Gives a player chips from the treasury.\n\nAttributes:\n  email: The player's email.\n  amount: The chips to give, at least 1.",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "email",
+        "amount"
+      ],
+      "type": "object"
+    },
     "Health": {
       "additionalProperties": false,
       "description": "The server's identity and capabilities.\n\nAttributes:\n  version: The installed Poker House server package's version.\n  revision: The source revision the server runs from, or null when unknown.\n  capabilities: What the server can do.",
@@ -781,6 +867,30 @@
     },
     "JsonValue": {
       "description": "Any JSON value."
+    },
+    "Me": {
+      "additionalProperties": false,
+      "description": "The signed-in player's account.\n\nAttributes:\n  balance: The chips they hold off the tables.\n  kind: person, internal or test, from their listing; null for none.",
+      "properties": {
+        "balance": {
+          "type": "integer"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "balance",
+        "kind"
+      ],
+      "type": "object"
     },
     "MoveKind": {
       "enum": [

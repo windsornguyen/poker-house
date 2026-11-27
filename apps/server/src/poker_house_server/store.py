@@ -30,6 +30,7 @@ from collections.abc import Mapping, Sequence
 
 from poker_house_server import contract, db, errors, plies, timeouts
 from poker_house_server import controllers as controllers_lib
+from poker_house_server import ledger as ledger_lib
 from poker_house_server import session as session_lib
 
 # The most sessions a store keeps, far more than the tabs one person opens.
@@ -115,6 +116,7 @@ class SessionStore:
         )
         self._lock = threading.Lock()
         self.journal = journal
+        self.chips = None if journal is None else ledger_lib.Ledger(journal.database)
         self.turns = timeouts.TurnClock()
         self.hands = timeouts.HandClock(self.expire)
 
@@ -205,6 +207,18 @@ class SessionStore:
         if session is None:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         return session
+
+    def ledger(self) -> ledger_lib.Ledger:
+        """The accounts, kept in the same database as the sessions.
+
+        Raises:
+          errors.LedgerUnavailableError: If the store keeps no database.
+        """
+        if self.chips is None:
+            raise errors.LedgerUnavailableError(
+                "This server keeps no database, so it holds no chips."
+            )
+        return self.chips
 
     def problem(self) -> str | None:
         """Returns why the store cannot keep sessions, or None when it can."""

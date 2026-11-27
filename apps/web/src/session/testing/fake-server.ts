@@ -50,6 +50,10 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   nothing_to_undo: 409,
   unauthorized: 401,
   room_full: 409,
+  forbidden: 403,
+  insufficient_chips: 402,
+  table_not_ready: 409,
+  ledger_unavailable: 503,
 };
 
 /** A request the fake received. */

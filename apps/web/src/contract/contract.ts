@@ -18,6 +18,36 @@
 import * as z from 'zod';
 
 /**
+ * One holder of chips.
+ *
+ * Attributes:
+ *   id: The player's id, `treasury`, or `room:<code>` for a table.
+ *   email: The player's email; null for the treasury and tables.
+ *   kind: The player's listing kind; null for the treasury and tables.
+ *   balance: The chips it holds.
+ */
+export const Account = z.strictObject({
+  id: z.string(),
+  email: z.string().nullable(),
+  kind: z.string().nullable(),
+  balance: z.int(),
+});
+export type Account = z.infer<typeof Account>;
+
+/**
+ * Every holder of chips, the largest balance first.
+ *
+ * Attributes:
+ *   supply: Every chip there is, which the balances always sum to.
+ *   accounts: The holders.
+ */
+export const Accounts = z.strictObject({
+  supply: z.int(),
+  accounts: z.array(Account),
+});
+export type Accounts = z.infer<typeof Accounts>;
+
+/**
  * A legal action at a position.
  *
  * Attributes:
@@ -418,6 +448,10 @@ export type CreateSession = z.infer<typeof CreateSession>;
  *   NOTHING_TO_UNDO: The live game has no action to undo.
  *   UNAUTHORIZED: The request names no signed-in player.
  *   ROOM_FULL: Every human seat of the room is taken.
+ *   FORBIDDEN: The player may not make the request.
+ *   INSUFFICIENT_CHIPS: The account holds fewer chips than the request moves.
+ *   TABLE_NOT_READY: The room cannot deal its next hand yet.
+ *   LEDGER_UNAVAILABLE: The server keeps no ledger, so it cannot stake chips.
  */
 export const ErrorCode = z.enum([
   'bad_request',
@@ -432,6 +466,10 @@ export const ErrorCode = z.enum([
   'nothing_to_undo',
   'unauthorized',
   'room_full',
+  'forbidden',
+  'insufficient_chips',
+  'table_not_ready',
+  'ledger_unavailable',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -719,6 +757,19 @@ export const Frame = z.strictObject({
 export type Frame = z.infer<typeof Frame>;
 
 /**
+ * Gives a player chips from the treasury.
+ *
+ * Attributes:
+ *   email: The player's email.
+ *   amount: The chips to give, at least 1.
+ */
+export const Grant = z.strictObject({
+  email: z.string(),
+  amount: z.int(),
+});
+export type Grant = z.infer<typeof Grant>;
+
+/**
  * The server's identity and capabilities.
  *
  * Attributes:
@@ -732,6 +783,19 @@ export const Health = z.strictObject({
   capabilities: Capabilities,
 });
 export type Health = z.infer<typeof Health>;
+
+/**
+ * The signed-in player's account.
+ *
+ * Attributes:
+ *   balance: The chips they hold off the tables.
+ *   kind: person, internal or test, from their listing; null for none.
+ */
+export const Me = z.strictObject({
+  balance: z.int(),
+  kind: z.string().nullable(),
+});
+export type Me = z.infer<typeof Me>;
 
 export const MoveKind = z.enum(['fold', 'check', 'call', 'bet', 'raise']);
 export type MoveKind = z.infer<typeof MoveKind>;
@@ -782,5 +846,7 @@ export const ResponseBody = z.union([
   Health,
   SessionClosed,
   Error,
+  Me,
+  Accounts,
 ]);
 export type ResponseBody = z.infer<typeof ResponseBody>;
