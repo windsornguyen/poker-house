@@ -9,7 +9,8 @@
     "provision": "node provision.ts"
   },
   "dependencies": {
-    "dedalus": "0.8.0"
+    "dedalus": "0.8.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "26.6.11",

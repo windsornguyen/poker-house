@@ -37,7 +37,7 @@ export const SCHEMA_PATH = resolve(
   import.meta.dirname,
   '../../server/src/poker_house_server/contract.schema.json',
 );
-/** The generated TypeScript types of the wire format, src/contract/contract.ts. */
+/** The generated Zod schemas of the wire format, src/contract/contract.ts. */
 export const CONTRACT_PATH = resolve(
   import.meta.dirname,
   '../src/contract/contract.ts',
@@ -132,14 +132,15 @@ const TYPE_KEYWORDS = new Map([
 ]);
 const FORMS = ['$ref', 'const', 'enum', 'anyOf', 'oneOf'] as const;
 const PRIMITIVES = new Map([
-  ['string', 'string'],
-  ['integer', 'number'],
-  ['number', 'number'],
-  ['boolean', 'boolean'],
-  ['null', 'null'],
+  ['string', 'z.string()'],
+  ['integer', 'z.int()'],
+  ['number', 'z.number()'],
+  ['boolean', 'z.boolean()'],
+  ['null', 'z.null()'],
 ]);
 const REF_PREFIX = '#/$defs/';
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+const ANY = 'z.unknown()';
 
 /** `value` as a JSON object; `at` is where it is in the schema. */
 function asObject(value: unknown, at: string): Record<string, unknown> {
@@ -176,18 +177,32 @@ function jsonTypes(value: unknown): string[] {
   return [typeof value];
 }
 
-/** The union of `members`, each once. */
+/** The schema accepting any of `members`, each once. */
 function union(members: string[]): string {
-  return [...new Set(members)].join(' | ');
+  const distinct = [...new Set(members)];
+  const [first] = distinct;
+  if (distinct.length === 1 && first !== undefined) return first;
+  const nonNull = distinct.filter(member => member !== 'z.null()');
+  const only = nonNull[0];
+  if (nonNull.length === 1 && only !== undefined) return `${only}.nullable()`;
+  return `z.union([${distinct.join(', ')}])`;
+}
+
+/** The schema accepting exactly `values`. */
+function literals(values: unknown[]): string {
+  const [only] = values;
+  if (values.length === 1) return `z.literal(${JSON.stringify(only)})`;
+  if (values.every(isString)) return `z.enum(${JSON.stringify(values)})`;
+  return `z.literal(${JSON.stringify(values)})`;
 }
 
 /**
- * The TypeScript type of `schema`. Exactly one form gives it: `$ref`,
- * `const`, `enum`, `anyOf`, `oneOf` or `type`; `type` may also accompany
- * `const` or `enum`, whose values must then be of that type. A schema with no
- * form admits any value.
+ * The Zod schema of `schema`. Exactly one form gives it: `$ref`, `const`,
+ * `enum`, `anyOf`, `oneOf` or `type`; `type` may also accompany `const` or
+ * `enum`, whose values must then be of that type. A schema with no form
+ * admits any value.
  */
-function typeOf(schema: Schema, at: string): string {
+function zodOf(schema: Schema, at: string): string {
   const types = schema.type === undefined ? [] : [schema.type].flat();
   for (const [keyword, type] of TYPE_KEYWORDS) {
     if (keyword in schema && !types.includes(type)) {
@@ -204,12 +219,7 @@ function typeOf(schema: Schema, at: string): string {
   if (forms.length > 1) {
     throw new Error(`${at}: ${forms.join(' together with ')}`);
   }
-  if (schema.$ref !== undefined) {
-    if (!schema.$ref.startsWith(REF_PREFIX)) {
-      throw new Error(`${at}: unsupported $ref ${schema.$ref}`);
-    }
-    return schema.$ref.slice(REF_PREFIX.length);
-  }
+  if (schema.$ref !== undefined) return refName(schema.$ref, at);
   const values = 'const' in schema ? [schema.const] : schema.enum;
   if (values !== undefined) {
     const strays = values.filter(
@@ -221,7 +231,7 @@ function typeOf(schema: Schema, at: string): string {
       const listed = strays.map(value => JSON.stringify(value)).join(', ');
       throw new Error(`${at}: ${listed} not of type ${types.join(' or ')}`);
     }
-    return union(values.map(value => JSON.stringify(value)));
+    return literals(values);
   }
   for (const keyword of ['anyOf', 'oneOf'] as const) {
     const members = schema[keyword];
@@ -229,25 +239,33 @@ function typeOf(schema: Schema, at: string): string {
       return union(
         members.map((member: unknown, index) => {
           const where = `${at}/${keyword}/${String(index)}`;
-          return typeOf(asSchema(member, where), where);
+          return zodOf(asSchema(member, where), where);
         }),
       );
     }
   }
-  if (types.length === 0) return 'unknown';
-  return union(types.map(type => typeOfType(schema, type, at)));
+  if (types.length === 0) return ANY;
+  return union(types.map(type => zodOfType(schema, type, at)));
 }
 
-/** The TypeScript type of `schema` restricted to one of its types. */
-function typeOfType(schema: Schema, type: string, at: string): string {
+/** The definition a `$ref` names. */
+function refName(ref: string, at: string): string {
+  if (!ref.startsWith(REF_PREFIX)) {
+    throw new Error(`${at}: unsupported $ref ${ref}`);
+  }
+  return ref.slice(REF_PREFIX.length);
+}
+
+/** The Zod schema of `schema` restricted to one of its types. */
+function zodOfType(schema: Schema, type: string, at: string): string {
   const primitive = PRIMITIVES.get(type);
   if (primitive !== undefined) return primitive;
   if (type === 'array') {
     if (schema.items === undefined) {
       throw new Error(`${at}: an array needs items`);
     }
-    const items = typeOf(asSchema(schema.items, `${at}/items`), `${at}/items`);
-    return /^[\w.]+$/.test(items) ? `${items}[]` : `Array<${items}>`;
+    const where = `${at}/items`;
+    return `z.array(${zodOf(asSchema(schema.items, where), where)})`;
   }
   if (type === 'object') {
     if (schema.properties !== undefined) {
@@ -260,9 +278,8 @@ function typeOfType(schema: Schema, type: string, at: string): string {
       throw new Error(`${at}: an object needs properties or their values`);
     }
     const where = `${at}/additionalProperties`;
-    const value =
-      values === true ? 'unknown' : typeOf(asSchema(values, where), where);
-    return `Record<string, ${value}>`;
+    const value = values === true ? ANY : zodOf(asSchema(values, where), where);
+    return `z.record(z.string(), ${value})`;
   }
   throw new Error(`${at}: unsupported type ${type}`);
 }
@@ -275,15 +292,8 @@ function docComment(text: string | undefined, indent: string): string {
   return `${indent}/**\n${body.join('\n')}\n${indent} */\n`;
 }
 
-/** The declaration of the type `name`: an interface or a type alias. */
-function declaration(name: string, schema: Schema, at: string): string {
-  if (!IDENTIFIER.test(name)) {
-    throw new Error(`${at}: not a TypeScript identifier`);
-  }
-  const comment = docComment(schema.description, '');
-  if (schema.properties === undefined) {
-    return `${comment}export type ${name} = ${typeOf(schema, at)};\n`;
-  }
+/** The strict object schema of a definition with `properties`. */
+function objectOf(schema: Schema, at: string): string {
   if (schema.type !== 'object') {
     throw new Error(`${at}: properties without type object`);
   }
@@ -292,9 +302,9 @@ function declaration(name: string, schema: Schema, at: string): string {
     throw new Error(`${at}: properties together with ${forms.join(', ')}`);
   }
   if (schema.additionalProperties !== false) {
-    throw new Error(`${at}: an interface must refuse extra properties`);
+    throw new Error(`${at}: an object definition must refuse extra properties`);
   }
-  const {properties} = schema;
+  const properties = schema.properties ?? {};
   const required = new Set(schema.required);
   const undeclared = [...required].filter(
     key => !Object.hasOwn(properties, key),
@@ -308,32 +318,90 @@ function declaration(name: string, schema: Schema, at: string): string {
     if (!IDENTIFIER.test(key)) {
       throw new Error(`${where}: not a TypeScript identifier`);
     }
-    const optional = required.has(key) ? '' : '?';
-    const type = typeOf(property, where);
-    return `${docComment(property.description, '  ')}  ${key}${optional}: ${type};\n`;
+    const optional = required.has(key) ? '' : '.exactOptional()';
+    const member = zodOf(property, where);
+    return `${docComment(property.description, '  ')}  ${key}: ${member}${optional},\n`;
   });
-  return `${comment}export interface ${name} {\n${members.join('')}}\n`;
+  return `z.strictObject({\n${members.join('')}})`;
+}
+
+/** The schema `name` and the type it infers, under the same name. */
+function declaration(name: string, schema: Schema, at: string): string {
+  if (!IDENTIFIER.test(name)) {
+    throw new Error(`${at}: not a TypeScript identifier`);
+  }
+  const value =
+    schema.properties === undefined ? zodOf(schema, at) : objectOf(schema, at);
+  return (
+    `${docComment(schema.description, '')}export const ${name} = ${value};\n` +
+    `export type ${name} = z.infer<typeof ${name}>;\n`
+  );
+}
+
+/** Every definition `value` refers to, at any depth. */
+function refsOf(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(refsOf);
+  if (!isObject(value)) return [];
+  const own = isString(value['$ref']) ? [value['$ref']] : [];
+  return [...own, ...Object.values(value).flatMap(refsOf)];
 }
 
 /**
- * Translates the contract schema into TypeScript declarations: one exported
- * type per definition, under the definition's name, and `ROOT_NAME` for the
- * root.
+ * The definitions' names with each after every definition it refers to, so
+ * that each schema constant is declared before its first use.
  */
-export function schemaToTypeScript(root: unknown): string {
+function dependencyOrder(defs: Record<string, unknown>): string[] {
+  const order: string[] = [];
+  const visiting = new Set<string>();
+  const visit = (name: string, at: string): void => {
+    if (order.includes(name)) return;
+    if (visiting.has(name)) {
+      throw new Error(`${at}: a $ref cycle through ${name}`);
+    }
+    if (!Object.hasOwn(defs, name)) {
+      throw new Error(`${at}: no definition ${name}`);
+    }
+    visiting.add(name);
+    // A $ref this generator cannot follow is refused where it appears.
+    const local = refsOf(defs[name]).filter(ref => ref.startsWith(REF_PREFIX));
+    for (const ref of local) {
+      visit(ref.slice(REF_PREFIX.length), `${REF_PREFIX}${name}`);
+    }
+    visiting.delete(name);
+    order.push(name);
+  };
+  for (const name of Object.keys(defs)) visit(name, '#/$defs');
+  return order;
+}
+
+/**
+ * Translates the contract schema into Zod schemas: one exported schema per
+ * definition, under the definition's name and with the type it infers, and
+ * `ROOT_NAME` for the root.
+ */
+export function schemaToZod(root: unknown): string {
   const schema = asSchema(root, '#', ROOT_KEYWORDS);
-  if (schema.$defs === undefined || schema.oneOf === undefined) {
+  const defs = schema.$defs;
+  if (defs === undefined || schema.oneOf === undefined) {
     throw new Error('#: the root needs $defs and oneOf');
   }
-  const declarations = Object.entries(schema.$defs).map(([name, value]) => {
-    const at = `${REF_PREFIX}${name}`;
-    return declaration(name, asSchema(value, at), at);
-  });
+  // Translating every definition first refuses a bad one at its own pointer.
+  const declared = new Map(
+    Object.entries(defs).map(([name, value]) => {
+      const at = `${REF_PREFIX}${name}`;
+      return [name, declaration(name, asSchema(value, at), at)];
+    }),
+  );
+  const declarations = dependencyOrder(defs).map(name => declared.get(name));
   const responses: Schema = {
     oneOf: schema.oneOf,
     description: ROOT_DESCRIPTION,
   };
-  return [declaration(ROOT_NAME, responses, '#'), ...declarations].join('\n');
+  return [
+    "import * as z from 'zod';\n",
+    ...declarations,
+    declaration(ROOT_NAME, responses, '#'),
+  ].join('\n');
 }
 
 /** The formatted source of src/contract/contract.ts for the current schema. */
@@ -343,7 +411,7 @@ export async function generateContract(): Promise<string> {
     readFile(import.meta.filename, 'utf8'),
   ]);
   const header = ownText.slice(0, ownText.indexOf('\n\n'));
-  const types = schemaToTypeScript(JSON.parse(schemaText));
+  const types = schemaToZod(JSON.parse(schemaText));
   const source = `${header}\n\n${NOTICE}\n\n${types}`;
   const vp = fileURLToPath(import.meta.resolve('vite-plus/bin'));
   return execFileSync(

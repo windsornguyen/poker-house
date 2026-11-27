@@ -15,10 +15,7 @@
 // Generated from apps/server/src/poker_house_server/contract.schema.json by
 // scripts/generate_contract.ts. Do not edit; run pnpm generate:contract.
 
-/**
- * Every response body the server sends.
- */
-export type ResponseBody = Frame | Catalogue | Health | SessionClosed | Error;
+import * as z from 'zod';
 
 /**
  * A legal action at a position.
@@ -27,10 +24,17 @@ export type ResponseBody = Frame | Catalogue | Health | SessionClosed | Error;
  *   id: The OpenSpiel action id, which a client sends to play it.
  *   label: The game's text for the action.
  */
-export interface Action {
-  id: number;
-  label: string;
-}
+export const Action = z.strictObject({
+  id: z.int(),
+  label: z.string(),
+});
+export type Action = z.infer<typeof Action>;
+
+/**
+ * Any JSON value.
+ */
+export const JsonValue = z.unknown();
+export type JsonValue = z.infer<typeof JsonValue>;
 
 /**
  * What a game's adapter says about one legal action, for its renderer.
@@ -40,10 +44,11 @@ export interface Action {
  *   hint: The adapter's description of the action, such as the card it plays
  *     or the cells it joins.
  */
-export interface ActionHint {
-  id: number;
-  hint: JsonValue;
-}
+export const ActionHint = z.strictObject({
+  id: z.int(),
+  hint: JsonValue,
+});
+export type ActionHint = z.infer<typeof ActionHint>;
 
 /**
  * Lets controllers play their seats.
@@ -59,9 +64,10 @@ export interface ActionHint {
  *   max_plies: The most seat actions to apply, from 1 to 1000, or null for
  *     1000.
  */
-export interface Advance {
-  max_plies: number | null;
-}
+export const Advance = z.strictObject({
+  max_plies: z.int().nullable(),
+});
+export type Advance = z.infer<typeof Advance>;
 
 /**
  * Plays an action for the seat to move.
@@ -73,10 +79,11 @@ export interface Advance {
  *     ply plays from that position and takes back every later ply, as only
  *     an omniscient viewer may.
  */
-export interface ApplyAction {
-  action: number;
-  ply: number | null;
-}
+export const ApplyAction = z.strictObject({
+  action: z.int(),
+  ply: z.int().nullable(),
+});
+export type ApplyAction = z.infer<typeof ApplyAction>;
 
 /**
  * Chooses the outcome at a chance node under the `expose` policy.
@@ -85,10 +92,29 @@ export interface ApplyAction {
  *   outcome: The OpenSpiel action id, one of the frame's `chance_outcomes`.
  *   ply: The position to choose at, as for `ApplyAction`.
  */
-export interface ApplyChanceOutcome {
-  outcome: number;
-  ply: number | null;
-}
+export const ApplyChanceOutcome = z.strictObject({
+  outcome: z.int(),
+  ply: z.int().nullable(),
+});
+export type ApplyChanceOutcome = z.infer<typeof ApplyChanceOutcome>;
+
+/**
+ * One action of a bot's policy, with the probability it gave it.
+ *
+ * Attributes:
+ *   action: The OpenSpiel action id, a legal action where the bot chose.
+ *     The schema's type admits null, but a history entry carries a bot
+ *     output only when its own action is given, and then every policy
+ *     entry's action is given too, so no frame holds a null one.
+ *   label: The game's text for the action.
+ *   prob: The probability the bot gave the action, in [0, 1].
+ */
+export const PolicyEntry = z.strictObject({
+  action: z.int().nullable(),
+  label: z.string(),
+  prob: z.number(),
+});
+export type PolicyEntry = z.infer<typeof PolicyEntry>;
 
 /**
  * What a bot said about one of its choices, beyond the action.
@@ -103,11 +129,46 @@ export interface ApplyChanceOutcome {
  *   decided_by: What part of the bot made the choice, such as `network`,
  *     `search`, `scripted` or `forced`; null when it did not say.
  */
-export interface BotOutput {
-  policy: PolicyEntry[];
-  value: number | null;
-  decided_by: string | null;
-}
+export const BotOutput = z.strictObject({
+  policy: z.array(PolicyEntry),
+  value: z.number().nullable(),
+  decided_by: z.string().nullable(),
+});
+export type BotOutput = z.infer<typeof BotOutput>;
+
+/**
+ * A kind of agent that can play a seat.
+ *
+ * Attributes:
+ *   name: The stable identifier used in requests and in `SeatView.controller`.
+ *   label: The human-readable name.
+ *   config_schema: A JSON Schema object that a seat's `config` for this
+ *     controller must satisfy; `{}` when it takes no settings. Each of its
+ *     `properties` gives a setting's `type`, `default` and constraints; a
+ *     setting listed in its `required` has no `default`, and a seat must be
+ *     given it.
+ *   unavailable_reason: Why the controller cannot play the session's game;
+ *     null when it can. A seat is never played by a controller with a
+ *     reason.
+ */
+export const Controller = z.strictObject({
+  name: z.string(),
+  label: z.string(),
+  config_schema: z.record(z.string(), JsonValue),
+  unavailable_reason: z.string().nullable(),
+});
+export type Controller = z.infer<typeof Controller>;
+
+/**
+ * How chance nodes are resolved.
+ *
+ * Attributes:
+ *   AUTO: The server samples each outcome from a seeded generator.
+ *   EXPOSE: The client chooses each outcome; in a game that hides
+ *     information, only from the oracle view.
+ */
+export const ChancePolicy = z.enum(['auto', 'expose']);
+export type ChancePolicy = z.infer<typeof ChancePolicy>;
 
 /**
  * What the server can do, independent of any one game.
@@ -116,20 +177,104 @@ export interface BotOutput {
  *   controllers: Every registered controller, starting with the human one.
  *   chance_policies: The chance policies the server accepts.
  */
-export interface Capabilities {
-  controllers: Controller[];
-  chance_policies: ChancePolicy[];
-}
+export const Capabilities = z.strictObject({
+  controllers: z.array(Controller),
+  chance_policies: z.array(ChancePolicy),
+});
+export type Capabilities = z.infer<typeof Capabilities>;
 
 /**
- * Every game the server knows.
+ * How players move, as the game declares it.
  *
  * Attributes:
- *   games: One entry per game, ordered by name.
+ *   SEQUENTIAL: One player acts at a time.
+ *   SIMULTANEOUS: Players act together; served through the turn-based wrapper.
+ *   MEAN_FIELD: A mean-field game.
  */
-export interface Catalogue {
-  games: CatalogueEntry[];
-}
+export const Dynamics = z.enum(['sequential', 'simultaneous', 'mean_field']);
+export type Dynamics = z.infer<typeof Dynamics>;
+
+/**
+ * How the game uses chance, as the game declares it.
+ *
+ * Attributes:
+ *   DETERMINISTIC: The game has no chance nodes.
+ *   EXPLICIT_STOCHASTIC: Chance nodes list their outcomes and probabilities.
+ *   SAMPLED_STOCHASTIC: Chance outcomes are sampled inside the state.
+ */
+export const ChanceMode = z.enum([
+  'deterministic',
+  'explicit_stochastic',
+  'sampled_stochastic',
+]);
+export type ChanceMode = z.infer<typeof ChanceMode>;
+
+/**
+ * What the players observe, as the game declares it.
+ *
+ * Attributes:
+ *   ONE_SHOT: A one-shot game.
+ *   PERFECT_INFORMATION: Every player observes the full state.
+ *   IMPERFECT_INFORMATION: Some state is hidden from some players.
+ */
+export const Information = z.enum([
+  'one_shot',
+  'perfect_information',
+  'imperfect_information',
+]);
+export type Information = z.infer<typeof Information>;
+
+/**
+ * The type of a game parameter's value.
+ *
+ * Attributes:
+ *   BOOL: A boolean.
+ *   INT: An integer.
+ *   FLOAT: A real number.
+ *   STRING: A string.
+ */
+export const ParameterType = z.enum(['bool', 'int', 'float', 'string']);
+export type ParameterType = z.infer<typeof ParameterType>;
+
+/**
+ * Which values a game parameter admits.
+ *
+ * Attributes:
+ *   FREE: Any value of its type.
+ *   RANGE: A number between `minimum` and `maximum`, inclusive.
+ *   CHOICE: One of `choices`.
+ */
+export const ParameterKind = z.enum(['free', 'range', 'choice']);
+export type ParameterKind = z.infer<typeof ParameterKind>;
+
+/**
+ * A game parameter, as a client needs it to offer the parameter.
+ *
+ * Attributes:
+ *   name: The parameter's name, a key of a session's `parameters`.
+ *   type: The type of the parameter's value.
+ *   kind: Which values the parameter admits.
+ *   default: The value the game uses when none is given.
+ *   minimum: The least admitted value when `kind` is `range`, otherwise null.
+ *   maximum: The greatest admitted value when `kind` is `range`, otherwise
+ *     null.
+ *   choices: The admitted values when `kind` is `choice`, otherwise null.
+ *   description: What the parameter controls, or null when the game does not
+ *     say.
+ */
+export const ParameterSpec = z.strictObject({
+  name: z.string(),
+  type: ParameterType,
+  kind: ParameterKind,
+  default: z.union([z.boolean(), z.int(), z.number(), z.string()]),
+  minimum: z.number().nullable(),
+  maximum: z.number().nullable(),
+  choices: z
+    .array(z.union([z.boolean(), z.int(), z.number(), z.string()]))
+    .nullable(),
+  description: z.string().nullable(),
+});
+export type ParameterSpec = z.infer<typeof ParameterSpec>;
 
 /**
  * A game the server knows, and whether it can serve it.
@@ -156,34 +301,33 @@ export interface Catalogue {
  *     the client has that renderer. Null for a game with no adapter, and for
  *     one that is not loadable; such a game is shown as its text.
  */
-export interface CatalogueEntry {
-  name: string;
-  long_name: string;
-  dynamics: Dynamics;
-  chance_mode: ChanceMode;
-  information: Information;
-  min_seats: number;
-  max_seats: number;
-  num_players: number | null;
-  parameters: ParameterSpec[];
-  loadable: boolean;
-  unavailable_reason: string | null;
-  controllers: string[];
-  renderer: string | null;
-}
+export const CatalogueEntry = z.strictObject({
+  name: z.string(),
+  long_name: z.string(),
+  dynamics: Dynamics,
+  chance_mode: ChanceMode,
+  information: Information,
+  min_seats: z.int(),
+  max_seats: z.int(),
+  num_players: z.int().nullable(),
+  parameters: z.array(ParameterSpec),
+  loadable: z.boolean(),
+  unavailable_reason: z.string().nullable(),
+  controllers: z.array(z.string()),
+  renderer: z.string().nullable(),
+});
+export type CatalogueEntry = z.infer<typeof CatalogueEntry>;
 
 /**
- * How the game uses chance, as the game declares it.
+ * Every game the server knows.
  *
  * Attributes:
- *   DETERMINISTIC: The game has no chance nodes.
- *   EXPLICIT_STOCHASTIC: Chance nodes list their outcomes and probabilities.
- *   SAMPLED_STOCHASTIC: Chance outcomes are sampled inside the state.
+ *   games: One entry per game, ordered by name.
  */
-export type ChanceMode =
-  | 'deterministic'
-  | 'explicit_stochastic'
-  | 'sampled_stochastic';
+export const Catalogue = z.strictObject({
+  games: z.array(CatalogueEntry),
+});
+export type Catalogue = z.infer<typeof Catalogue>;
 
 /**
  * A chance outcome at a chance node.
@@ -193,43 +337,12 @@ export type ChanceMode =
  *   label: The game's text for the outcome.
  *   probability: The outcome's probability, in (0, 1].
  */
-export interface ChanceOutcome {
-  id: number;
-  label: string;
-  probability: number;
-}
-
-/**
- * How chance nodes are resolved.
- *
- * Attributes:
- *   AUTO: The server samples each outcome from a seeded generator.
- *   EXPOSE: The client chooses each outcome; in a game that hides
- *     information, only from the oracle view.
- */
-export type ChancePolicy = 'auto' | 'expose';
-
-/**
- * A kind of agent that can play a seat.
- *
- * Attributes:
- *   name: The stable identifier used in requests and in `SeatView.controller`.
- *   label: The human-readable name.
- *   config_schema: A JSON Schema object that a seat's `config` for this
- *     controller must satisfy; `{}` when it takes no settings. Each of its
- *     `properties` gives a setting's `type`, `default` and constraints; a
- *     setting listed in its `required` has no `default`, and a seat must be
- *     given it.
- *   unavailable_reason: Why the controller cannot play the session's game;
- *     null when it can. A seat is never played by a controller with a
- *     reason.
- */
-export interface Controller {
-  name: string;
-  label: string;
-  config_schema: Record<string, JsonValue>;
-  unavailable_reason: string | null;
-}
+export const ChanceOutcome = z.strictObject({
+  id: z.int(),
+  label: z.string(),
+  probability: z.number(),
+});
+export type ChanceOutcome = z.infer<typeof ChanceOutcome>;
 
 /**
  * Why a seat's controller stopped playing.
@@ -240,10 +353,30 @@ export interface Controller {
  *     omniscient, the failing seat included, since the message may describe
  *     any seat's private state.
  */
-export interface ControllerFailure {
-  error: string;
-  message: string | null;
-}
+export const ControllerFailure = z.strictObject({
+  error: z.string(),
+  message: z.string().nullable(),
+});
+export type ControllerFailure = z.infer<typeof ControllerFailure>;
+
+/**
+ * Who plays a seat.
+ *
+ * Attributes:
+ *   controller: The `Controller.name` to play the seat.
+ *   config: The controller's settings, satisfying its `config_schema`.
+ *   autoplay: Whether the server plays the seat's moves as soon as it is to
+ *     move. Must be false for a human seat.
+ */
+export const SeatConfig = z.strictObject({
+  controller: z.string(),
+  config: z.record(
+    z.string(),
+    z.union([z.boolean(), z.int(), z.number(), z.string()]),
+  ),
+  autoplay: z.boolean(),
+});
+export type SeatConfig = z.infer<typeof SeatConfig>;
 
 /**
  * Starts a session.
@@ -256,40 +389,17 @@ export interface ControllerFailure {
  *   seed: The chance generator's seed, a non-negative integer, or null for
  *     the server to choose one.
  */
-export interface CreateSession {
-  game: string;
-  parameters: Record<string, boolean | number | string>;
-  seats: SeatConfig[];
-  chance_policy: ChancePolicy;
-  seed: number | null;
-}
-
-/**
- * How players move, as the game declares it.
- *
- * Attributes:
- *   SEQUENTIAL: One player acts at a time.
- *   SIMULTANEOUS: Players act together; served through the turn-based wrapper.
- *   MEAN_FIELD: A mean-field game.
- */
-export type Dynamics = 'sequential' | 'simultaneous' | 'mean_field';
-
-/**
- * A refused request.
- *
- * Attributes:
- *   code: Why the request was refused.
- *   message: A human-readable explanation, safe to show the requester: it
- *     never holds state the requester may not see.
- *   seat: The seat the refusal concerns, or null.
- *   ply: The index of the history entry the refusal concerns, or null.
- */
-export interface Error {
-  code: ErrorCode;
-  message: string;
-  seat: number | null;
-  ply: number | null;
-}
+export const CreateSession = z.strictObject({
+  game: z.string(),
+  parameters: z.record(
+    z.string(),
+    z.union([z.boolean(), z.int(), z.number(), z.string()]),
+  ),
+  seats: z.array(SeatConfig),
+  chance_policy: ChancePolicy,
+  seed: z.int().nullable(),
+});
+export type CreateSession = z.infer<typeof CreateSession>;
 
 /**
  * Why a request was refused.
@@ -307,17 +417,231 @@ export interface Error {
  *   CONTROLLER_FAILED: A seat's controller failed and the session is paused.
  *   NOTHING_TO_UNDO: The live game has no action to undo.
  */
-export type ErrorCode =
-  | 'bad_request'
-  | 'not_found'
-  | 'method_not_allowed'
-  | 'game_unavailable'
-  | 'viewer_unavailable'
-  | 'not_your_turn'
-  | 'illegal_action'
-  | 'controller_unavailable'
-  | 'controller_failed'
-  | 'nothing_to_undo';
+export const ErrorCode = z.enum([
+  'bad_request',
+  'not_found',
+  'method_not_allowed',
+  'game_unavailable',
+  'viewer_unavailable',
+  'not_your_turn',
+  'illegal_action',
+  'controller_unavailable',
+  'controller_failed',
+  'nothing_to_undo',
+]);
+export type ErrorCode = z.infer<typeof ErrorCode>;
+
+/**
+ * A refused request.
+ *
+ * Attributes:
+ *   code: Why the request was refused.
+ *   message: A human-readable explanation, safe to show the requester: it
+ *     never holds state the requester may not see.
+ *   seat: The seat the refusal concerns, or null.
+ *   ply: The index of the history entry the refusal concerns, or null.
+ */
+export const Error = z.strictObject({
+  code: ErrorCode,
+  message: z.string(),
+  seat: z.int().nullable(),
+  ply: z.int().nullable(),
+});
+export type Error = z.infer<typeof Error>;
+
+/**
+ * The fixed properties of a session.
+ *
+ * Attributes:
+ *   id: The session's identifier.
+ *   game: The game's short name.
+ *   parameters: The game's parameters, defaults included.
+ *   num_seats: The number of seats.
+ *   chance_policy: How chance nodes are resolved.
+ *   turn_based: Whether a simultaneous game is served through the turn-based
+ *     wrapper, which has its seats act one after another.
+ *   hides_information: Whether some seat may not see the full state. When
+ *     false, every viewer is omniscient.
+ *   seed: The chance generator's seed; null for every viewer but the oracle,
+ *     since it determines every chance outcome to come.
+ *   controllers: The controllers that can play a seat of this game.
+ */
+export const SessionInfo = z.strictObject({
+  id: z.string(),
+  game: z.string(),
+  parameters: z.record(
+    z.string(),
+    z.union([z.boolean(), z.int(), z.number(), z.string()]),
+  ),
+  num_seats: z.int(),
+  chance_policy: ChancePolicy,
+  turn_based: z.boolean(),
+  hides_information: z.boolean(),
+  seed: z.int().nullable(),
+  controllers: z.array(Controller),
+});
+export type SessionInfo = z.infer<typeof SessionInfo>;
+
+/**
+ * Who a frame is built for.
+ *
+ * Attributes:
+ *   SEAT: A player, who sees what that player may observe.
+ *   SPECTATOR: A watcher in no seat, who sees only public state.
+ *   ORACLE: An omniscient observer, who sees the full state.
+ */
+export const ViewerKind = z.enum(['seat', 'spectator', 'oracle']);
+export type ViewerKind = z.infer<typeof ViewerKind>;
+
+/**
+ * The audience a frame is built for.
+ *
+ * Attributes:
+ *   kind: Whether the viewer holds a seat, watches, or sees everything.
+ *   seat: The viewer's seat when `kind` is `seat`, otherwise null.
+ */
+export const Viewer = z.strictObject({
+  kind: ViewerKind,
+  seat: z.int().nullable(),
+});
+export type Viewer = z.infer<typeof Viewer>;
+
+/**
+ * The state of a session's live game.
+ *
+ * Attributes:
+ *   PLAYING: The game is in progress.
+ *   PAUSED: A seat's controller failed; play resumes only after an undo, a
+ *     reset or a change of that seat's controller. A seat whose controller
+ *     could not be built (`SeatStatus.UNAVAILABLE`) resumes only after a
+ *     change of its controller.
+ *   TERMINAL: The game is over.
+ */
+export const SessionStatus = z.enum(['playing', 'paused', 'terminal']);
+export type SessionStatus = z.infer<typeof SessionStatus>;
+
+/**
+ * Whether a seat's controller is ready to play.
+ *
+ * Attributes:
+ *   READY: The controller is built and plays the seat; a human seat is always
+ *     ready.
+ *   PREPARING: The server is building the controller, which can take a while
+ *     (a trained model loads and warms up). The seat does not move until it
+ *     is ready; then autoplay goes on.
+ *   UNAVAILABLE: The controller could not be built, or was not built within
+ *     the build budget. The seat has a `failure`, so the session is paused
+ *     until the seat is given a controller again.
+ */
+export const SeatStatus = z.enum(['ready', 'preparing', 'unavailable']);
+export type SeatStatus = z.infer<typeof SeatStatus>;
+
+/**
+ * One seat of a session.
+ *
+ * Attributes:
+ *   seat: The seat index, which is the OpenSpiel player id.
+ *   controller: The `Controller.name` playing the seat.
+ *   config: The controller's settings, satisfying its `config_schema`.
+ *     Every viewer receives them, so they hold no secret.
+ *   autoplay: Whether the server plays the seat's moves as soon as it is to
+ *     move, rather than on an advance request. Never true for a human seat.
+ *   failure: Why the controller failed, or null while it plays.
+ *   status: Whether the controller is ready, being built, or could not be
+ *     built.
+ *   message: Why the seat is not ready, for every viewer: what the server is
+ *     doing while it is `preparing`, or why it is `unavailable`; null when it
+ *     is `ready`, and optional while it is `preparing`.
+ *   notice: The controller's short note about its latest choice, such as a
+ *     remote bot reporting something it recovered from; null when it gave
+ *     none. Only the seat's own viewer and omniscient viewers receive it. It
+ *     has no effect on play.
+ */
+export const SeatView = z.strictObject({
+  seat: z.int(),
+  controller: z.string(),
+  config: z.record(
+    z.string(),
+    z.union([z.boolean(), z.int(), z.number(), z.string()]),
+  ),
+  autoplay: z.boolean(),
+  failure: ControllerFailure.nullable(),
+  status: SeatStatus,
+  message: z.string().nullable(),
+  notice: z.string().nullable(),
+});
+export type SeatView = z.infer<typeof SeatView>;
+
+/**
+ * Who acts at a position.
+ *
+ * Attributes:
+ *   SEAT: A seat chooses the next action.
+ *   CHANCE: Chance chooses the next action.
+ *   TERMINAL: The game is over and nobody acts.
+ */
+export const MoverKind = z.enum(['seat', 'chance', 'terminal']);
+export type MoverKind = z.infer<typeof MoverKind>;
+
+/**
+ * Who acts at a position.
+ *
+ * Attributes:
+ *   kind: Whether a seat or chance acts, or the game is over.
+ *   seat: The acting seat when `kind` is `seat`, otherwise null.
+ */
+export const ToMove = z.strictObject({
+  kind: MoverKind,
+  seat: z.int().nullable(),
+});
+export type ToMove = z.infer<typeof ToMove>;
+
+/**
+ * One action of the live game, as the viewer may see it.
+ *
+ * Attributes:
+ *   seat: The seat that acted, or null for a chance outcome.
+ *   action: The OpenSpiel action id, or null when withheld from the viewer.
+ *   label: The game's text for the action, or null when withheld.
+ *   rewards: Each seat's reward for the action, in seat order, or null when
+ *     withheld.
+ *   public_label: What every viewer may read of a withheld action, as the
+ *     game's adapter says, such as a card discarded face up; null when the
+ *     action is shown in full or wholly hidden.
+ *   bot_output: What the seat's controller said about the action: its
+ *     policy, value and what decided it. It goes with the action in full: to
+ *     an omniscient viewer and to the seat's own, and null for any other
+ *     viewer, since in a game that hides information a bot's policy, value
+ *     and what decided its move all follow from its hand. Null also when the
+ *     controller said nothing.
+ */
+export const HistoryEntry = z.strictObject({
+  seat: z.int().nullable(),
+  action: z.int().nullable(),
+  label: z.string().nullable(),
+  rewards: z.array(z.number()).nullable(),
+  public_label: z.string().nullable(),
+  bot_output: BotOutput.nullable(),
+});
+export type HistoryEntry = z.infer<typeof HistoryEntry>;
+
+/**
+ * A position as the game's adapter presents it to one viewer.
+ *
+ * Attributes:
+ *   renderer: The name of the client renderer that draws the view.
+ *   view: The adapter's view of the position, holding only what the viewer
+ *     may see.
+ *   actions: The adapter's hints for the legal actions, each naming an action
+ *     of the frame's `legal_actions` at most once; null exactly when the
+ *     frame's `legal_actions` is null.
+ */
+export const Presentation = z.strictObject({
+  renderer: z.string(),
+  view: JsonValue,
+  actions: z.array(ActionHint).nullable(),
+});
+export type Presentation = z.infer<typeof Presentation>;
 
 /**
  * A position of a session, built for one viewer.
@@ -363,27 +687,28 @@ export type ErrorCode =
  *   presentation: The position as the game's adapter presents it to the
  *     viewer; null when no adapter is registered for the game.
  */
-export interface Frame {
-  session: SessionInfo;
-  viewer: Viewer;
-  omniscient: boolean;
-  status: SessionStatus;
-  seats: SeatView[];
-  ply: number;
-  num_plies: number;
-  to_move: ToMove;
-  legal_actions: Action[] | null;
-  chance_outcomes: ChanceOutcome[] | null;
-  history: HistoryEntry[];
-  rewards: number[] | null;
-  returns: number[] | null;
-  state_text: string | null;
-  observation_text: string | null;
-  information_state_text: string | null;
-  struct: JsonValue;
-  observation_struct: JsonValue;
-  presentation: Presentation | null;
-}
+export const Frame = z.strictObject({
+  session: SessionInfo,
+  viewer: Viewer,
+  omniscient: z.boolean(),
+  status: SessionStatus,
+  seats: z.array(SeatView),
+  ply: z.int(),
+  num_plies: z.int(),
+  to_move: ToMove,
+  legal_actions: z.array(Action).nullable(),
+  chance_outcomes: z.array(ChanceOutcome).nullable(),
+  history: z.array(HistoryEntry),
+  rewards: z.array(z.number()).nullable(),
+  returns: z.array(z.number()).nullable(),
+  state_text: z.string().nullable(),
+  observation_text: z.string().nullable(),
+  information_state_text: z.string().nullable(),
+  struct: JsonValue,
+  observation_struct: JsonValue,
+  presentation: Presentation.nullable(),
+});
+export type Frame = z.infer<typeof Frame>;
 
 /**
  * The server's identity and capabilities.
@@ -393,148 +718,12 @@ export interface Frame {
  *   revision: The source revision the server runs from, or null when unknown.
  *   capabilities: What the server can do.
  */
-export interface Health {
-  version: string;
-  revision: string | null;
-  capabilities: Capabilities;
-}
-
-/**
- * One action of the live game, as the viewer may see it.
- *
- * Attributes:
- *   seat: The seat that acted, or null for a chance outcome.
- *   action: The OpenSpiel action id, or null when withheld from the viewer.
- *   label: The game's text for the action, or null when withheld.
- *   rewards: Each seat's reward for the action, in seat order, or null when
- *     withheld.
- *   public_label: What every viewer may read of a withheld action, as the
- *     game's adapter says, such as a card discarded face up; null when the
- *     action is shown in full or wholly hidden.
- *   bot_output: What the seat's controller said about the action: its
- *     policy, value and what decided it. It goes with the action in full: to
- *     an omniscient viewer and to the seat's own, and null for any other
- *     viewer, since in a game that hides information a bot's policy, value
- *     and what decided its move all follow from its hand. Null also when the
- *     controller said nothing.
- */
-export interface HistoryEntry {
-  seat: number | null;
-  action: number | null;
-  label: string | null;
-  rewards: number[] | null;
-  public_label: string | null;
-  bot_output: BotOutput | null;
-}
-
-/**
- * What the players observe, as the game declares it.
- *
- * Attributes:
- *   ONE_SHOT: A one-shot game.
- *   PERFECT_INFORMATION: Every player observes the full state.
- *   IMPERFECT_INFORMATION: Some state is hidden from some players.
- */
-export type Information =
-  | 'one_shot'
-  | 'perfect_information'
-  | 'imperfect_information';
-
-/**
- * Any JSON value.
- */
-export type JsonValue = unknown;
-
-/**
- * Who acts at a position.
- *
- * Attributes:
- *   SEAT: A seat chooses the next action.
- *   CHANCE: Chance chooses the next action.
- *   TERMINAL: The game is over and nobody acts.
- */
-export type MoverKind = 'seat' | 'chance' | 'terminal';
-
-/**
- * Which values a game parameter admits.
- *
- * Attributes:
- *   FREE: Any value of its type.
- *   RANGE: A number between `minimum` and `maximum`, inclusive.
- *   CHOICE: One of `choices`.
- */
-export type ParameterKind = 'free' | 'range' | 'choice';
-
-/**
- * A game parameter, as a client needs it to offer the parameter.
- *
- * Attributes:
- *   name: The parameter's name, a key of a session's `parameters`.
- *   type: The type of the parameter's value.
- *   kind: Which values the parameter admits.
- *   default: The value the game uses when none is given.
- *   minimum: The least admitted value when `kind` is `range`, otherwise null.
- *   maximum: The greatest admitted value when `kind` is `range`, otherwise
- *     null.
- *   choices: The admitted values when `kind` is `choice`, otherwise null.
- *   description: What the parameter controls, or null when the game does not
- *     say.
- */
-export interface ParameterSpec {
-  name: string;
-  type: ParameterType;
-  kind: ParameterKind;
-  default: boolean | number | string;
-  minimum: number | null;
-  maximum: number | null;
-  choices: Array<boolean | number | string> | null;
-  description: string | null;
-}
-
-/**
- * The type of a game parameter's value.
- *
- * Attributes:
- *   BOOL: A boolean.
- *   INT: An integer.
- *   FLOAT: A real number.
- *   STRING: A string.
- */
-export type ParameterType = 'bool' | 'int' | 'float' | 'string';
-
-/**
- * One action of a bot's policy, with the probability it gave it.
- *
- * Attributes:
- *   action: The OpenSpiel action id, a legal action where the bot chose.
- *     The schema's type admits null, but a history entry carries a bot
- *     output only when its own action is given, and then every policy
- *     entry's action is given too, so no frame holds a null one.
- *   label: The game's text for the action.
- *   prob: The probability the bot gave the action, in [0, 1].
- */
-export interface PolicyEntry {
-  action: number | null;
-  label: string;
-  prob: number;
-}
-
-/**
- * A position as the game's adapter presents it to one viewer.
- *
- * Attributes:
- *   renderer: The name of the client renderer that draws the view.
- *   view: The adapter's view of the position, holding only what the viewer
- *     may see.
- *   actions: The adapter's hints for the legal actions, each naming an action
- *     of the frame's `legal_actions` at most once; null exactly when the
- *     frame's `legal_actions` is null.
- */
-export interface Presentation {
-  renderer: string;
-  view: JsonValue;
-  actions: ActionHint[] | null;
-}
+export const Health = z.strictObject({
+  version: z.string(),
+  revision: z.string().nullable(),
+  capabilities: Capabilities,
+});
+export type Health = z.infer<typeof Health>;
 
 /**
  * Restarts the live game, keeping the session's seats.
@@ -543,71 +732,10 @@ export interface Presentation {
  *   history: Actions to replay from the initial state, chance outcomes
  *     included, as in a frame's `history`; null or empty for a fresh game.
  */
-export interface Reset {
-  history: number[] | null;
-}
-
-/**
- * Who plays a seat.
- *
- * Attributes:
- *   controller: The `Controller.name` to play the seat.
- *   config: The controller's settings, satisfying its `config_schema`.
- *   autoplay: Whether the server plays the seat's moves as soon as it is to
- *     move. Must be false for a human seat.
- */
-export interface SeatConfig {
-  controller: string;
-  config: Record<string, boolean | number | string>;
-  autoplay: boolean;
-}
-
-/**
- * Whether a seat's controller is ready to play.
- *
- * Attributes:
- *   READY: The controller is built and plays the seat; a human seat is always
- *     ready.
- *   PREPARING: The server is building the controller, which can take a while
- *     (a trained model loads and warms up). The seat does not move until it
- *     is ready; then autoplay goes on.
- *   UNAVAILABLE: The controller could not be built, or was not built within
- *     the build budget. The seat has a `failure`, so the session is paused
- *     until the seat is given a controller again.
- */
-export type SeatStatus = 'ready' | 'preparing' | 'unavailable';
-
-/**
- * One seat of a session.
- *
- * Attributes:
- *   seat: The seat index, which is the OpenSpiel player id.
- *   controller: The `Controller.name` playing the seat.
- *   config: The controller's settings, satisfying its `config_schema`.
- *     Every viewer receives them, so they hold no secret.
- *   autoplay: Whether the server plays the seat's moves as soon as it is to
- *     move, rather than on an advance request. Never true for a human seat.
- *   failure: Why the controller failed, or null while it plays.
- *   status: Whether the controller is ready, being built, or could not be
- *     built.
- *   message: Why the seat is not ready, for every viewer: what the server is
- *     doing while it is `preparing`, or why it is `unavailable`; null when it
- *     is `ready`, and optional while it is `preparing`.
- *   notice: The controller's short note about its latest choice, such as a
- *     remote bot reporting something it recovered from; null when it gave
- *     none. Only the seat's own viewer and omniscient viewers receive it. It
- *     has no effect on play.
- */
-export interface SeatView {
-  seat: number;
-  controller: string;
-  config: Record<string, boolean | number | string>;
-  autoplay: boolean;
-  failure: ControllerFailure | null;
-  status: SeatStatus;
-  message: string | null;
-  notice: string | null;
-}
+export const Reset = z.strictObject({
+  history: z.array(z.int()).nullable(),
+});
+export type Reset = z.infer<typeof Reset>;
 
 /**
  * The answer to closing a session: the server has forgotten it.
@@ -615,82 +743,19 @@ export interface SeatView {
  * Attributes:
  *   id: The id of the session closed.
  */
-export interface SessionClosed {
-  id: string;
-}
+export const SessionClosed = z.strictObject({
+  id: z.string(),
+});
+export type SessionClosed = z.infer<typeof SessionClosed>;
 
 /**
- * The fixed properties of a session.
- *
- * Attributes:
- *   id: The session's identifier.
- *   game: The game's short name.
- *   parameters: The game's parameters, defaults included.
- *   num_seats: The number of seats.
- *   chance_policy: How chance nodes are resolved.
- *   turn_based: Whether a simultaneous game is served through the turn-based
- *     wrapper, which has its seats act one after another.
- *   hides_information: Whether some seat may not see the full state. When
- *     false, every viewer is omniscient.
- *   seed: The chance generator's seed; null for every viewer but the oracle,
- *     since it determines every chance outcome to come.
- *   controllers: The controllers that can play a seat of this game.
+ * Every response body the server sends.
  */
-export interface SessionInfo {
-  id: string;
-  game: string;
-  parameters: Record<string, boolean | number | string>;
-  num_seats: number;
-  chance_policy: ChancePolicy;
-  turn_based: boolean;
-  hides_information: boolean;
-  seed: number | null;
-  controllers: Controller[];
-}
-
-/**
- * The state of a session's live game.
- *
- * Attributes:
- *   PLAYING: The game is in progress.
- *   PAUSED: A seat's controller failed; play resumes only after an undo, a
- *     reset or a change of that seat's controller. A seat whose controller
- *     could not be built (`SeatStatus.UNAVAILABLE`) resumes only after a
- *     change of its controller.
- *   TERMINAL: The game is over.
- */
-export type SessionStatus = 'playing' | 'paused' | 'terminal';
-
-/**
- * Who acts at a position.
- *
- * Attributes:
- *   kind: Whether a seat or chance acts, or the game is over.
- *   seat: The acting seat when `kind` is `seat`, otherwise null.
- */
-export interface ToMove {
-  kind: MoverKind;
-  seat: number | null;
-}
-
-/**
- * The audience a frame is built for.
- *
- * Attributes:
- *   kind: Whether the viewer holds a seat, watches, or sees everything.
- *   seat: The viewer's seat when `kind` is `seat`, otherwise null.
- */
-export interface Viewer {
-  kind: ViewerKind;
-  seat: number | null;
-}
-
-/**
- * Who a frame is built for.
- *
- * Attributes:
- *   SEAT: A player, who sees what that player may observe.
- *   SPECTATOR: A watcher in no seat, who sees only public state.
- *   ORACLE: An omniscient observer, who sees the full state.
- */
-export type ViewerKind = 'seat' | 'spectator' | 'oracle';
+export const ResponseBody = z.union([
+  Frame,
+  Catalogue,
+  Health,
+  SessionClosed,
+  Error,
+]);
+export type ResponseBody = z.infer<typeof ResponseBody>;

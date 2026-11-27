@@ -157,6 +157,11 @@ export default defineConfig({
     overrides: [
       ...Array.from({length: MAX_DEPTH + 1}, (_, depth) => staysInWeb(depth)),
       {
+        // Each generated type alias restates the documented schema above it.
+        files: [WEB + 'src/contract/contract.ts'],
+        rules: {'jsdoc-js/require-jsdoc': 'off'},
+      },
+      {
         // DOM code reads textContent.
         files: [WEB + 'src/**/*.{ts,tsx}'],
         rules: {
