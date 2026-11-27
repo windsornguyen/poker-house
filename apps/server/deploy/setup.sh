@@ -28,7 +28,18 @@ if [[ ! -f $ENV_FILE ]]; then
   chmod 600 "$ENV_FILE"
 fi
 password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
-systemctl start postgresql
+cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/poker-house.conf" <<CONF
+shared_buffers = 512MB
+effective_cache_size = 2GB
+synchronous_commit = off
+wal_compression = lz4
+checkpoint_timeout = 15min
+max_wal_size = 1GB
+random_page_cost = 1.1
+jit = off
+max_connections = 20
+CONF
+systemctl restart "postgresql@$PG_MAJOR-main"
 runuser -u postgres -- psql -v ON_ERROR_STOP=1 -q <<SQL
 SELECT 'CREATE ROLE poker_house LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'poker_house')\gexec
 ALTER ROLE poker_house PASSWORD '$password';
@@ -56,6 +67,7 @@ cd "$APP_DIR"
 as_app uv sync -q --frozen --package poker-house-server
 as_app pnpm install --frozen-lockfile --silent
 as_app pnpm build >/dev/null
+psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
 
 allow_hosts=()
 for host in "${HOSTS[@]}"; do
