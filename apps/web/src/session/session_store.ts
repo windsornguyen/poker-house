@@ -181,6 +181,11 @@ export class SessionStore implements SessionCommands {
     this.enqueue(this.reload);
   };
 
+  /** Shows why the server's stream of frames ended. */
+  readonly streamFailed = (error: TransportError): void => {
+    this.update({error});
+  };
+
   /**
    * Takes a live frame the server pushed. A command's own answer wins while
    * one is pending, and a replay stays shown while new plies arrive.

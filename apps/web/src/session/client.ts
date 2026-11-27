@@ -20,7 +20,7 @@ import type {
   SeatConfig,
   Viewer,
 } from '../contract/contract.ts';
-import {type Bodies, decode} from './decode.ts';
+import {type Bodies, decode, decodeFrame} from './decode.ts';
 import {TransportError} from './errors.ts';
 
 /** The subset of `fetch` the client uses. */
@@ -109,18 +109,29 @@ export class SessionClient {
    * Calls `onFrame` with the live position now and after every change to
    * the session, until the returned function is called. The browser
    * reconnects a dropped stream itself, and each connection starts with the
-   * current position.
+   * current position. An event that is not a frame ends the stream and
+   * goes to `onError`.
    */
   events(
     id: string,
     viewer: Viewer,
     onFrame: (frame: Frame) => void,
+    onError: (error: TransportError) => void,
   ): () => void {
     const source = new EventSource(
       `${this.origin}/api/sessions/${encodeURIComponent(id)}/events?${query(viewer)}`,
     );
     source.onmessage = event => {
-      onFrame(JSON.parse(String(event.data)) as Frame);
+      let frame: Frame;
+      try {
+        frame = decodeFrame(String(event.data));
+      } catch (e) {
+        if (!(e instanceof TransportError)) throw e;
+        source.close();
+        onError(e);
+        return;
+      }
+      onFrame(frame);
     };
     // The server ends a quiet stream so an idle tab lets the machine sleep.
     source.addEventListener('idle', () => {

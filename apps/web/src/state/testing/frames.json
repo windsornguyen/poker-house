@@ -6,31 +6,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "",
@@ -110,31 +120,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "0p",
@@ -214,31 +234,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "0pbb",
@@ -318,31 +348,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "",
@@ -422,31 +462,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "2p",
@@ -526,31 +576,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "2pbb",
@@ -630,31 +690,41 @@
         "action": 0,
         "label": "Deal:0",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 2,
         "label": "Deal:2",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -734,31 +804,41 @@
         "action": 0,
         "label": "Deal:0",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 2,
         "label": "Deal:2",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -838,31 +918,41 @@
         "action": 0,
         "label": "Deal:0",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 2,
         "label": "Deal:2",
         "rewards": [0.0, 0.0],
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "Pass",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 1,
         "label": "Bet",
         "rewards": [-2.0, 2.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -942,31 +1032,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -1046,31 +1146,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -1150,31 +1260,41 @@
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": null
+        "seat": null,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": null,
         "label": null,
         "rewards": null,
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -1254,19 +1374,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "4, 0",
@@ -1397,19 +1523,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": "4, 0, 8",
@@ -1602,19 +1734,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -1742,19 +1880,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -2157,19 +2301,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,
@@ -2297,19 +2447,25 @@
         "action": 4,
         "label": "x(1,1)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 0,
         "label": "o(0,0)",
         "rewards": [0.0, 0.0],
-        "seat": 1
+        "seat": 1,
+        "public_label": null,
+        "bot_output": null
       },
       {
         "action": 8,
         "label": "x(2,2)",
         "rewards": [0.0, 0.0],
-        "seat": 0
+        "seat": 0,
+        "public_label": null,
+        "bot_output": null
       }
     ],
     "information_state_text": null,

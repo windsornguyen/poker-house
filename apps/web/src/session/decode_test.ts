@@ -14,7 +14,8 @@
 
 import {describe, expect, it} from 'vite-plus/test';
 
-import {decode} from './decode.ts';
+import {recordedFrame} from '../state/testing/recorded_frames.ts';
+import {decode, decodeFrame} from './decode.ts';
 import {ContractError, TransportError} from './errors.ts';
 
 function response(
@@ -68,7 +69,16 @@ describe('decode bodies', () => {
 
   it('refuses a body of another kind', async () => {
     await expect(decode(response(HEALTH), 'frame')).rejects.toThrow(
-      'The server answered 200 without a Frame body.',
+      'The server answered 200 without a Frame body: ',
+    );
+  });
+});
+
+describe('decodeFrame', () => {
+  it('names the path of a field outside the contract', async () => {
+    const frame = await recordedFrame('kuhn_poker/0/0');
+    expect(() => decodeFrame(JSON.stringify({...frame, ply: 'two'}))).toThrow(
+      /without a Frame body: .*→ at ply/s,
     );
   });
 });
@@ -76,13 +86,13 @@ describe('decode bodies', () => {
 describe('decode failures', () => {
   it('refuses a JSON value that is not an object', async () => {
     await expect(decode(response('[1]'), 'health')).rejects.toThrow(
-      'not an object',
+      'expected object, received array',
     );
   });
 
   it('refuses a failure status without an error body', async () => {
     await expect(decode(response(HEALTH, 500), 'health')).rejects.toThrow(
-      'The server answered 500 without an error body.',
+      'The server answered 500 without an error body: ',
     );
   });
 
@@ -97,9 +107,9 @@ describe('decode failures', () => {
       (e: unknown) => e,
     );
     expect(error).toBeInstanceOf(TransportError);
-    expect(error).toMatchObject({
-      message: 'The server answered 409 without an error body.',
-    });
+    expect((error as TransportError).message).toContain(
+      'The server answered 409 without an error body: ',
+    );
   });
 
   it('reports a response without JSON with its status and text', async () => {

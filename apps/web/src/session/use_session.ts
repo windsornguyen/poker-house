@@ -52,7 +52,7 @@ export function useSession(client: SessionClient, viewer: Viewer): Session {
   const {busy} = snapshot;
   useEffect(() => {
     if (id === null || busy) return undefined;
-    return client.events(id, viewer, store.receive);
+    return client.events(id, viewer, store.receive, store.streamFailed);
     // `shown` names the viewer, whose object may change without it changing.
     // oxlint-disable-next-line react/exhaustive-deps
   }, [client, store, id, shown, busy]);
