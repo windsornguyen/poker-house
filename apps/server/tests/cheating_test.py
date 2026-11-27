@@ -20,6 +20,7 @@ The requests run in process against the production schema in a real Postgres,
 so each example costs milliseconds and a run explores thousands of requests.
 """
 
+import atexit
 import json
 import os
 import unittest.mock
@@ -76,8 +77,12 @@ READS: psycopg.Connection
 ACCOUNTS: dict[str, str] = {}
 
 
-def setUpModule() -> None:
+def start() -> None:
+    """Starts the cluster, its accounts and the API, once, for every example after."""
     global POSTGRES, API, READS
+    if ACCOUNTS:
+        return
+
     # A clock that acts for an idle player would add plies no request made.
     unittest.mock.patch.object(timeouts, "TURN_SECONDS", 24 * 60 * 60.0).start()
     POSTGRES = cluster.Cluster()
@@ -95,11 +100,7 @@ def setUpModule() -> None:
         health=health_report.build,
         player_key=harness.PLAYER_KEY,
     )
-
-
-def tearDownModule() -> None:
-    READS.close()
-    POSTGRES.stop()
+    atexit.register(POSTGRES.stop)
 
 
 def rows(sql: LiteralString, *params: object) -> list[tuple[Any, ...]]:
@@ -118,6 +119,7 @@ class Cheaters(stateful.RuleBasedStateMachine):
 
     def __init__(self) -> None:
         super().__init__()
+        start()
         self.codes: list[str] = []
         self.seen: dict[str, list[tuple[int | None, int]]] = {}
         # The stack each player should hold at each room: their buy-in, plus
@@ -449,8 +451,7 @@ class Cheaters(stateful.RuleBasedStateMachine):
             assert self.holders(hand)[opened.seat] == ACCOUNTS.get(who or "")
 
 
-class CheatingTest(Cheaters.TestCase):  # ty: ignore[unsupported-base]
-    """Runs the machine; a subclass, so unittest runs this module's fixtures around it."""
+CheatingTest = Cheaters.TestCase
 
 
 if __name__ == "__main__":
