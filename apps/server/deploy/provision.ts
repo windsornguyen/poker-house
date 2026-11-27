@@ -28,6 +28,11 @@ console.log(`Machine ${machineId}`);
 await waitRunning(machineId);
 
 const port = await ensurePort(machineId, SERVER_PORT);
+if (port.initial_access_key) {
+	console.log(
+		`Port key:  ${port.initial_access_key.access_key} (shown once, expires ${port.initial_access_key.expires_at})`,
+	);
+}
 const hosts = [
 	...new Set(
 		[port.application_url, port.url]
@@ -48,11 +53,6 @@ if (execution.status !== "succeeded") {
 	throw new Error(`Setup ended ${execution.status} with exit code ${execution.exit_code}.`);
 }
 console.log(output.stdout?.trim());
-if (port.initial_access_key) {
-	console.log(
-		`Port key:  ${port.initial_access_key.access_key} (shown once, expires ${port.initial_access_key.expires_at})`,
-	);
-}
 console.log(`Share URL: ${port.url ?? port.application_url}`);
 console.log(`API URL:   ${port.application_url}`);
 console.log(`Check:     curl -fsS -H "X-Dedalus-Port-Key: <port key>" ${port.application_url}`);

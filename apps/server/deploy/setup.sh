@@ -15,6 +15,7 @@ readonly ENV_FILE=/etc/poker-house/db.env
 readonly BOOT_TARGET=dm-bake.target
 
 export DEBIAN_FRONTEND=noninteractive
+export PATH="/opt/node/bin:$PATH"
 
 apt-get update -qq
 apt-get install -y -qq postgresql-common git curl xz-utils ca-certificates >/dev/null
