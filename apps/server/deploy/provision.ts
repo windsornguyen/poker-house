@@ -10,11 +10,6 @@ const SETUP_TIMEOUT_MS = 1_800_000;
 
 const Env = z.object({
   POKER_HOUSE_SITE_URL: z.url(),
-  // The emails that may make an account, comma-separated.
-  POKER_HOUSE_PLAYERS: z
-    .string()
-    .transform(list => list.split(','))
-    .pipe(z.array(z.email()).min(1)),
   POKER_HOUSE_MACHINE_ID: z.string().optional(),
 });
 
@@ -70,7 +65,6 @@ const {execution, output} = await run(
   [
     'env',
     `SITE_URL=${env.POKER_HOUSE_SITE_URL}`,
-    `PLAYERS=${env.POKER_HOUSE_PLAYERS.join(',')}`,
     'bash',
     '-s',
     '--',

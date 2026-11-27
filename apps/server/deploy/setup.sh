@@ -32,8 +32,8 @@ if [[ ! -f $AUTH_ENV_FILE ]]; then
   printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
   chmod 600 "$AUTH_ENV_FILE"
 fi
-sed -i '/^BETTER_AUTH_URL=/d; /^POKER_HOUSE_PLAYERS=/d' "$AUTH_ENV_FILE"
-printf 'BETTER_AUTH_URL=%s\nPOKER_HOUSE_PLAYERS=%s\n' "$SITE_URL" "$PLAYERS" >>"$AUTH_ENV_FILE"
+sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
+printf 'BETTER_AUTH_URL=%s\n' "$SITE_URL" >>"$AUTH_ENV_FILE"
 password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
 cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/poker-house.conf" <<CONF
 shared_buffers = 512MB

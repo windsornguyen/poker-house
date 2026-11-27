@@ -11,23 +11,27 @@ const Env = z.object({
   BETTER_AUTH_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
   DATABASE_URL: z.url(),
-  // The emails that may make an account, comma-separated.
-  POKER_HOUSE_PLAYERS: z
-    .string()
-    .transform(list => list.split(','))
-    .pipe(z.array(z.email()).min(1)),
 });
 const env = Env.parse(process.env);
-const allowed = new Set(env.POKER_HOUSE_PLAYERS);
+const pool = new Pool({
+  connectionString: env.DATABASE_URL,
+  options: '-c search_path=auth',
+});
+
+/** Whether `email` is on the player list, which decides who may sign up. */
+async function isPlayer(email: string): Promise<boolean> {
+  const found = await pool.query(
+    'select 1 from poker.player where email = $1',
+    [email],
+  );
+  return found.rowCount === 1;
+}
 
 /** Better Auth's configuration, shared by the server and the migration. */
 export const options = {
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  database: new Pool({
-    connectionString: env.DATABASE_URL,
-    options: '-c search_path=auth',
-  }),
+  database: pool,
   emailAndPassword: {enabled: true},
   session: {
     expiresIn: WEEK_SECONDS,
@@ -37,7 +41,7 @@ export const options = {
     user: {
       create: {
         before: async user =>
-          Promise.resolve(allowed.has(user.email) ? {data: user} : false),
+          (await isPlayer(user.email)) ? {data: user} : false,
       },
     },
   },

@@ -32,8 +32,13 @@ and this server behind a `key_required` port. It deploys the pushed
 ```sh
 export DEDALUS_API_KEY=dsk_...
 export POKER_HOUSE_MACHINE_ID=...   # omit to create a Machine
+export POKER_HOUSE_SITE_URL=https://...   # the site players sign in on
 pnpm deploy:dm
 ```
+
+Only emails in the `poker.player` table can make an account. Add one on the
+Machine with
+`psql "$DATABASE_URL" -c "insert into poker.player (email) values ('friend@example.com')"`.
 
 The first run prints the port's access key once. Keys expire, so issue a new one with `dedalus machines ports access-keys mint`. The key keeps strangers out. Everyone who has it sees every seat's
 cards in the analysis view, so share it only with trusted players.
