@@ -53,7 +53,11 @@ POKER_HOUSE_EMAIL=you@example.com POKER_HOUSE_PASSWORD=… \
   node apps/web/scripts/join-room.ts https://your-site ABC123
 ```
 
-Import `signIn`, `joinRoom` and `play` from it to write a player of your own.
+Import `signIn`, `joinRoom` and `play` from it to write a player of your own. A client that
+plays longer than five minutes renews its session every four, with
+`GET /api/auth/get-session?disableCookieCache=true`, because the site trusts a session
+cookie for five. `apps/players` is a Python client that does so, with two strategies and
+a duplicate match runner.
 Updates arrive as server-sent events from
 `/api/sessions/{id}/events?viewer={seat}`. Each event is one `Frame`.
 
