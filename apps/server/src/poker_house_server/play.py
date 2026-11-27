@@ -16,7 +16,7 @@
 
 """Runs a poker session and independently hosted bots in one command.
 
-  python -m poker_house_server.play --game poker_house --spectate --structured \
+  python -m poker_house_server.play --game poker_house --spectate \
     --bot poker_house_server.poker_bot:make_call_bot \
     --seat-bot 1=poker_house_server.poker_bot:make_raise_bot
 
@@ -42,7 +42,6 @@ import pyspiel
 
 from poker_house_server import child_servers
 from poker_house_server import cli
-from poker_house_server import information
 from poker_house_server import play_config
 from poker_house_server import remote_bot
 from poker_house_server import request as request_contract
@@ -68,33 +67,6 @@ STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 
 
 LaunchError = child_servers.LaunchError
-
-
-def full_state_note(
-    options: Options, game: pyspiel.Game, chosen: bool = False
-) -> str | None:
-  """Returns the line saying the bot sees what its seat may not, or None.
-
-  That is when the bot is sent the full state of a game that hides
-  information (another seat's cards, say); None otherwise.
-
-  Args:
-    options: What is launched, its `state` the state the bot is sent.
-    game: The game.
-    chosen: Whether `options.state` was not given but is the one state mode
-      the bot server takes; the line then says so.
-  """
-  if options.state != remote_bot.FULL_STATE:
-    return None
-  if not information.hides_information(game.get_type()):
-    return None
-  how = " (the only state this bot server takes)" if chosen else ""
-  return (
-      f"Note: --state full_state{how} sends the bot the whole state of "
-      f"{game.get_type().short_name}, which hides information, so it sees "
-      "what its seat may not (the other seats' private cards, say); "
-      "--state seat_view sends only what its seat may see."
-  )
 
 
 def _request(
@@ -156,68 +128,21 @@ def bot_unready(bot_url: str) -> str | None:
   return None
 
 
-def resolve_state(bot_url: str, state: str | None) -> str:
-  """Returns the state the bot server at `bot_url` is sent.
-
-  That is `state` if given, else the one state mode the server's `/info`
-  names (a checkpoint bot that replays the game takes only full_state, say),
-  else seat_view.
-
-  Raises:
-    LaunchError: If `/info` names no state modes, or not `state`. The error
-      names the `--state` that fixes it: otherwise the session would fail on
-      creation.
-  """
-  info = _request("GET", bot_url + "/info")
-  modes = info.get("state_modes") if isinstance(info, dict) else None
-  if (
-      not isinstance(modes, list)
-      or not modes
-      or not set(modes) <= set(remote_bot.STATE_MODES)
-  ):
-    raise LaunchError(
-        "The bot server's /info names no state_modes from seat_view and "
-        f"full_state: {info!r}."
-    )
-  if state is None:
-    return modes[0] if len(modes) == 1 else remote_bot.SEAT_VIEW
-  if state in modes:
-    return state
-  raise LaunchError(
-      f"The bot server takes {', '.join(modes)}, not {state}: "
-      f"rerun with --state {modes[0]}."
-  )
-
-
 def seat_config(options: Options, bot_url: str) -> dict[str, Any]:
   """Returns the Remote bot seat's settings.
 
   The seat waits for each move as long as the move budget allows
   (`timeout_seconds` 0), so a checkpoint the bot loads at its first move
   (BOT_MOVE_BUDGET_SECONDS) is not cut short.
-
-  Raises:
-    ValueError: If `options.state` is None, not yet resolved against the bot
-      server (`resolve_state`).
   """
-  if options.state is None:
-    raise ValueError("The seat's state is not resolved; see resolve_state.")
-  config = {
-      "url": bot_url,
-      "state": options.state,
-      "checkpoint": options.checkpoint,
-      "timeout_seconds": 0.0,
-  }
-  if options.structured:
-    config["structured"] = True
-  return config
+  del options
+  return {"url": bot_url, "timeout_seconds": 0.0}
 
 
 def session_body(
     options: Options,
     bot_url: str | Mapping[int, str],
     num_players: int,
-    states: Mapping[int, str] | None = None,
 ) -> dict[str, Any]:
   """Returns the body that opens the session, its bot seats Remote bots.
 
@@ -225,7 +150,6 @@ def session_body(
     options: What is launched.
     bot_url: The bot server's URL, or each bot seat's.
     num_players: The game's number of seats.
-    states: Each bot seat's state, if not `options.state`.
   """
   name, parameters = parse_game(options.game)
   who = seating(options, num_players)
@@ -233,17 +157,11 @@ def session_body(
       {"controller": "human", "config": {}, "autoplay": False}
       for _ in range(num_players)
   ]
-  for seat, bot in who.bots.items():
+  for seat in who.bots:
     url = bot_url if isinstance(bot_url, str) else bot_url[seat]
-    state = options.state if states is None else states[seat]
     seats[seat] = {
         "controller": remote_bot.NAME,
-        "config": seat_config(
-            dataclasses.replace(
-                options, checkpoint=bot.checkpoint, state=state
-            ),
-            url,
-        ),
+        "config": seat_config(options, url),
         "autoplay": True,
     }
   return {
@@ -331,36 +249,18 @@ def _start_bot(
 def _start_bots(
     options: Options,
     who: Seating,
-    game: pyspiel.Game,
     out: TextIO,
     started: list[child_servers.ChildServer],
-) -> tuple[dict[int, str], dict[int, str]]:
-  """Starts the bot servers `who` needs; returns each bot seat's URL and state.
+) -> dict[int, str]:
+  """Starts the bot servers `who` needs; returns each bot seat's URL.
 
-  Each server is appended to `started` as soon as it runs. The full-state
-  note is printed once, however many servers it applies to.
+  Each server is appended to `started` as soon as it runs.
   """
   urls: dict[tuple[int | None, SeatBot], str] = {}
-  server_states: dict[tuple[int | None, SeatBot], str] = {}
-  printed: set[str] = set()
   for i, served in enumerate(who.servers()):
     label = "bot" if i == 0 else f"bot {i + 1}"
-    url = _start_bot(options, served[1], label, out, started)
-    state = resolve_state(url, options.state)
-    note = full_state_note(
-        dataclasses.replace(options, state=state),
-        game,
-        chosen=options.state is None,
-    )
-    if note is not None and note not in printed:
-      printed.add(note)
-      print(note, file=out, flush=True)
-    urls[served] = url
-    server_states[served] = state
-  keys = {seat: who.server_of(seat) for seat in who.bots}
-  bot_urls = {seat: urls[key] for seat, key in keys.items()}
-  states = {seat: server_states[key] for seat, key in keys.items()}
-  return bot_urls, states
+    urls[served] = _start_bot(options, served[1], label, out, started)
+  return {seat: urls[who.server_of(seat)] for seat in who.bots}
 
 
 def launch(
@@ -393,17 +293,13 @@ def launch(
   if num_players < 2:
     raise LaunchError(f"{name} has one seat, so no one plays against the bot.")
   who = seating(options, num_players)
-  if options.state is not None and options.state not in remote_bot.STATE_MODES:
-    raise LaunchError(
-        f"--state {options.state!r} is not seat_view or full_state."
-    )
   reason = child_servers.port_unavailable(options.host, options.port)
   if reason is not None:
     raise LaunchError(reason)
   bots: list[child_servers.ChildServer] = []
   gui: child_servers.ChildServer | None = None
   try:
-    bot_urls, states = _start_bots(options, who, game, out, bots)
+    bot_urls = _start_bots(options, who, out, bots)
     gui_args = [
         "--host",
         options.host,
@@ -437,7 +333,7 @@ def launch(
     frame = _request(
         "POST",
         f"{local_api}/sessions?viewer=oracle",
-        session_body(options, bot_urls, num_players, states),
+        session_body(options, bot_urls, num_players),
         timeout_seconds=settlement_seconds,
     )
     session = str(frame["session"]["id"])

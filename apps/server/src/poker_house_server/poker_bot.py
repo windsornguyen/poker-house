@@ -17,7 +17,7 @@
 The call bot checks or calls. The raise bot chooses the smallest bet or
 raise, then checks or calls when no aggression is available. Both rank fold
 last. Replace choose_action to use cards, stacks, the pot or betting history
-from the structured observation; the server supplies all legal action ids.
+from the observation; the server supplies all legal action ids.
 """
 
 from collections.abc import Mapping
@@ -43,7 +43,7 @@ def _actions(
   """Decodes the fields these example policies consume at the JSON boundary."""
   values = observation.get("actions")
   if not isinstance(values, list) or not values:
-    raise ValueError("The structured observation needs non-empty actions.")
+    raise ValueError("The observation needs non-empty actions.")
   actions: list[PokerAction] = []
   for value in values:
     if not isinstance(value, Mapping):
@@ -90,31 +90,23 @@ def choose_action(
 
 
 class PokerBot:
-  """A deterministic strategy that accepts structured, private seat views."""
-
-  state_modes = ("seat_view",)
-  games = ("poker_house", "poker_house_acpc")
+  """A deterministic strategy that reads only its seat's private observation."""
 
   def __init__(self, style: Style) -> None:
     self._style = style
 
-  def step(self, mode: str, request: dict[str, contract.JsonValue]) -> int:
-    """Chooses an action, refusing missing or unsupported observations."""
-    if mode != "seat_view":
-      raise ValueError("PokerBot accepts only seat_view requests.")
-    envelope = request.get("observation")
-    if not isinstance(envelope, Mapping):
-      raise ValueError("PokerBot requires a structured seat observation.")
-    observation = envelope.get("observation_struct")
+  def move(self, request: dict[str, contract.JsonValue]) -> int:
+    """Chooses an action, refusing a malformed or unsupported observation."""
+    observation = request.get("observation")
     if not isinstance(observation, Mapping):
-      raise ValueError("Enable structured observations for PokerBot.")
+      raise ValueError("The move request needs an observation object.")
     version = observation.get("schema_version")
     if (
         not isinstance(version, int)
         or isinstance(version, bool)
         or version != 1
     ):
-      raise ValueError("PokerBot requires structured observation schema 1.")
+      raise ValueError("PokerBot requires observation schema 1.")
     if observation.get("variant") != "NoLimitTexasHoldem":
       raise ValueError("PokerBot plays only NoLimitTexasHoldem.")
     return choose_action(observation, self._style)

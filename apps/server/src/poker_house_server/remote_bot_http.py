@@ -36,11 +36,6 @@ from poker_house_server import controller_settings
 # The largest reply read from a bot server.
 MAX_REPLY_BYTES = 1 << 20
 
-# The protocol version, sent with every request in the `PROTOCOL_HEADER`
-# header, so that a request's body is exactly the bot's input.
-PROTOCOL = 1
-PROTOCOL_HEADER = "Spiel-Protocol"
-
 # A bot server's refusal: the request was understood and declined.
 REFUSAL_STATUSES = frozenset({
     http.HTTPStatus.BAD_REQUEST,
@@ -99,7 +94,7 @@ def send(
       refusal's (a redirect included, which is not followed).
     RemoteBotReplyError: If the body is not JSON, or is too large.
   """
-  headers = {"Accept": "application/json", PROTOCOL_HEADER: str(PROTOCOL)}
+  headers = {"Accept": "application/json"}
   if body is not None:
     headers["Content-Type"] = "application/json"
   if token is not None:

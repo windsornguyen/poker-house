@@ -70,7 +70,7 @@ export function pokerMatchRequest(settings: MatchSettings): CreateSession {
     },
     seats: urls.map(url => ({
       controller: 'remote',
-      config: {url, state: 'seat_view', structured: true},
+      config: {url},
       autoplay: true,
     })),
     chance_policy: 'auto',
@@ -191,7 +191,7 @@ function MatchForm({
         ))}
       </div>
       <p className="lobby__hint">
-        Each bot serves <code>/health</code> and <code>/spiel/observe</code>.
+        Each bot serves <code>GET /health</code> and <code>POST /move</code>.
         The default addresses match the example bots.
       </p>
       {!available && (

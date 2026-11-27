@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe('the poker lobby', () => {
-  it('connects both bot endpoints with private structured observations', async () => {
+  it('connects both bot endpoints', async () => {
     const shown = frame();
     shown.session.game = 'poker_house';
     const fetch = vi.fn<Fetch>(() => Promise.resolve(Response.json(shown)));
@@ -69,20 +69,12 @@ describe('the poker lobby', () => {
       seats: [
         {
           controller: 'remote',
-          config: {
-            url: 'http://alice.local:9001',
-            state: 'seat_view',
-            structured: true,
-          },
+          config: {url: 'http://alice.local:9001'},
           autoplay: true,
         },
         {
           controller: 'remote',
-          config: {
-            url: 'https://bob.example/bot',
-            state: 'seat_view',
-            structured: true,
-          },
+          config: {url: 'https://bob.example/bot'},
           autoplay: true,
         },
       ],

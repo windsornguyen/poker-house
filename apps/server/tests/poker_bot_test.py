@@ -28,14 +28,14 @@ from poker_house_server import remote_bot
 def _request(
     actions: list[contract.JsonValue],
 ) -> dict[str, contract.JsonValue]:
-  """Wraps action descriptors in the structured seat-view request."""
+  """Wraps action descriptors in a move request."""
   return {
+      "seat": 0,
+      "seed": 0,
       "observation": {
-          "observation_struct": {
-              "schema_version": 1,
-              "variant": "NoLimitTexasHoldem",
-              "actions": actions,
-          },
+          "schema_version": 1,
+          "variant": "NoLimitTexasHoldem",
+          "actions": actions,
       },
   }
 
@@ -51,23 +51,22 @@ class PokerBotTest(absltest.TestCase):
         {"id": 82, "kind": "raise", "amount": 5},
         {"id": 1, "kind": "call", "amount": 2},
     ])
-    self.assertEqual(poker_bot.make_call_bot().step("seat_view", request), 1)
-    self.assertEqual(poker_bot.make_raise_bot().step("seat_view", request), 82)
+    self.assertEqual(poker_bot.make_call_bot().move(request), 1)
+    self.assertEqual(poker_bot.make_raise_bot().move(request), 82)
 
   def test_both_policies_check_when_no_bet_is_available(self) -> None:
     request = _request([{"id": 7, "kind": "check", "amount": 0}])
     for bot in (poker_bot.make_call_bot(), poker_bot.make_raise_bot()):
-      self.assertEqual(bot.state_modes, ("seat_view",))
-      self.assertEqual(bot.step("seat_view", request), 7)
+      self.assertEqual(bot.move(request), 7)
 
   def test_fold_is_an_explicit_policy_choice_when_it_is_the_only_move(
       self,
   ) -> None:
     request = _request([{"id": 9, "kind": "fold", "amount": 0}])
     for bot in (poker_bot.make_call_bot(), poker_bot.make_raise_bot()):
-      self.assertEqual(bot.step("seat_view", request), 9)
+      self.assertEqual(bot.move(request), 9)
 
-  def test_missing_or_malformed_structured_inputs_are_refused(self) -> None:
+  def test_missing_or_malformed_observations_are_refused(self) -> None:
     bot = poker_bot.make_call_bot()
     requests: tuple[dict[str, contract.JsonValue], ...] = (
         {},
@@ -76,8 +75,8 @@ class PokerBotTest(absltest.TestCase):
     )
     for request in requests:
       with self.subTest(request=request):
-        with self.assertRaisesRegex(ValueError, "structured"):
-          bot.step("seat_view", request)
+        with self.assertRaisesRegex(ValueError, "observation"):
+          bot.move(request)
     bad_actions: tuple[list[contract.JsonValue], ...] = (
         [],
         [{"id": True, "kind": "check", "amount": 0}],
@@ -87,9 +86,7 @@ class PokerBotTest(absltest.TestCase):
     for actions in bad_actions:
       with self.subTest(actions=actions):
         with self.assertRaisesRegex(ValueError, "actions"):
-          bot.step("seat_view", _request(actions))
-    with self.assertRaisesRegex(ValueError, "seat_view"):
-      bot.step("full_state", _request([]))
+          bot.move(_request(actions))
 
   def test_live_holdem_games_end_with_only_legal_moves(self) -> None:
     for name in (
@@ -106,15 +103,7 @@ class PokerBotTest(absltest.TestCase):
           },
       ).game
       transport = remote_bot.RemoteBot(
-          game,
-          url="http://127.0.0.1:9001",
-          state_mode="seat_view",
-          bot_config={},
-          extras=False,
-          tensors=False,
-          structured=True,
-          timeout_seconds=0,
-          seed=3,
+          url="http://127.0.0.1:9001", timeout_seconds=0, seed=3
       )
       for factories in (
           (poker_bot.make_call_bot, poker_bot.make_call_bot),
@@ -131,8 +120,8 @@ class PokerBotTest(absltest.TestCase):
               action = rng.choice(state.chance_outcomes())[0]
             else:
               seat = state.current_player()
-              _, body = transport.request(state, seat)
-              action = bots[seat].step("seat_view", json.loads(body))
+              body = transport.request(state, seat)
+              action = bots[seat].move(json.loads(body))
               self.assertIn(action, state.legal_actions())
               decisions += 1
               self.assertLess(decisions, 200)

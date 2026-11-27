@@ -26,7 +26,6 @@ import pyspiel
 
 from poker_house_server import child_servers
 from poker_house_server import loader
-from poker_house_server import remote_bot
 from poker_house_server import remote_bot_server
 from poker_house_server import static
 
@@ -35,10 +34,7 @@ LaunchError = child_servers.LaunchError
 # The variable the bot server's factory reads its checkpoint from, unless
 # `--checkpoint-env` names another.
 CHECKPOINT_ENV = remote_bot_server.CHECKPOINT_ENV
-# The variables the bot server is given the checkpoint in, unless
-# `--checkpoint-env` names one: the generic CHECKPOINT_ENV, and the one
-# `open_spiel.python.scale.serve.remote_bot` reads.
-CHECKPOINT_ENVS = (CHECKPOINT_ENV, "OPEN_SPIEL_SCALE_REMOTE_BOT_CHECKPOINT")
+CHECKPOINT_ENVS = (CHECKPOINT_ENV,)
 # Seconds; the GUI server's move budget, and so the most the bot seat waits
 # for a move. A checkpoint named only in the seat (its Checkpoint field)
 # may load and warm up at its first move, beyond the server default of 10 s.
@@ -75,17 +71,12 @@ class Options:
     human_seat: The seat the printed address opens as; None (the default) is
       seat 0, or the first seat that is not a bot seat.
     spectate: Whether every seat plays a bot and the viewer is a spectator.
-    structured: Whether bots receive their structured observation.
     seat_bots: The seats that play a bot or checkpoint other than `bot` and
       `checkpoint`, each a bot seat.
     server_per_seat: Whether every bot seat gets a bot server of its own,
       for a bot that keeps state between requests and cannot key it on the
       request's seat; otherwise the seats with the same bot and checkpoint
       share one.
-    state: What the bot is sent: seat_view, what its seat may see; or
-      full_state, the whole state, for a bot that needs it. None (the
-      default) is the bot server's one state mode if it declares one, and
-      seat_view if it takes both.
     host: The address the GUI server listens on.
     port: The GUI server's port; 0 picks a free one.
     client_dir: The built browser client.
@@ -105,10 +96,8 @@ class Options:
   bot_seats: tuple[int, ...] = ()
   human_seat: int | None = None
   spectate: bool = False
-  structured: bool = False
   seat_bots: Mapping[int, SeatBot] = dataclasses.field(default_factory=dict)
   server_per_seat: bool = False
-  state: str | None = None
   host: str = "127.0.0.1"
   port: int = 8787
   client_dir: str = str(static.DEFAULT_ROOT)
@@ -311,11 +300,6 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
       help="Watch bots play every seat, without taking a human seat.",
   )
   parser.add_argument(
-      "--structured",
-      action="store_true",
-      help="Send each bot its structured observation; require seat_view.",
-  )
-  parser.add_argument(
       "--seat-bot",
       action="append",
       default=[],
@@ -333,18 +317,6 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
       help=(
           "A bot seat's own checkpoint, instead of --checkpoint; may be "
           "repeated."
-      ),
-  )
-  parser.add_argument(
-      "--state",
-      default=None,
-      choices=remote_bot.STATE_MODES,
-      help=(
-          "What the bot is sent: seat_view, what its seat may see; or "
-          "full_state, the whole state, for a bot that needs it (in a game "
-          "that hides information, the bot then sees what its seat may "
-          "not). Default: the one state the bot server takes, if it takes "
-          "one, else seat_view."
       ),
   )
   parser.add_argument("--host", default="127.0.0.1")
@@ -408,10 +380,8 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
       bot_seats=tuple(args.bot_seat or ()),
       human_seat=args.human_seat,
       spectate=args.spectate,
-      structured=args.structured,
       seat_bots=seat_bots,
       server_per_seat=args.server_per_seat,
-      state=args.state,
       host=args.host,
       port=args.port,
       client_dir=args.client_dir,

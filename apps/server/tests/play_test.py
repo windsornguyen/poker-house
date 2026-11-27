@@ -32,9 +32,9 @@ import time
 from poker_house_server.poker_bot import PokerBot
 
 class SlowBot(PokerBot):
-  def step(self, mode, request):
+  def move(self, request):
     time.sleep(0.1)
-    return super().step(mode, request)
+    return super().move(request)
 
 def make_bot():
   return SlowBot("call")
@@ -72,8 +72,6 @@ class LauncherTest(absltest.TestCase):
           game="poker_house(blinds=1 2,stack_sizes=20 20)",
           bot="slow_poker_bot:make_bot",
           spectate=True,
-          structured=True,
-          state="seat_view",
           server_per_seat=True,
           port=0,
           move_budget_seconds=1,

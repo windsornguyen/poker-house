@@ -16,23 +16,11 @@
 
 """The remote bot: a seat played by a bot server, over HTTP.
 
-A seat given the `remote` controller sends each position to a bot server at
-the seat's `url`, which answers with the action to play. The bot server runs
-anywhere: on this machine at another port, or elsewhere. What it is sent is
-the seat's `state` setting:
-
-  seat_view   POST {url}/spiel/observe with what the seat may see: its
-              information state string, its legal actions and a seed,
-              nothing else, which a strict seat-view bot accepts; on
-              request (`extras`, `tensors`, `structured`) also its observation
-              string, its legal actions' labels, the history as the seat sees
-              it, its tensors, and its structured observation.
-  full_state  POST {url}/spiel/step with the full state (`state.serialize()`)
-              and the whole history.
-
-A seat's settings go to every viewer, so every viewer can see which a seat
-is sent. REMOTE_BOTS.md documents the protocol, and
-`remote_bot_server` is a reference bot server that wraps any bot.
+For each move the server sends `POST {url}/move` with the seat, a seed and
+the seat's private observation, and plays the action id the bot answers
+with. `GET {url}/health` must answer 2xx before the seat plays.
+REMOTE_BOTS.md documents the protocol, and `remote_bot_server` hosts any
+Python strategy behind it.
 
 The server posts only to loopback addresses unless it is started with
 `--remote-bot-host` (`configure`), so a viewer who sets a seat's URL cannot
@@ -50,7 +38,6 @@ from poker_house_server import controller_registry
 from poker_house_server import controller_settings
 from poker_house_server import information
 from poker_house_server import move_budget
-from poker_house_server import plies
 from poker_house_server import remote_bot_config
 from poker_house_server import remote_bot_http
 from poker_house_server import wire
@@ -58,65 +45,34 @@ import pyspiel
 
 NAME = "remote"
 
-# The `state` setting's values: what the bot server is sent.
-SEAT_VIEW = remote_bot_config.SEAT_VIEW
-FULL_STATE = remote_bot_config.FULL_STATE
-STATE_MODES = remote_bot_config.STATE_MODES
-
-# The protocol version every request carries, in a header.
-PROTOCOL = remote_bot_http.PROTOCOL
-
-# A seat-view request's keys and its observation's, with `extras` and
-# `tensors` off: exactly what a strict seat-view bot accepts (one that
-# refuses a request with any other key).
-SEAT_VIEW_KEYS = ("game", "observation", "config", "game_encoding")
-SEAT_VIEW_OBSERVATION_KEYS = (
-    "information_state_string",
-    "seat",
-    "legal_actions",
-    "seed",
-)
-# The observation's keys `extras` adds, and those `tensors` adds.
-EXTRAS_KEYS = ("observation_string", "legal_action_labels", "history")
-TENSORS_KEYS = ("observation_tensor", "information_state_tensor")
-
-# The bot server's routes, below the seat's `url`.
-OBSERVE_PATH = "/spiel/observe"
-STEP_PATH = "/spiel/step"
+MOVE_PATH = "/move"
 HEALTH_PATH = "/health"
-INFO_PATH = "/info"
 
-# How long the build waits for `/health` and `/info`.
 CHECK_TIMEOUT_SECONDS = 10.0
 
-# How much of the move budget is left for the server, after the bot's reply.
 _MARGIN_SECONDS = 0.5
 
-# The ways a remote bot fails, as its seat's failure names them.
 RemoteBotRefusedError = remote_bot_http.RemoteBotRefusedError
 RemoteBotUnreachableError = remote_bot_http.RemoteBotUnreachableError
 RemoteBotReplyError = remote_bot_http.RemoteBotReplyError
 
 
 class RemoteBotObservationError(RuntimeError):
-  """The game cannot supply the structured observation a bot requires."""
+  """The game cannot supply the observation a bot is sent."""
 
 
-def _structured_observation(
-    state: pyspiel.State, seat: int
-) -> contract.JsonValue:
-  """Returns the seat's structured observation, refusing missing data."""
+def observation(state: pyspiel.State, seat: int) -> contract.JsonValue:
+  """Returns what `seat` may see at `state`, refusing a withheld one."""
   name = state.get_game().get_type().short_name
   try:
     observed = information.observation_struct(state, seat)
   except (pyspiel.SpielError, wire.DecodeError) as e:
     raise RemoteBotObservationError(
-        f"{name} cannot provide a structured observation for seat {seat}."
+        f"{name} cannot provide an observation for seat {seat}."
     ) from e
   if observed is None:
     raise RemoteBotObservationError(
-        f"{name}'s structured observation is withheld for seat {seat} "
-        "at this position."
+        f"{name}'s observation is withheld for seat {seat} at this position."
     )
   return observed
 
@@ -222,42 +178,6 @@ def url_refusal(url: str) -> str | None:
   )
 
 
-def _provides_seat_view(game: pyspiel.Game) -> bool:
-  """Whether the game gives a seat something to see beyond its actions."""
-  game_type = game.get_type()
-  return (
-      not information.hides_information(game_type)
-      or game_type.provides_observation_string
-      or _provides_information_state_string(game_type)
-  )
-
-
-def _provides_information_state_string(game_type: pyspiel.GameType) -> bool:
-  """Whether the game gives a seat an information state it may see."""
-  return (
-      game_type.provides_information_state_string
-      and game_type.short_name not in information.HIDDEN_DESPITE_DECLARATION
-  )
-
-
-def _information_state_string(state: pyspiel.State, seat: int) -> str | None:
-  """The seat's information state string, or None if the game gives none.
-
-  Some games give one without declaring it (gin rummy's, the seat's own
-  action-observation history, is one), and a seat-view bot may rely on it,
-  so an undeclared one is sent when the game gives it.
-  """
-  game_type = state.get_game().get_type()
-  if game_type.short_name in information.HIDDEN_DESPITE_DECLARATION:
-    return None
-  if game_type.provides_information_state_string:
-    return str(state.information_state_string(seat))
-  try:
-    return str(state.information_state_string(seat))
-  except pyspiel.SpielError:
-    return None
-
-
 def config_refusal(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue]
 ) -> str | None:
@@ -266,66 +186,10 @@ def config_refusal(
   if reason is not None:
     return reason
   try:
-    remote_bot_config.seat_bot_config(config)
-  except ValueError as e:
+    observation(game.new_initial_state(), 0)
+  except RemoteBotObservationError as e:
     return str(e)
-  if config["structured"]:
-    if config["state"] != SEAT_VIEW:
-      return "Structured observations require the seat_view state mode."
-    try:
-      _structured_observation(game.new_initial_state(), 0)
-    except RemoteBotObservationError as e:
-      return str(e)
-  if (
-      config["state"] == SEAT_VIEW
-      and not config["structured"]
-      and not _provides_seat_view(game)
-  ):
-    return (
-        f"{game.get_type().short_name} gives a seat no observation or "
-        "information state to send; use full_state."
-    )
   return None
-
-
-def reads_full_state(config: Mapping[str, contract.ParameterValue]) -> bool:
-  """Whether a remote bot with `config` is sent the full state."""
-  return config["state"] == FULL_STATE
-
-
-def _request_json(
-    url: str, body: bytes | None, timeout: float
-) -> tuple[int, contract.JsonValue]:
-  """Sends a request to a bot server, with the configured token."""
-  return remote_bot_http.send(url, body, timeout, token_for(url))
-
-
-def _seat_history(
-    state: pyspiel.State, seat: int, hides: bool
-) -> list[dict[str, contract.JsonValue]]:
-  """The history as `seat` sees it, as a frame for the seat shows it.
-
-  The seat's own actions are given in full; any other ply, a chance outcome
-  included, only as its public label, in a game that hides information.
-  """
-  _, played = plies.rebuild(state.get_game(), state.history())
-  history: list[dict[str, contract.JsonValue]] = []
-  for ply in played:
-    if not hides or (ply.seat is not None and ply.seat == seat):
-      history.append({
-          "seat": ply.seat,
-          "action": ply.action,
-          "label": ply.label,
-          "public_label": None,
-      })
-    else:
-      history.append({
-          "seat": ply.seat,
-          "action": None,
-          "label": None,
-          "public_label": ply.public_label,
-      })
-  return history
 
 
 class RemoteBot:
@@ -337,85 +201,32 @@ class RemoteBot:
       action (its policy, value and `decided_by`), or None.
   """
 
-  def __init__(
-      self,
-      game: pyspiel.Game,
-      *,
-      url: str,
-      state_mode: str,
-      bot_config: dict[str, contract.JsonValue],
-      extras: bool,
-      tensors: bool,
-      timeout_seconds: float,
-      seed: int,
-      structured: bool = False,
-  ) -> None:
-    if state_mode not in STATE_MODES:
-      raise ValueError(f"Unknown state mode {state_mode!r}.")
-    self._game = game
+  def __init__(self, *, url: str, timeout_seconds: float, seed: int) -> None:
     self._url = url.rstrip("/")
-    self._state_mode = state_mode
-    self._bot_config = bot_config
-    self._extras = extras
-    self._tensors = tensors
-    self._structured = structured
     self._timeout_seconds = timeout_seconds
     self._seed = seed
     self.last_notice: str | None = None
     self.last_output: contract.BotOutput | None = None
 
-  def check(self) -> None:
-    """Checks the bot server answers, and can play this game this way.
+  def _send(
+      self, path: str, body: bytes | None, timeout: float
+  ) -> tuple[int, contract.JsonValue]:
+    """Sends a request to the bot server, with its configured token."""
+    url = self._url + path
+    return remote_bot_http.send(url, body, timeout, token_for(url))
 
-    `GET /health` must answer 2xx JSON. `GET /info` is optional: when it answers
-    2xx with `games` or `state_modes`, a game or a state mode it does not
-    list is refused.
+  def check(self) -> None:
+    """Checks the bot server's `/health` answers 2xx.
 
     Raises:
-      controller_registry.UnavailableError: If the bot server says it cannot
-        play the game, or be sent the seat's state mode.
-      RemoteBotUnreachableError: If `/health` cannot be reached or does not
-        answer 2xx.
-      RemoteBotReplyError: If either answers with a body that is not JSON,
-        or `/info` with one that is not the protocol's.
+      RemoteBotUnreachableError: If it cannot be reached or answers otherwise.
+      RemoteBotReplyError: If its body is not JSON.
     """
-    status, _ = _request_json(
-        self._url + HEALTH_PATH, None, CHECK_TIMEOUT_SECONDS
-    )
+    status, _ = self._send(HEALTH_PATH, None, CHECK_TIMEOUT_SECONDS)
     if not 200 <= status < 300:
       raise RemoteBotUnreachableError(
           f"The bot server's {HEALTH_PATH} answered HTTP {status}."
       )
-    try:
-      status, info = _request_json(
-          self._url + INFO_PATH, None, CHECK_TIMEOUT_SECONDS
-      )
-    except RemoteBotUnreachableError:
-      return  # `/info` is optional.
-    if not 200 <= status < 300:
-      return
-    if not isinstance(info, dict):
-      raise RemoteBotReplyError(
-          f"The bot server's {INFO_PATH} is not an object."
-      )
-    name = self._game.get_type().short_name
-    games, modes = info.get("games"), info.get("state_modes")
-    if games is not None:
-      if not isinstance(games, list):
-        raise RemoteBotReplyError(f"{INFO_PATH} `games` is not a list.")
-      if name not in games and str(self._game) not in games:
-        raise controller_registry.UnavailableError(
-            f"The bot server plays {', '.join(map(str, games)) or 'no game'}, "
-            f"not {name}."
-        )
-    if modes is not None:
-      if not isinstance(modes, list):
-        raise RemoteBotReplyError(f"{INFO_PATH} `state_modes` is not a list.")
-      if self._state_mode not in modes:
-        raise controller_registry.UnavailableError(
-            f"The bot server takes {', '.join(map(str, modes)) or 'nothing'}, "
-            f"not {self._state_mode}."
-        )
 
   def _timeout(self) -> float:
     """How long to wait for a reply: within the move budget."""
@@ -429,67 +240,13 @@ class RemoteBot:
       return min(self._timeout_seconds, limit)
     return limit
 
-  def request(self, state: pyspiel.State, seat: int) -> tuple[str, bytes]:
-    """Returns the path and JSON body of the request for `seat` at `state`."""
-    game_type = self._game.get_type()
-    legal = [int(action) for action in state.legal_actions(seat)]
-    seed = controller_registry.choice_seed(self._seed, state)
-    encoding = {"num_distinct_actions": self._game.num_distinct_actions()}
-    body: dict[str, contract.JsonValue]
-    if self._state_mode == FULL_STATE:
-      path = STEP_PATH
-      body = {
-          "game": str(self._game),
-          "state": state.serialize(),
-          "history": [int(action) for action in state.history()],
-          "seat": seat,
-          "legal_actions": legal,
-          "seed": seed,
-          "game_encoding": encoding,
-          "config": self._bot_config,
-      }
-    else:
-      path = OBSERVE_PATH
-      observation: dict[str, contract.JsonValue] = {
-          "information_state_string": _information_state_string(state, seat),
-          "seat": seat,
-          "legal_actions": legal,
-          "seed": seed,
-      }
-      if self._extras:
-        observation["observation_string"] = (
-            str(state.observation_string(seat))
-            if game_type.provides_observation_string
-            else None
-        )
-        observation["legal_action_labels"] = [
-            str(state.action_to_string(seat, action)) for action in legal
-        ]
-        observation["history"] = _seat_history(
-            state, seat, information.hides_information(game_type)
-        )
-      if self._tensors:
-        observation["observation_tensor"] = (
-            [float(x) for x in state.observation_tensor(seat)]
-            if game_type.provides_observation_tensor
-            else None
-        )
-        observation["information_state_tensor"] = (
-            [float(x) for x in state.information_state_tensor(seat)]
-            if game_type.provides_information_state_tensor
-            and game_type.short_name
-            not in information.HIDDEN_DESPITE_DECLARATION
-            else None
-        )
-      if self._structured:
-        observation["observation_struct"] = _structured_observation(state, seat)
-      body = {
-          "game": str(self._game),
-          "observation": observation,
-          "config": self._bot_config,
-          "game_encoding": encoding,
-      }
-    return path, json.dumps(body).encode()
+  def request(self, state: pyspiel.State, seat: int) -> bytes:
+    """Returns the JSON body of the move request for `seat` at `state`."""
+    return json.dumps({
+        "seat": seat,
+        "seed": controller_registry.choice_seed(self._seed, state),
+        "observation": observation(state, seat),
+    }).encode()
 
   def choose_action(self, state: pyspiel.State, seat: int) -> int:
     """Asks the bot server for `seat`'s action at `state`.
@@ -498,13 +255,14 @@ class RemoteBot:
       RemoteBotRefusedError: If the bot server refuses.
       RemoteBotUnreachableError: If it cannot be reached, or does not answer
         within the timeout.
-      RemoteBotReplyError: If its reply is not the protocol's, or its action
-        is not legal.
+      RemoteBotReplyError: If its reply is malformed, or its action is not
+        legal.
     """
     self.last_notice = None
     self.last_output = None
-    path, body = self.request(state, seat)
-    status, reply = _request_json(self._url + path, body, self._timeout())
+    status, reply = self._send(
+        MOVE_PATH, self.request(state, seat), self._timeout()
+    )
     if status in remote_bot_http.REFUSAL_STATUSES:
       raise RemoteBotRefusedError(
           f"The bot server refused (HTTP {status}):"
@@ -527,22 +285,12 @@ def _build(
   """Builds a remote bot, checking its bot server answers.
 
   Raises:
-    controller_registry.UnavailableError: If the bot server cannot be
-      reached, refuses, or says it cannot play the game this way. The
-      message names the URL, which the seat's settings show every viewer,
-      and what the server answered.
+    controller_registry.UnavailableError: If the bot server is not ready.
   """
+  del game
   url = str(config["url"])
   bot = RemoteBot(
-      game,
-      url=url,
-      state_mode=str(config["state"]),
-      bot_config=remote_bot_config.seat_bot_config(config),
-      extras=bool(config["extras"]),
-      tensors=bool(config["tensors"]),
-      structured=bool(config["structured"]),
-      timeout_seconds=float(config["timeout_seconds"]),
-      seed=seed,
+      url=url, timeout_seconds=float(config["timeout_seconds"]), seed=seed
   )
   try:
     bot.check()
@@ -558,9 +306,7 @@ def kind() -> controller_registry.Kind:
   return controller_registry.Kind(
       "Remote bot",
       remote_bot_config.settings(),
-      # What it reads is its seat's `state` setting, not its kind's.
       reads_full_state=False,
       build=_build,
       config_refusal=config_refusal,
-      config_reads_full_state=reads_full_state,
   )

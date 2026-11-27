@@ -37,17 +37,14 @@ from poker_house_server import store
 class RecordingBot:
   """Keeps the JSON received at the bot's own HTTP boundary."""
 
-  state_modes = ("seat_view",)
-  games = ("poker_house",)
-
   def __init__(self, strategy: poker_bot.PokerBot) -> None:
     self.strategy = strategy
     self.requests: list[dict[str, contract.JsonValue]] = []
 
-  def step(self, mode: str, request: dict[str, contract.JsonValue]) -> int:
+  def move(self, request: dict[str, contract.JsonValue]) -> int:
     """Records the server's observation and returns a strategy's legal move."""
     self.requests.append(request)
-    return self.strategy.step(mode, request)
+    return self.strategy.move(request)
 
 
 class ArenaTest(absltest.TestCase):
@@ -148,11 +145,7 @@ class ArenaTest(absltest.TestCase):
       seats.append({
           "controller": "remote",
           "autoplay": True,
-          "config": {
-              "url": listener.url,
-              "state": "seat_view",
-              "structured": True,
-          },
+          "config": {"url": listener.url},
       })
     result = self.create(seats)
     self.assertEqual(result["status"], "terminal")
@@ -163,11 +156,9 @@ class ArenaTest(absltest.TestCase):
     for seat, bot in enumerate(bots):
       self.assertTrue(bot.requests)
       for request in bot.requests:
-        self.assertNotIn("state", request)
-        self.assertNotIn("history", request)
-        observation = request["observation"]
-        assert isinstance(observation, dict)
-        structured = observation["observation_struct"]
+        self.assertEqual(set(request), {"seat", "seed", "observation"})
+        self.assertEqual(request["seat"], seat)
+        structured = request["observation"]
         assert isinstance(structured, dict)
         self.assertEqual(structured["observing_player"], seat)
         hands = structured["hole_cards"]

@@ -14,28 +14,18 @@
 # Modified for Poker House.
 
 
-"""A reference bot server for the GUI's Remote bot seats.
+"""Hosts a Python poker strategy behind the bot protocol (REMOTE_BOTS.md).
 
   python -m poker_house_server.remote_bot_server --port 9001 --bot random
 
-serves a bot over the remote bot protocol (REMOTE_BOTS.md); a seat given
-the Remote bot controller with the URL http://localhost:9001 then plays it.
-`--bot` is `random`, `mcts`, or `MODULE:FACTORY`: a function that takes no
-arguments and returns a bot, so that any bot (a trained checkpoint, say) is
-served without the GUI knowing of it. A bot is an object with:
+`--bot` is `random` or `MODULE:FACTORY`: a function that takes no arguments
+and returns a bot. A bot has one method, `move(request)`, given the JSON body
+of `POST /move` and returning an action id, or a dict with `action` and the
+optional `notice`, `policy`, `value` and `decided_by`. A ValueError is
+answered as a refusal (HTTP 422) with its message.
 
-  state_modes: the requests it takes, a subset of ("seat_view",
-    "full_state").
-  games: the short names of the games it plays, or None for any.
-  step(mode, request): the action to play, as an int, or a dict
-    {"action": int, "notice": str | None}, which may add the bot output
-    `policy`, `value` and `decided_by` (REMOTE_BOTS.md). `mode` is
-    "seat_view" or "full_state", and `request` is the request's JSON body.
-    A ValueError is answered as a refusal (HTTP 422), with its message.
-
-A factory that plays a checkpoint reads it, by convention, from the
-environment variable CHECKPOINT_ENV, and a request's `config.checkpoint`
-(a Remote bot seat's `checkpoint` setting) may name another.
+A factory that plays a checkpoint reads it from the environment variable
+CHECKPOINT_ENV.
 
 The server listens on 127.0.0.1 unless told otherwise. With `--token-env
 VAR` it answers only requests carrying `Authorization: Bearer <token>`, the
@@ -54,144 +44,49 @@ import random
 from typing import Any, Protocol
 
 from absl import logging
-import numpy as np
 
-from open_spiel.python.algorithms import mcts
-# Register Poker House before a bot restores the named game.
-from poker_house_engine import game as poker_game  # pylint: disable=unused-import
 from poker_house_server import plugins
 from poker_house_server import remote_bot
-import pyspiel
 
-SEAT_VIEW = "seat_view"
-FULL_STATE = "full_state"
+CHECKPOINT_ENV = "POKER_HOUSE_BOT_CHECKPOINT"
 
-# Each request path, and the state mode it carries.
-_PATHS = {"/spiel/observe": SEAT_VIEW, "/spiel/step": FULL_STATE}
-
-# The environment variable a bot's factory reads the checkpoint it plays
-# from, by convention: `play --checkpoint` sets it and
-# `stand_in_checkpoint_bot` reads it.
-CHECKPOINT_ENV = "OPEN_SPIEL_REMOTE_BOT_CHECKPOINT"
-
-# The largest request body read.
 MAX_BODY_BYTES = 16 << 20
-
-# MCTS's simulations per move, unless a request's config gives
-# `max_simulations`.
-DEFAULT_MCTS_SIMULATIONS = 200
 
 
 class Bot(Protocol):
-  """What the server serves."""
+  """What the server hosts."""
 
-  @property
-  def state_modes(self) -> Sequence[str]:
-    """The requests it takes: "seat_view", "full_state" or both."""
-
-  @property
-  def games(self) -> Sequence[str] | None:
-    """The short names of the games it plays, or None for any."""
-
-  def step(self, mode: str, request: dict[str, Any]) -> int | dict[str, Any]:
-    """Returns the action to play, or {"action", "notice"}."""
-
-
-def legal_actions(mode: str, request: dict[str, Any]) -> list[int]:
-  """Returns the seat's legal actions, from either kind of request."""
-  if mode == SEAT_VIEW:
-    return list(request["observation"]["legal_actions"])
-  return list(request["legal_actions"])
-
-
-def seed_of(mode: str, request: dict[str, Any]) -> int:
-  """Returns the request's per-move seed."""
-  if mode == SEAT_VIEW:
-    return int(request["observation"]["seed"])
-  return int(request["seed"])
+  def move(self, request: dict[str, Any]) -> int | dict[str, Any]:
+    """Returns the action to play, or {"action", "notice", ...}."""
 
 
 class RandomBot:
   """Plays a uniformly random legal action, from the request's seed."""
 
-  state_modes = (SEAT_VIEW, FULL_STATE)
-  games = None
-
-  def step(self, mode: str, request: dict[str, Any]) -> int:
+  def move(self, request: dict[str, Any]) -> int:
     """Returns one of the legal actions, drawn uniformly."""
-    rng = random.Random(seed_of(mode, request))
-    return rng.choice(legal_actions(mode, request))
-
-
-class MctsBot:
-  """Plays OpenSpiel's Python MCTS on the full state.
-
-  The state is rebuilt from the game and the history, so it needs
-  `full_state`. A request's config may give `max_simulations`.
-  """
-
-  state_modes = (FULL_STATE,)
-  games = None
-
-  def step(self, mode: str, request: dict[str, Any]) -> int:
-    """Returns MCTS's choice at the request's state."""
-    if mode != FULL_STATE:
-      raise ValueError("MCTS needs the full state.")
-    game = pyspiel.load_game(request["game"])
-    state = game.new_initial_state()
-    for action in request["history"]:
-      state.apply_action(int(action))
-    if state.current_player() != request["seat"]:
-      raise ValueError(
-          f"Seat {request['seat']} is not to move after the history."
-      )
-    simulations = int(
-        request.get("config", {}).get(
-            "max_simulations", DEFAULT_MCTS_SIMULATIONS
-        )
-    )
-    if not 1 <= simulations <= 100_000:
-      raise ValueError(f"max_simulations {simulations} is not 1..100000.")
-    rng = np.random.RandomState(  # pylint: disable=no-member
-        seed_of(mode, request) % (2**32)
-    )
-    bot = mcts.MCTSBot(
-        game,
-        uct_c=2.0,
-        max_simulations=simulations,
-        evaluator=mcts.RandomRolloutEvaluator(1, rng),
-        random_state=rng,
-    )
-    return int(bot.step(state))
+    actions = request["observation"]["actions"]
+    return int(random.Random(int(request["seed"])).choice(actions)["id"])
 
 
 def load_bot(name: str) -> Bot:
-  """Returns the bot `--bot` names: random, mcts or MODULE:FACTORY.
+  """Returns the bot `--bot` names: random or MODULE:FACTORY.
 
   Raises:
-    ValueError: If `name` is none of these, or the factory's bot does not
-      declare its state modes.
+    ValueError: If `name` is neither, or the factory's bot has no `move`.
     plugins.PluginError: If the factory's module cannot be imported.
   """
   if name == "random":
     return RandomBot()
-  if name == "mcts":
-    return MctsBot()
   module_name, sep, factory_name = name.partition(":")
   if not sep or not module_name or not factory_name:
-    raise ValueError(f"--bot {name!r} is not random, mcts or MODULE:FACTORY.")
+    raise ValueError(f"--bot {name!r} is not random or MODULE:FACTORY.")
   factory = getattr(
       plugins.import_named(module_name, "The bot's module"), factory_name
   )
   bot: Bot = factory()
-  modes = tuple(getattr(bot, "state_modes", ()))
-  if not modes or not set(modes) <= {SEAT_VIEW, FULL_STATE}:
-    raise ValueError(
-        f"{name}'s bot declares state_modes {modes!r}, not a non-empty subset "
-        f"of {SEAT_VIEW!r} and {FULL_STATE!r}."
-    )
-  if not callable(getattr(bot, "step", None)):
-    raise ValueError(f"{name}'s bot has no step(mode, request).")
+  if not callable(getattr(bot, "move", None)):
+    raise ValueError(f"{name}'s bot has no move(request).")
   return bot
 
 
@@ -199,7 +94,7 @@ def reply_of(result: object, notice: str | None) -> dict[str, Any]:
   """Returns the reply body for a bot's result.
 
   Args:
-    result: What the bot's `step` returned.
+    result: What the bot's `move` returned.
     notice: The server's `--notice`, added when the bot gives none.
 
   Raises:
@@ -244,7 +139,7 @@ class Server(http.server.ThreadingHTTPServer):
     Args:
       address: The host and port to listen on.
       bot: The bot to serve.
-      name: The bot's name, for /health and /info.
+      name: The bot's name, for /health.
       notice: A notice added to every move the bot gives none for.
       token: The bearer token every request must carry; None for none.
 
@@ -303,23 +198,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     return False
 
   def do_GET(self) -> None:  # pylint: disable=invalid-name
-    """Answers /health and /info."""
+    """Answers /health."""
     if not self._authorized():
       return
-    bot = self.server.bot
-    if self.path == "/health":
+    if self.path == remote_bot.HEALTH_PATH:
       self._send(http.HTTPStatus.OK, {"ok": True, "name": self.server.name})
-    elif self.path == "/info":
-      games = getattr(bot, "games", None)
-      self._send(
-          http.HTTPStatus.OK,
-          {
-              "name": self.server.name,
-              "protocol": 1,
-              "state_modes": list(bot.state_modes),
-              "games": None if games is None else list(games),
-          },
-      )
     else:
       self._send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
 
@@ -327,8 +210,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     """Answers a move request."""
     if not self._authorized():
       return
-    mode = _PATHS.get(self.path)
-    if mode is None:
+    if self.path != remote_bot.MOVE_PATH:
       self._send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
       return
     length = int(self.headers.get("Content-Length", "0"))
@@ -346,18 +228,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
           {"error": "the body is not JSON", "reason": "bad_request"},
       )
       return
-    bot = self.server.bot
-    if mode not in bot.state_modes:
-      self._send(
-          http.HTTPStatus.CONFLICT,
-          {
-              "error": f"this bot takes {', '.join(bot.state_modes)}",
-              "reason": "state_mode",
-          },
-      )
-      return
     try:
-      result = bot.step(mode, request)
+      result = self.server.bot.move(request)
     except ValueError as e:
       self._send(
           http.HTTPStatus.UNPROCESSABLE_ENTITY,
@@ -378,21 +250,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
   """Parses the command line."""
   parser = argparse.ArgumentParser(
       prog="python -m poker_house_server.remote_bot_server",
-      description="Serve a bot to the OpenSpiel GUI's Remote bot seats.",
+      description="Host a poker strategy behind the bot protocol.",
   )
   parser.add_argument("--host", default="127.0.0.1")
   parser.add_argument("--port", type=int, default=9001)
   parser.add_argument(
       "--bot",
       default="random",
-      help="random, mcts, or MODULE:FACTORY (a function returning a bot).",
+      help="random, or MODULE:FACTORY (a function returning a bot).",
   )
   parser.add_argument(
       "--token-env",
       metavar="VAR",
       help=(
           "Answer only requests carrying 'Authorization: Bearer <token>', the "
-          "token in the environment variable VAR (the GUI server sends it "
+          "token in the environment variable VAR (the game server sends it "
           "with --remote-bot-token-env). Required to listen beyond loopback."
       ),
   )
@@ -400,7 +272,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
       "--notice",
       default=None,
       help=(
-          "A notice to send with every move, which the GUI shows to the "
+          "A notice to send with every move, which the table shows to the "
           "seat's own viewer and to omniscient viewers; for trying it out."
       ),
   )

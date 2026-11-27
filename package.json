@@ -13,7 +13,7 @@
     "dev": "uv run --package poker-house-server python -m poker_house_server --port 8787",
     "dev:lan": "uv run --package poker-house-server python -m poker_house_server --host 0.0.0.0 --port 8787",
     "build": "pnpm --filter @poker-house/web build",
-    "demo": "uv run --package poker-house-server python -m poker_house_server.play --game 'poker_house(num_players=2,blinds=1 2,stack_sizes=200 200)' --bot poker_house_server.poker_bot:make_call_bot --seat-bot 1=poker_house_server.poker_bot:make_raise_bot --spectate --structured --state seat_view --server-per-seat --port 8787",
+    "demo": "uv run --package poker-house-server python -m poker_house_server.play --game 'poker_house(num_players=2,blinds=1 2,stack_sizes=200 200)' --bot poker_house_server.poker_bot:make_call_bot --seat-bot 1=poker_house_server.poker_bot:make_raise_bot --spectate --server-per-seat --port 8787",
     "bot:call": "uv run --package poker-house-server python -m poker_house_server.remote_bot_server --port 9001 --bot poker_house_server.poker_bot:make_call_bot",
     "bot:raise": "uv run --package poker-house-server python -m poker_house_server.remote_bot_server --port 9002 --bot poker_house_server.poker_bot:make_raise_bot",
     "deploy:dm": "pnpm --filter @poker-house/deploy provision",

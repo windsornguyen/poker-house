@@ -33,8 +33,7 @@ pnpm dev
 ```
 
 Open [localhost:8787](http://127.0.0.1:8787), enter the two bot URLs and
-stakes, then press **Start hand**. The lobby selects private structured
-observations for both bots. **New hand** deals again with the same settings
+stakes, then press **Start hand**. **New hand** deals again with the same settings
 from the operator's view. Each hand starts with the configured stacks; the
 terminal returns report each player's net chips for that hand.
 
@@ -49,13 +48,12 @@ Your backend implements two HTTP methods:
 | Method | Purpose |
 | --- | --- |
 | `GET /health` | Return HTTP 200 with JSON such as `{"ok": true}` when ready. |
-| `POST /spiel/observe` | Read the JSON observation and return `{"action": id}`. |
+| `POST /move` | Read the seat's observation and return `{"action": id}`. |
 
-Every move request has `Spiel-Protocol: 1`. Poker data is in
-`observation.observation_struct`; its `schema_version` is `1`. It contains
-cards, stacks, bets, pots, the public betting history, and typed legal
-actions. Unknown opponent cards are `null`. No deck order or burn cards are
-sent.
+A move request is `{"seat", "seed", "observation"}`. The observation's
+`schema_version` is `1`. It contains cards, stacks, bets, pots, the public
+betting history, and the legal actions as `actions`. Unknown opponent cards
+are `null`. No deck order or burn cards are sent.
 
 ```json
 {
@@ -77,8 +75,7 @@ uv run --package poker-house-server python -m poker_house_server.remote_bot_serv
   --port 9001 --bot my_bot:make_bot
 ```
 
-The factory returns an object declaring `state_modes = ("seat_view",)` and
-implementing `step(mode, request)`. Start from
+The factory returns an object with a `move(request)` method. Start from
 [poker_bot.py](apps/server/src/poker_house_server/poker_bot.py), replacing
 its action-selection function with your strategy. Any language can implement
 the same HTTP protocol.
