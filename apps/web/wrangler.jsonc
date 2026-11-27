@@ -9,7 +9,8 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "none",
-    "run_worker_first": ["/api/*"],
+    "run_worker_first": ["/api/*", "/mail/*"],
   },
+  "send_email": [{"name": "EMAIL"}],
   "observability": {"enabled": true},
 }

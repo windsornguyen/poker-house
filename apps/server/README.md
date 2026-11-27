@@ -36,9 +36,16 @@ export POKER_HOUSE_SITE_URL=https://...   # the site players sign in on
 pnpm deploy:dm
 ```
 
-Only emails in the `poker.player` table can make an account. Add one on the
-Machine with
-`psql "$DATABASE_URL" -c "insert into poker.player (email) values ('friend@example.com')"`.
+Only emails in the `poker.player` table can make an account, and each must be
+confirmed by the link the sign-up emails. To add a player:
+
+1. On the Machine, insert the lowercase email:
+   `psql "$DATABASE_URL" -c "insert into poker.player (email) values ('friend@example.com')"`.
+2. In `apps/web`, run `npx wrangler email routing addresses create friend@example.com`.
+   Cloudflare sends that address a one-time confirmation, and sign-in emails reach it
+   only after the player confirms.
+
+Deleting a player's row deletes their account and sessions.
 
 The first run prints the port's access key once. Keys expire, so issue a new one with `dedalus machines ports access-keys mint`. The key keeps strangers out. Everyone who has it sees every seat's
 cards in the analysis view, so share it only with trusted players.

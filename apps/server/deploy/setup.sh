@@ -32,6 +32,7 @@ if [[ ! -f $AUTH_ENV_FILE ]]; then
   printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
   chmod 600 "$AUTH_ENV_FILE"
 fi
+grep -q '^MAIL_KEY=' "$AUTH_ENV_FILE" || printf 'MAIL_KEY=%s\n' "$(openssl rand -hex 32)" >>"$AUTH_ENV_FILE"
 sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
 printf 'BETTER_AUTH_URL=%s\n' "$SITE_URL" >>"$AUTH_ENV_FILE"
 password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
@@ -76,6 +77,7 @@ as_app pnpm install --frozen-lockfile --silent
 as_app pnpm build >/dev/null
 psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
 (set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$APP_DIR/apps/auth" && as_app node migrate.ts)
+psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/auth/players.sql"
 
 allow_hosts=()
 for host in "${HOSTS[@]}"; do

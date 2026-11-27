@@ -2,11 +2,9 @@ create schema if not exists poker;
 
 create schema if not exists auth;
 
-create extension if not exists citext;
-
 -- The emails that may make an account.
 create table if not exists poker.player (
-    email citext primary key,
+    email text primary key constraint player_email_lowercase check (email = lower(email)),
     added_at timestamptz not null default now()
 );
 
