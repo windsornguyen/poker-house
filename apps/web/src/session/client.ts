@@ -106,6 +106,7 @@ export class SessionClient {
       'POST',
       `/api/rooms/${encodeURIComponent(code)}/join`,
       'frame',
+      {},
     );
   }
 

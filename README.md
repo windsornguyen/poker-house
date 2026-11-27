@@ -6,40 +6,56 @@ validates the returned action, and settles the hand. A browser table shows
 the action and lets you replay it.
 
 Poker House uses the OpenSpiel server and poker renderer, with PokerKit
-handling the game rules. The relevant components live here; the OpenSpiel
+handling the game rules. The relevant components live here. The OpenSpiel
 native runtime and PokerKit are installed dependencies. See [NOTICE](NOTICE)
 for the source revision and attribution.
 
 ## Start
 
-Install Python 3.14, [uv](https://docs.astral.sh/uv/), Node.js 22.22.2 or
-newer supported LTS, and pnpm 10.30.3. From the repository root:
+Install Python 3.14, [uv](https://docs.astral.sh/uv/), Node.js 26, pnpm 10.30.3 and
+Postgres 19, then run `pnpm setup`. Locally the stack runs as in production: the page
+and the Worker in front, the sign-in service and the game server behind it, and
+Postgres under both.
+
+1. Create a database and apply `apps/server/schema.sql`, then in `apps/auth` run
+   `node migrate.ts` and apply `players.sql`.
+2. Start the sign-in service: `node apps/auth/server.ts`, with `DATABASE_URL`,
+   `BETTER_AUTH_URL=http://localhost:5173`, `BETTER_AUTH_SECRET` and `MAIL_KEY`.
+3. Start the game server: `uv run --package poker-house-server python -m
+   poker_house_server`, with `DATABASE_URL` and `POKER_HOUSE_PLAYER_KEY`.
+4. Copy `apps/web/.dev.vars.example` to `apps/web/.dev.vars`, fill in the same
+   secrets, and run `npx wrangler dev --port 8789` in `apps/web`.
+5. Run `pnpm dev` and open [localhost:5173](http://localhost:5173).
+
+Only emails in `poker.player` can make an account. Locally, insert yours and mark
+it verified in `auth."user"`, since local email goes nowhere.
+
+## Play with friends
+
+Every table is a room with a six-character code, shown at the top of the table.
+
+1. Sign in and open a table. You hold seat 0.
+2. Share the code. A friend signs in and enters it under **Join**. They hold the
+   lowest open seat and see only their own cards.
+3. Play. Each move reaches the other player at once.
+
+The server decides what each account may see. You see every card only while no one
+else holds a seat, and the page switches to your own seat when a friend sits down.
+
+### From code
+
+`apps/web/scripts/join-room.ts` is a complete client in 80 lines. It signs in with
+Better Auth's client, joins by code, and checks every answer against the generated
+Zod contract (`apps/web/src/contract/contract.ts`):
 
 ```sh
-pnpm setup
-pnpm demo
+POKER_HOUSE_EMAIL=you@example.com POKER_HOUSE_PASSWORD=… \
+  node apps/web/scripts/join-room.ts https://your-site ABC123
 ```
 
-The demo starts the web server and two independent bot servers, plays a
-200-chip hand at blinds 1/2, and prints its browser URL. One example bot
-checks/calls; the other bets or raises the minimum legal amount. Ctrl-C
-stops all three processes. The examples demonstrate the interface; they are
-not strong poker strategies.
-
-To start just the application:
-
-```sh
-pnpm dev
-```
-
-Open [localhost:8787](http://127.0.0.1:8787), enter the two bot URLs and
-stakes, then press **Start hand**. **New hand** deals again with the same settings
-from the operator's view. Each hand starts with the configured stacks; the
-terminal returns report each player's net chips for that hand.
-
-For the included bot servers, run `pnpm bot:call` and `pnpm bot:raise` in
-separate terminals. Their addresses are prefilled in the lobby. A manual
-table and each seat's settings are also available in the browser.
+Import `signIn`, `joinRoom` and `play` from it to write a player of your own.
+Updates arrive as server-sent events from
+`/api/sessions/{id}/events?viewer={seat}`. Each event is one `Frame`.
 
 ## Bring your own bot
 
@@ -86,26 +102,11 @@ See the [bot protocol](apps/server/src/poker_house_server/REMOTE_BOTS.md),
 
 ## Hosting
 
-Localhost is the default. On a trusted LAN:
-
-```sh
-pnpm dev:lan --allow-host YOUR_LAN_IP
-```
-
-For a bot on another machine, explicitly allow its hostname with
-`--remote-bot-host HOST`. The remote bot host supports bearer authentication
-through `--token-env`; the game server's corresponding option is
-`--remote-bot-token-env HOST:PORT=VARIABLE`.
-
-This initial server inherits OpenSpiel's research model: sessions live in
-memory, and the browser's analysis view can inspect every player's cards.
-Use it with trusted participants on localhost or a private network. A
-public competitive service needs authentication, authorization and durable
-match storage.
-
-The Python/native engine does not run directly in Cloudflare Workers.
-Run the server on a computer or VM. A protected tunnel can provide remote
-access, but does not move the engine into Workers.
+`pnpm deploy:dm` provisions a Dedalus Machine running Postgres, the game server and
+the sign-in service (see `apps/server/README.md`). `pnpm --filter @poker-house/web run
+deploy` deploys the Cloudflare Worker, which serves the page, checks each player's
+session, and signs the player into every request it forwards. The game server trusts
+only that signature.
 
 ## Layout
 
@@ -118,7 +119,7 @@ packages/python/
 ```
 
 The repository uses pnpm and uv workspaces. Browser wire types are generated
-from the server's JSON schema; poker rules live in the engine dependency.
+from the server's JSON schema. Poker rules live in the engine dependency.
 
 ```sh
 pnpm test

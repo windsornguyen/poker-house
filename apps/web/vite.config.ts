@@ -25,12 +25,10 @@ import {playwright} from 'vite-plus/test/browser-playwright';
 
 import {thirdPartyNotices} from './scripts/third-party-notices.ts';
 
-// `pnpm dev` sends /api/auth to apps/auth (POKER_HOUSE_AUTH) and the rest
-// of /api to `python -m poker_house_server` (POKER_HOUSE_SERVER), as the
-// Worker does in production. The request keeps its own Host and
-// Origin, the dev server's, so the server's same-origin check passes.
-const API_SERVER = process.env['POKER_HOUSE_SERVER'] ?? 'http://127.0.0.1:8787';
-const AUTH_SERVER = process.env['POKER_HOUSE_AUTH'] ?? 'http://127.0.0.1:8788';
+// `pnpm dev` sends /api to the Worker running under `wrangler dev`
+// (POKER_HOUSE_WORKER), which signs the player in and forwards to the local
+// game server and sign-in service, as it does in production.
+const WORKER = process.env['POKER_HOUSE_WORKER'] ?? 'http://127.0.0.1:8789';
 
 export default defineConfig({
   plugins: [
@@ -42,8 +40,7 @@ export default defineConfig({
   resolve: {tsconfigPaths: true},
   server: {
     proxy: {
-      '/api/auth': {target: AUTH_SERVER, changeOrigin: false},
-      '/api': {target: API_SERVER, changeOrigin: false},
+      '/api': {target: WORKER, changeOrigin: false},
     },
   },
   test: {
