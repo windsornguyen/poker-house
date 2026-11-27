@@ -27,13 +27,10 @@ class Capabilities:
     Attributes:
       controllers: Every registered controller, starting with the human one.
       chance_policies: The chance policies the server accepts.
-      cpp_mcts_limits: How the served pyspiel's C++ MCTS bounds a search, and
-        so which limits MCTS plays with.
     """
 
     controllers: tuple[contract.Controller, ...]
     chance_policies: tuple[contract.ChancePolicy, ...]
-    cpp_mcts_limits: contract.MctsLimits
 
     def __post_init__(self) -> None:
         contract.require(
@@ -48,7 +45,7 @@ class Health:
     """The server's identity and capabilities.
 
     Attributes:
-      version: The installed OpenSpiel package's version.
+      version: The installed Poker House server package's version.
       revision: The source revision the server runs from, or null when unknown.
       capabilities: What the server can do.
     """

@@ -20,7 +20,7 @@ than the budget, 10 seconds unless the server's `--move-budget-seconds` (or
 waits at most the budget, and the server's other requests are answered
 meanwhile on their own threads. Python cannot stop a thread, so stopping is
 cooperative: when the budget expires, `run` asks the call to stop, and a call
-that may take long (MCTS, between simulations) calls `check` (or reads
+that may take long calls `check` (or reads
 `stop_requested`) often and returns or raises soon after. A call that never
 checks runs on, on its own copy of the state, until it returns. Either way
 what it returns after the budget is discarded; its seat has failed by then,

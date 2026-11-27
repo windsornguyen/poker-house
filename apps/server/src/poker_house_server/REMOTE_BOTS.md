@@ -21,8 +21,7 @@ seats' hole cards are `null`. `seed` changes from move to move and is the
 same at the same position, so a bot that draws from it plays reproducibly.
 
 A seat's settings are `url` and `timeout_seconds` (0 waits as long as the
-move budget allows). A bot that plays a checkpoint reads it from its own
-environment (`remote_bot_server.CHECKPOINT_ENV`).
+move budget allows).
 
 The answer may instead be `{"actions": [<id>, ...]}`, of which the first is
 played. It may add `"notice"`: plain text of at most 200 characters about

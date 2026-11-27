@@ -334,7 +334,6 @@ const HEALTH: Health = {
       },
     ],
     chance_policies: ['auto', 'expose'],
-    cpp_mcts_limits: 'simulations_only',
   },
 };
 

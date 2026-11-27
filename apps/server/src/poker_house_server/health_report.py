@@ -40,7 +40,6 @@ def build() -> health.Health:
         capabilities=health.Capabilities(
             controllers=controllers.registered(),
             chance_policies=tuple(contract.ChancePolicy),
-            cpp_mcts_limits=controllers.mcts_limits(),
         ),
     )
 

@@ -128,8 +128,7 @@ def seat_config(options: Options, bot_url: str) -> dict[str, Any]:
     """Returns the Remote bot seat's settings.
 
     The seat waits for each move as long as the move budget allows
-    (`timeout_seconds` 0), so a checkpoint the bot loads at its first move
-    (BOT_MOVE_BUDGET_SECONDS) is not cut short.
+    (`timeout_seconds` 0).
     """
     del options
     return {"url": bot_url, "timeout_seconds": 0.0}
@@ -211,9 +210,6 @@ def _start_bot(
     stops it whatever happens next.
     """
     env = dict(os.environ)
-    if bot.checkpoint:
-        for variable in options.checkpoint_envs:
-            env[variable] = bot.checkpoint
     child = child_servers.ChildServer(
         label,
         [
@@ -264,7 +260,7 @@ def launch(
     """Starts the bot servers and the GUI server, and opens the session.
 
     Every bot seat's bot (`seating`) runs in a bot server; seats with the same
-    bot and checkpoint share one. Every server started is stopped again if a
+    bot share one. Every server started is stopped again if a
     later step fails or is interrupted.
 
     Args:

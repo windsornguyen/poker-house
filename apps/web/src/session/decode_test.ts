@@ -31,7 +31,6 @@ const HEALTH = JSON.stringify({
   capabilities: {
     controllers: [],
     chance_policies: [],
-    cpp_mcts_limits: 'simulations_only',
   },
 });
 

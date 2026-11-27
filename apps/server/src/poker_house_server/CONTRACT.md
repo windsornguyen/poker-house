@@ -327,56 +327,11 @@ output whose policy names an action that is not legal fails the seat
 hidden information makes good, as a notice can carry it;
 `controller_registry.full_state_output` is the place to drop such outputs.
 
-The server registers four controllers: `human`, `random` (a uniformly random
-legal action), `mcts`, and `remote`, a bot server the seat's `url` names, sent
-what the seat's `state` setting says: `seat_view`, what the seat may see (its
-information state string, legal actions and a seed, with more on request), or
-`full_state`, the whole state ([REMOTE_BOTS.md](REMOTE_BOTS.md) gives the
-protocol). A `remote` seat may be sent the full state in a game that hides
-information; its `config`, which every viewer receives, says which it is sent.
-The server posts to bot servers on its own machine only, unless started with
-`--remote-bot-host`. MCTS = pyspiel C++ MCTSBot for C++ games; OpenSpiel Python
-MCTS for Python-implemented games. Its limits follow a capability check the
-server makes once at startup, reported as `Health.capabilities.cpp_mcts_limits`.
-
-A game implemented in C++ is searched by OpenSpiel's C++ search
-(`pyspiel.MCTSBot`), its tree capped at 1000 MB. That search cannot be
-stopped once started, and its only bounds are a simulation count and a
-wall-clock time. Some pyspiel builds stop it at whichever comes first;
-others, OpenSpiel's releases so far among them, let a wall-clock time
-replace the count. At startup the server searches tic-tac-toe with 5
-simulations and 0.2 seconds, and counts the simulations from the root's
-visit count: 5, in well under a millisecond, means the count is honoured;
-thousands, over the full 0.2 seconds, means the clock replaces it.
-
-| `cpp_mcts_limits`      | `max_simulations`              | Wall-clock time                         | Moves reproducible                |
-| ---------------------- | ------------------------------ | --------------------------------------- | --------------------------------- |
-| `simulations_or_clock` | at most 10000, 1000 by default | the move budget less 1 s, as a backstop | when the simulations finish first |
-| `simulations_only`     | at most 250, its default       | none                                    | always                            |
-
-With `simulations_only`, `max_simulations` is capped at 250: a move at the
-cap fits the 10 second move budget on the slowest catalogued C++ game MCTS
-plays (`hive`, one random rollout per simulation) with room to spare, also
-on a host half as fast as a typical server. Every other catalogued C++ game
-MCTS plays is faster.
-
-With `simulations_or_clock`, a slow game's move at a high count ends at the
-backstop instead (half the budget when the budget is under 2 s).
-
-A game implemented in Python, or a C++ game that wraps one, is searched by
-OpenSpiel's Python MCTS (`open_spiel.python.algorithms.mcts`) with its random
-rollouts played in C++: the C++ search releases Python's interpreter lock
-while it runs, and cannot call such a game safely. The Python search is
-cancellable at the move budget: it stops between simulations once the
-budget has expired, rather than searching on with no one waiting. It
-takes the same `max_simulations` setting, with the same bounds, and it stops
-once its tree holds 1,000,000 nodes (about 180 MB), playing the best move
-found so far. It has no wall-clock limit of its own: with
-`simulations_or_clock`, a move whose simulations outlast the move budget
-fails its seat with `Timeout`.
-
-Apart from the backstop, both searches count work, not time, so a move is
-reproducible from the seed on any machine.
+The server registers three controllers: `human`, `random` (a uniformly random
+legal action), and `remote`, a bot server the seat's `url` names, sent the
+seat's private observation ([REMOTE_BOTS.md](REMOTE_BOTS.md) gives the
+protocol). The server posts to bot servers on its own machine only, unless
+started with `--remote-bot-host`.
 
 ### Building a controller
 
@@ -415,9 +370,7 @@ controller.
 
 ## Catalogue
 
-`Catalogue.games` lists every registered game once, ordered by `name`,
-except the games the server is started with `--exclude-games` to leave out,
-whose sessions it refuses as `not_found`.
+`Catalogue.games` lists every served poker game once, ordered by `name`.
 The server loads each game once per process and keeps what it finds, so a
 game registered after the first catalogue is not listed until a restart.
 `renderer` is not kept: it is read from the adapter registry on every
@@ -455,11 +408,10 @@ A `ParameterSpec` describes one game parameter so a client can offer it:
 
 | Field                          | Meaning                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
-| `version`                      | the installed OpenSpiel package's version                                                    |
+| `version`                      | the installed Poker House server package's version                                           |
 | `revision`                     | the source revision the server runs from, or null when unknown                               |
 | `capabilities.controllers`     | every registered `Controller`, `human` first                                                 |
 | `capabilities.chance_policies` | the chance policies the server accepts                                                       |
-| `capabilities.cpp_mcts_limits` | how the C++ MCTS bounds a search (Controllers): `simulations_or_clock` or `simulations_only` |
 
 ## Errors
 

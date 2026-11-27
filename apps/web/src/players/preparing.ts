@@ -17,7 +17,7 @@
 
 import type {Controller, Frame, SeatView} from '../contract/contract.ts';
 
-/** "Preparing MCTS…": what a preparing seat shows in place of its name. */
+/** "Preparing Remote bot…": what a preparing seat shows in place of its name. */
 export function preparingText(
   controllers: readonly Controller[],
   seat: SeatView,

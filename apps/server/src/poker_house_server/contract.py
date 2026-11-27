@@ -142,26 +142,6 @@ class ChancePolicy(enum.StrEnum):
     EXPOSE = "expose"
 
 
-class MctsLimits(enum.StrEnum):
-    """How the served pyspiel's C++ MCTS (`pyspiel.MCTSBot`) bounds a search.
-
-    The server finds out once, at startup, and picks MCTS's limits by it.
-
-    Attributes:
-      SIMULATIONS_OR_CLOCK: A search stops at its simulation count or its
-        wall-clock time, whichever comes first. MCTS runs up to 10000
-        simulations, 1000 by default, with a wall-clock backstop a little
-        inside the move budget.
-      SIMULATIONS_ONLY: A wall-clock time replaces the simulation count rather
-        than bounding it. MCTS sets no wall-clock time, and its simulations are
-        capped at 250, which fits the move budget on the slowest catalogued
-        game.
-    """
-
-    SIMULATIONS_OR_CLOCK = "simulations_or_clock"
-    SIMULATIONS_ONLY = "simulations_only"
-
-
 @dataclasses.dataclass(frozen=True)
 class Viewer:
     """The audience a frame is built for.

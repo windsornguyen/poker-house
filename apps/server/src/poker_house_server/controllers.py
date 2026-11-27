@@ -23,10 +23,8 @@ lists only those that can), `create` builds one for a seat, and `choose` asks
 it for a move.
 
 Controllers are registered by name with `register` (`controller_registry`);
-`human`, `random`, `mcts` and `remote` (a bot server, `remote_bot`) are
-registered here, and a program that serves
-the GUI may register its own before it starts serving, since the catalogue
-and the health report read the registry once.
+`human`, `random` and `remote` (a bot server, `remote_bot`) are registered
+here.
 
 No controller stands in for another. When one raises, returns anything but
 a legal action, or takes longer than the move budget (`set_move_budget`,
@@ -34,14 +32,7 @@ a legal action, or takes longer than the move budget (`set_move_budget`,
 `choose` raises `ControllerError` naming the seat, and the caller pauses that
 seat. A controller chooses on a thread of its own, so a slow one holds up
 only the request that asked it, and only for the budget; a move it returns
-after that is discarded. A controller that may take long checks
-`move_budget.check` as it works, as MCTS does between simulations, so that
-one over its budget stops, and its thread exits, soon after. A call that
-cannot check, as OpenSpiel's C++ MCTS cannot, must bound its own work to fit
-the budget.
-
-Programs that serve the GUI and third-party packages alike register their
-controllers with `register`; `plugins` loads the packages' on request.
+after that is discarded.
 
 Every random choice a controller makes is seeded from its seed and the ply it
 moves at, so a seat moves the same way at the same position however often it
@@ -59,14 +50,12 @@ from poker_house_server import (
     controller_registry,
     controller_settings,
     errors,
-    mcts_controller,
     remote_bot,
 )
 from poker_house_server import move_budget as move_budget_lib
 
 HUMAN = contract.HUMAN
 RANDOM = "random"
-MCTS = mcts_controller.NAME
 REMOTE = remote_bot.NAME
 
 # A controller's settings, as a client sends them.
@@ -85,13 +74,8 @@ register = controller_registry.register
 unregister = controller_registry.unregister
 kinds = controller_registry.kinds
 
-# The settings' names, which a plugin declares its controller's settings with.
 Setting = controller_settings.Setting
 REQUIRED = controller_settings.REQUIRED
-
-# MCTS's limits (`mcts_controller`), which a server sets once at startup.
-configure_mcts = mcts_controller.configure
-mcts_limits = mcts_controller.configured_limits
 
 # The move budget's names, which callers reach through this module.
 DEFAULT_MOVE_BUDGET_SECONDS = move_budget_lib.DEFAULT_SECONDS
@@ -134,7 +118,7 @@ class Spec:
 
     Attributes:
       kind: The name the controller is registered under, such as `HUMAN`,
-        `RANDOM` or `MCTS`.
+        `RANDOM` or `REMOTE`.
       config: The controller's settings, satisfying its `config_schema`. A
         setting left out takes its default.
     """
@@ -212,11 +196,6 @@ register(
     RANDOM,
     Kind("Random", (), reads_full_state=False, build=_build_random),
 )
-# With the limits that fit the move budget with either behaviour of the C++
-# search, until `configure_mcts` says which the served pyspiel has.
-register(MCTS, mcts_controller.kind(contract.MctsLimits.SIMULATIONS_ONLY))
-# Sent what its seat's `state` setting says: the seat's view, or the full
-# state (`remote_bot`).
 register(REMOTE, remote_bot.kind())
 
 

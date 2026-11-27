@@ -24,17 +24,12 @@ from typing import Any
 
 import pyspiel
 
-from poker_house_server import child_servers, loader, remote_bot_server, static
+from poker_house_server import child_servers, loader, static
 
 LaunchError = child_servers.LaunchError
 
-# The variable the bot server's factory reads its checkpoint from, unless
-# `--checkpoint-env` names another.
-CHECKPOINT_ENV = remote_bot_server.CHECKPOINT_ENV
-CHECKPOINT_ENVS = (CHECKPOINT_ENV,)
-# Seconds; the GUI server's move budget, and so the most the bot seat waits
-# for a move. A checkpoint named only in the seat (its Checkpoint field)
-# may load and warm up at its first move, beyond the server default of 10 s.
+# Seconds; the game server's move budget, and so the most a bot seat waits
+# for a move.
 BOT_MOVE_BUDGET_SECONDS = 60.0
 
 
@@ -43,12 +38,10 @@ class SeatBot:
     """The bot a seat plays.
 
     Attributes:
-      bot: The bot server's `--bot`: random, mcts or MODULE:FACTORY.
-      checkpoint: The checkpoint the bot plays, or empty for none.
+      bot: The bot server's `--bot`: random or MODULE:FACTORY.
     """
 
     bot: str
-    checkpoint: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -57,10 +50,7 @@ class Options:
 
     Attributes:
       game: The poker game name and parameters, such as `poker_house`.
-      bot: The bot server's `--bot`: random, mcts or MODULE:FACTORY.
-      checkpoint: The checkpoint the bot plays, or empty for none.
-      checkpoint_envs: The environment variables the bot server is given the
-        checkpoint in.
+      bot: The bot server's `--bot`: random or MODULE:FACTORY.
       bot_seat: One seat the bot plays, as `bot_seats=(bot_seat,)` does; kept
         for callers that seat one bot.
       bot_seats: The seats the bots play, every other seat human. Empty (the
@@ -68,18 +58,17 @@ class Options:
       human_seat: The seat the printed address opens as; None (the default) is
         seat 0, or the first seat that is not a bot seat.
       spectate: Whether every seat plays a bot and the viewer is a spectator.
-      seat_bots: The seats that play a bot or checkpoint other than `bot` and
-        `checkpoint`, each a bot seat.
+      seat_bots: The seats that play a bot other than `bot`, each a bot seat.
       server_per_seat: Whether every bot seat gets a bot server of its own,
         for a bot that keeps state between requests and cannot key it on the
-        request's seat; otherwise the seats with the same bot and checkpoint
+        request's seat; otherwise the seats with the same bot
         share one.
       host: The address the GUI server listens on.
       port: The GUI server's port; 0 picks a free one.
       client_dir: The built browser client.
       move_budget_seconds: The GUI server's move budget.
       bot_start_seconds: How long the bot server may take to start (a bot that
-        loads and warms up a checkpoint takes a while).
+        loads a model takes a while).
       gui_flags: Further flags for the GUI server.
       open_browser: Whether to open the address in a browser too.
       python: The Python interpreter both servers run on.
@@ -87,8 +76,6 @@ class Options:
 
     game: str
     bot: str
-    checkpoint: str = ""
-    checkpoint_envs: tuple[str, ...] = CHECKPOINT_ENVS
     bot_seat: int | None = None
     bot_seats: tuple[int, ...] = ()
     human_seat: int | None = None
@@ -192,7 +179,7 @@ def seating(options: Options, num_players: int) -> Seating:
     human = None
     if not options.spectate:
         human = humans[0] if options.human_seat is None else options.human_seat
-    default = SeatBot(options.bot, options.checkpoint)
+    default = SeatBot(options.bot)
     return Seating(
         bots={seat: options.seat_bots.get(seat, default) for seat in sorted(seats)},
         human=human,
@@ -239,27 +226,8 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
         "--bot",
         required=True,
         help=(
-            "The bot server's --bot: random, mcts, or MODULE:FACTORY, a "
+            "The bot server's --bot: random, or MODULE:FACTORY, a "
             "function returning a bot (REMOTE_BOTS.md)."
-        ),
-    )
-    parser.add_argument(
-        "--checkpoint",
-        default="",
-        help=(
-            "The checkpoint the bot plays, <location>@<step>: a directory, "
-            "or any path or URL the bot reads (a cloud bucket, say); given to "
-            "the bot server in its environment and set as the seat's "
-            "checkpoint."
-        ),
-    )
-    parser.add_argument(
-        "--checkpoint-env",
-        default=None,
-        metavar="VAR",
-        help=(
-            "The one variable the bot reads its checkpoint from. Default: "
-            f"set all of {', '.join(CHECKPOINT_ENVS)}."
         ),
     )
     parser.add_argument(
@@ -293,17 +261,7 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
         action="append",
         default=[],
         metavar="SEAT=BOT",
-        help=(
-            "A bot seat's own bot server --bot, instead of --bot, with no "
-            "checkpoint unless --seat-checkpoint gives one; may be repeated."
-        ),
-    )
-    parser.add_argument(
-        "--seat-checkpoint",
-        action="append",
-        default=[],
-        metavar="SEAT=CHECKPOINT",
-        help=("A bot seat's own checkpoint, instead of --checkpoint; may be repeated."),
+        help=("A bot seat's own bot server --bot, instead of --bot; may be repeated."),
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787, help="The GUI's port; 0 picks one.")
@@ -314,7 +272,7 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
         default=BOT_MOVE_BUDGET_SECONDS,
         help=(
             "How long the bot may take per move (its first move with a new "
-            "checkpoint may load and warm it up). Default: %(default)g."
+            "model may load). Default: %(default)g."
         ),
     )
     parser.add_argument(
@@ -334,26 +292,15 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
         help=(
             "Give every bot seat a bot server of its own, for a bot that keeps "
             "state between requests and cannot key it on the request's seat. "
-            "Default: seats with the same bot and checkpoint share one."
+            "Default: seats with the same bot share one."
         ),
     )
     args = parser.parse_args(argv)
     bots = _seat_values(parser, "--seat-bot", args.seat_bot)
-    checkpoints = _seat_values(parser, "--seat-checkpoint", args.seat_checkpoint)
-    seat_bots = {
-        seat: SeatBot(
-            bots.get(seat, args.bot),
-            checkpoints.get(seat, "" if seat in bots else args.checkpoint.strip()),
-        )
-        for seat in sorted(set(bots) | set(checkpoints))
-    }
+    seat_bots = {seat: SeatBot(bots[seat]) for seat in sorted(bots)}
     return Options(
         game=args.game,
         bot=args.bot,
-        checkpoint=args.checkpoint.strip(),
-        checkpoint_envs=(
-            CHECKPOINT_ENVS if args.checkpoint_env is None else (args.checkpoint_env,)
-        ),
         bot_seats=tuple(args.bot_seat or ()),
         human_seat=args.human_seat,
         spectate=args.spectate,

@@ -16,7 +16,7 @@
 
 A controller is registered by name with `register`, and `kinds` lists every
 registered controller in the order registered, `human` first. `controllers`
-registers `human`, `random` and `mcts`, and builds and asks controllers for
+registers `human`, `random` and `remote`, and builds and asks controllers for
 moves; a program that serves the GUI may register its own before it starts
 serving, since the catalogue and the health report read the registry once.
 """

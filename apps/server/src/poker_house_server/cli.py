@@ -32,13 +32,9 @@ from absl import logging
 from poker_house_server import (
     api,
     builds,
-    contract,
     controllers,
     health_report,
     loader,
-    mcts_controller,
-    mcts_search,
-    plugins,
     remote_bot,
     static,
     store,
@@ -114,21 +110,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="The directory of the built browser client.",
     )
     parser.add_argument(
-        "--controllers",
-        action="append",
-        default=[],
-        metavar="MODULE[,MODULE...]",
-        help=(
-            "Controller plugins to load before serving: modules, each with a "
-            "function register_into(controllers) that registers its bots with "
-            f"controllers.register. {plugins.AUTO!r} loads every plugin that "
-            "an installed distribution declares in the entry-point group "
-            f"{plugins.ENTRY_POINT_GROUP!r}. Repeatable. Without this flag no "
-            "plugin is loaded. A plugin that cannot be imported, has no "
-            "register_into, or fails to register stops the server starting."
-        ),
-    )
-    parser.add_argument(
         "--move-budget-seconds",
         type=_seconds,
         default=controllers.DEFAULT_MOVE_BUDGET_SECONDS,
@@ -173,17 +154,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "never part of a seat's settings, which every viewer sees."
         ),
     )
-    parser.add_argument(
-        "--exclude-games",
-        action="append",
-        default=[],
-        metavar="GAME[,GAME...]",
-        help=(
-            "Registered games to leave out of the catalogue, and to refuse "
-            "sessions of. Repeatable. A name this build does not register is "
-            "ignored."
-        ),
-    )
     return parser.parse_args(argv)
 
 
@@ -206,26 +176,6 @@ def remote_bot_tokens(values: Sequence[str]) -> dict[str, str]:
             )
         tokens[where.strip()] = token
     return tokens
-
-
-def excluded_games(values: Sequence[str]) -> tuple[str, ...]:
-    """Returns the game names `--exclude-games` gives, each comma separated."""
-    return tuple(name.strip() for value in values for name in value.split(",") if name.strip())
-
-
-def load_plugins(values: Sequence[str]) -> tuple[str, ...]:
-    """Loads the controller plugins that `--controllers` names.
-
-    Args:
-      values: The `--controllers` values, each comma separated.
-
-    Returns:
-      The names of the controllers the plugins registered.
-
-    Raises:
-      plugins.PluginError: If a plugin fails to load or register.
-    """
-    return plugins.load([name for value in values for name in plugins.parse(value)])
 
 
 def allowed_hosts(host: str, extra: Sequence[str]) -> frozenset[str]:
@@ -278,31 +228,6 @@ def log_disclaimer(host: str) -> None:
     )
 
 
-def configure_mcts() -> None:
-    """Sets MCTS's limits by how the served pyspiel's C++ MCTS bounds a search.
-
-    Probes once (`mcts_search.limits`) and logs what it found.
-    """
-    probe = mcts_search.limits()
-    controllers.configure_mcts(probe.limits)
-    maximum = mcts_controller.SIMULATIONS[probe.limits].maximum
-    logging.info(
-        "C++ MCTS limits: %s (the probe's search, given %d simulations and "
-        "%g s, ran %d simulations in %.1f ms); max_simulations is at most %d%s.",
-        probe.limits.value,
-        mcts_search.PROBE_SIMULATIONS,
-        mcts_search.PROBE_SECONDS,
-        probe.simulations,
-        probe.seconds * 1000,
-        maximum,
-        (
-            ", with a wall-clock backstop inside the move budget"
-            if probe.limits == contract.MctsLimits.SIMULATIONS_OR_CLOCK
-            else ", with no wall-clock time"
-        ),
-    )
-
-
 def enable_crash_stacks() -> None:
     """Makes a crash of the server print every thread's Python stack.
 
@@ -323,9 +248,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     log_disclaimer(args.host)
     controllers.set_move_budget(args.move_budget_seconds)
     builds.set_budget_seconds(args.build_budget_seconds)
-    # Before the server: the catalogue and the health report read the
-    # registry once. A plugin that fails stops the start here.
-    configure_mcts()
     remote_bot.configure(
         hosts=args.remote_bot_host,
         tokens=remote_bot_tokens(args.remote_bot_token_env),
@@ -335,11 +257,6 @@ def main(argv: Sequence[str] | None = None) -> None:
             "Remote bot seats may post to this machine and to %s.",
             ", ".join(args.remote_bot_host),
         )
-    if args.exclude_games:
-        left_out = loader.exclude(excluded_games(args.exclude_games))
-        logging.info("Games left out of the catalogue: %s.", ", ".join(left_out) or "none")
-    if args.controllers:
-        load_plugins(args.controllers)
     server = server_lib.Server(
         (args.host, args.port),
         api.Api(

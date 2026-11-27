@@ -120,10 +120,6 @@ export interface Capabilities {
    * The chance policies the server accepts.
    */
   chance_policies: ChancePolicy[];
-  /**
-   * How the served pyspiel's C++ MCTS bounds a search, and so which limits MCTS plays with.
-   */
-  cpp_mcts_limits: MctsLimits;
 }
 
 /**
@@ -438,7 +434,7 @@ export interface Frame {
  */
 export interface Health {
   /**
-   * The installed OpenSpiel package's version.
+   * The installed Poker House server package's version.
    */
   version: string;
   /**
@@ -490,16 +486,6 @@ export interface HistoryEntry {
  */
 export type Information =
   'one_shot' | 'perfect_information' | 'imperfect_information';
-
-/**
- * How the served pyspiel's C++ MCTS (`pyspiel.MCTSBot`) bounds a search.
- *
- * The server finds out once, at startup, and picks MCTS's limits by it.
- *
- * - `simulations_or_clock`: A search stops at its simulation count or its wall-clock time, whichever comes first. MCTS runs up to 10000 simulations, 1000 by default, with a wall-clock backstop a little inside the move budget.
- * - `simulations_only`: A wall-clock time replaces the simulation count rather than bounding it. MCTS sets no wall-clock time, and its simulations are capped at 250, which fits the move budget on the slowest catalogued game.
- */
-export type MctsLimits = 'simulations_or_clock' | 'simulations_only';
 
 /**
  * Who acts at a position.

@@ -22,9 +22,6 @@ of `POST /move` and returning an action id, or a dict with `action` and the
 optional `notice`, `policy`, `value` and `decided_by`. A ValueError is
 answered as a refusal (HTTP 422) with its message.
 
-A factory that plays a checkpoint reads it from the environment variable
-CHECKPOINT_ENV.
-
 The server listens on 127.0.0.1 unless told otherwise. With `--token-env
 VAR` it answers only requests carrying `Authorization: Bearer <token>`, the
 token held in the environment variable VAR, and 401 to any other; it refuses
@@ -35,6 +32,7 @@ import argparse
 import hmac
 import http
 import http.server
+import importlib
 import json
 import os
 import random
@@ -43,9 +41,7 @@ from typing import Any, Protocol
 
 from absl import logging
 
-from poker_house_server import plugins, remote_bot
-
-CHECKPOINT_ENV = "POKER_HOUSE_BOT_CHECKPOINT"
+from poker_house_server import remote_bot
 
 MAX_BODY_BYTES = 16 << 20
 
@@ -71,14 +67,17 @@ def load_bot(name: str) -> Bot:
 
     Raises:
       ValueError: If `name` is neither, or the factory's bot has no `move`.
-      plugins.PluginError: If the factory's module cannot be imported.
     """
     if name == "random":
         return RandomBot()
     module_name, sep, factory_name = name.partition(":")
     if not sep or not module_name or not factory_name:
         raise ValueError(f"--bot {name!r} is not random or MODULE:FACTORY.")
-    factory = getattr(plugins.import_named(module_name, "The bot's module"), factory_name)
+    try:
+        module = importlib.import_module(module_name)
+    except ImportError as e:
+        raise ValueError(f"The bot's module {module_name!r} cannot be imported: {e}") from e
+    factory = getattr(module, factory_name)
     bot: Bot = factory()
     if not callable(getattr(bot, "move", None)):
         raise ValueError(f"{name}'s bot has no move(request).")
@@ -290,7 +289,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             notice=args.notice,
             token=token,
         )
-    except (ValueError, plugins.PluginError) as e:
+    except ValueError as e:
         # A mistake on the command line is one line, not a traceback.
         raise SystemExit(f"error: {e}") from e
     with server:

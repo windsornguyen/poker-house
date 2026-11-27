@@ -25,7 +25,7 @@ turn-based wrapper.
 import dataclasses
 import functools
 import types
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 import pyspiel
 from absl import logging
@@ -50,23 +50,6 @@ SUPPORTED_GAMES = frozenset({"poker_house", "poker_house_acpc"})
 
 # Re-exported: the session's parameters are part of what `load` reports.
 session_parameters = loader_support.session_parameters
-
-# Parameters that name a file or directory on the server, by game: the server
-# loads these games only with the parameter's default, so that no request can
-# make it read a path of the requester's choosing. The names are top-level
-# parameters only: a wrapper's nested game could carry one, so every game with
-# a nested game parameter stays unavailable (`unavailable_reason`).
-SERVER_PATH_PARAMETERS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("bargaining", "instances_file"),
-        ("colored_trails", "boards_file"),
-        ("crossword", "puzzles_root"),
-        ("crossword", "word_list_file"),
-        ("efg_game", "filename"),
-        ("nfg_game", "filename"),
-        ("python_hangman", "word_list_file"),
-    }
-)
 
 
 class UnknownGameError(errors.NotFoundError):
@@ -149,68 +132,13 @@ class LoadedGame:
         )
 
 
-# The registered games the server leaves out (`exclude`).
-_EXCLUDED: set[str] = set()
-
-
-def exclude(names: Iterable[str]) -> tuple[str, ...]:
-    """Leaves registered games out of the catalogue, and refuses their sessions.
-
-    For a build of OpenSpiel that registers games a server should not offer.
-    Call it before serving: the catalogue reads the registered games once.
-
-    Args:
-      names: Short names of games to leave out. A name this build does not
-        register is ignored, with a warning, so that one list serves several
-        builds.
-
-    Returns:
-      The names given that this build registers, and so are now left out,
-      in order.
-
-    Raises:
-      ValueError: If a name is blank.
-    """
-    names = tuple(names)
-    for name in names:
-        if not name.strip():
-            raise ValueError("A game to exclude has a blank name.")
-    registered = set(pyspiel.registered_names())
-    for name in sorted(set(names) - registered):
-        # Ignored, so that one list serves several builds; said, so that a typo
-        # shows.
-        logging.warning(
-            "Not excluding %r: this build of OpenSpiel registers no such game.",
-            name,
-        )
-    _EXCLUDED.update(names)
-    registered_types.cache_clear()
-    _loaded_entries.cache_clear()
-    return tuple(sorted(set(names) & registered))
-
-
-def clear_exclusions() -> None:
-    """Offers every supported poker game again, undoing `exclude`."""
-    _EXCLUDED.clear()
-    registered_types.cache_clear()
-    _loaded_entries.cache_clear()
-
-
-def excluded() -> frozenset[str]:
-    """Returns the names of the games `exclude` left out."""
-    return frozenset(_EXCLUDED)
-
-
 @functools.cache
 def registered_types() -> Mapping[str, pyspiel.GameType]:
-    """Returns every registered game's type, keyed by short name.
-
-    A game left out by `exclude` is not listed.
-    """
+    """Returns every served poker game's type, keyed by short name."""
     return {
         game_type.short_name: game_type
         for game_type in pyspiel.registered_games()
-        if game_type.short_name in SUPPORTED_GAMES and game_type.short_name not in _EXCLUDED
+        if game_type.short_name in SUPPORTED_GAMES
     }
 
 
@@ -245,14 +173,12 @@ def load(name: str, parameters: Mapping[str, contract.ParameterValue]) -> Loaded
     Raises:
       UnknownGameError: If no game is registered under `name`.
       UnavailableError: If the server cannot serve the game.
-      InvalidParametersError: If a parameter in `SERVER_PATH_PARAMETERS` is not
-        its default, or the game refuses the parameters, or cannot build its
-        initial state with them.
+      InvalidParametersError: If the game refuses the parameters, or cannot
+        build its initial state with them.
     """
     game_type = registered_types().get(name)
     if game_type is None:
         raise UnknownGameError(f"There is no game {name!r}.")
-    _refuse_server_paths(game_type, parameters)
     reason = unavailable_reason(game_type)
     if reason is not None:
         raise UnavailableError(f"{name} cannot be served. {reason}")
@@ -280,32 +206,6 @@ def load(name: str, parameters: Mapping[str, contract.ParameterValue]) -> Loaded
             and name not in information.HIDDEN_DESPITE_DECLARATION
         ),
     )
-
-
-def _refuse_server_paths(
-    game_type: pyspiel.GameType,
-    parameters: Mapping[str, contract.ParameterValue],
-) -> None:
-    """Refuses a value other than the default for a parameter naming a path.
-
-    Args:
-      game_type: The game's type.
-      parameters: The parameters to override.
-
-    Raises:
-      InvalidParametersError: If a parameter in `SERVER_PATH_PARAMETERS` is
-        given a value other than its default.
-    """
-    defaults = game_type.parameter_specification
-    for name, value in sorted(parameters.items()):
-        if (game_type.short_name, name) not in SERVER_PATH_PARAMETERS:
-            continue
-        if name in defaults and value == defaults[name]:
-            continue
-        raise InvalidParametersError(
-            f"{game_type.short_name}'s parameter {name!r} names a file on the "
-            "server, so this server serves it only with its default."
-        )
 
 
 def _widen(
@@ -347,7 +247,6 @@ def _load_or_refuse(
     Returns:
       The loaded game.
     """
-    verbosity = logging.get_verbosity()
     try:
         if turn_based:
             return pyspiel.load_game_as_turn_based(name, dict(parameters))
@@ -358,31 +257,6 @@ def _load_or_refuse(
         raise InvalidParametersError(
             f"{name} refuses these parameters; the server's log has the details."
         ) from error
-    finally:
-        _keep_verbosity(verbosity, name)
-
-
-def _keep_verbosity(verbosity: int, name: str) -> None:
-    """Undoes a change a game made to the process's log verbosity on loading.
-
-    The log is the server's: chat_game, for one, sets it to ERROR when it
-    loads, which would silence every later request line and warning, the
-    catalogue's own loading included.
-
-    Args:
-      verbosity: The verbosity before the game loaded.
-      name: The game, named in the warning.
-    """
-    changed = logging.get_verbosity()
-    if changed == verbosity:
-        return
-    logging.set_verbosity(verbosity)
-    logging.warning(
-        "Loading %s set the log verbosity to %d; the server keeps its own, %d.",
-        name,
-        changed,
-        verbosity,
-    )
 
 
 def _new_initial_state(game: pyspiel.Game, name: str) -> pyspiel.State:
@@ -512,13 +386,6 @@ _PARAMETER_TYPES: tuple[tuple[type[object], catalogue.ParameterType], ...] = (
 )
 
 
-# Parameters a client offers as a list of values rather than as a free
-# field, by game and parameter: the board sizes a game is played on.
-_PARAMETER_CHOICES: dict[tuple[str, str], tuple[contract.ParameterValue, ...]] = {
-    ("go", "board_size"): (9, 13, 19),
-}
-
-
 def _parameter_specs(
     game_type: pyspiel.GameType,
 ) -> tuple[catalogue.ParameterSpec, ...]:
@@ -534,23 +401,15 @@ def _parameter_specs(
             # one, so the catalogue lists such a game as unavailable and none of
             # its parameters is offered.
             continue
-        choices = _PARAMETER_CHOICES.get((game_type.short_name, name))
-        if (game_type.short_name, name) in SERVER_PATH_PARAMETERS:
-            # `load` admits only the default, so that is the one choice offered.
-            choices = (default,)
         specs.append(
             catalogue.ParameterSpec(
                 name=name,
                 type=parameter_type,
-                kind=(
-                    catalogue.ParameterKind.FREE
-                    if choices is None
-                    else catalogue.ParameterKind.CHOICE
-                ),
+                kind=catalogue.ParameterKind.FREE,
                 default=default,
                 minimum=None,
                 maximum=None,
-                choices=choices,
+                choices=None,
                 description=None,
             )
         )
