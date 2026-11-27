@@ -18,6 +18,7 @@ import process from 'node:process';
 
 import {reactRouter} from '@react-router/dev/vite';
 import babel from '@rolldown/plugin-babel';
+import tailwindcss from '@tailwindcss/vite';
 import react, {reactCompilerPreset} from '@vitejs/plugin-react';
 import {defineConfig} from 'vite-plus';
 
@@ -31,6 +32,7 @@ const API_SERVER = process.env['POKER_HOUSE_SERVER'] ?? 'http://127.0.0.1:8787';
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     process.env['VITEST'] ? react() : reactRouter(),
     babel({presets: [reactCompilerPreset()]}),
     thirdPartyNotices(),

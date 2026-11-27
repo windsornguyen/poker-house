@@ -16,6 +16,7 @@
     "skipLibCheck": true,
     "types": ["vite/client"],
     "rootDirs": [".", "./.react-router/types"],
+    "paths": {"@/*": ["./src/*"]},
 
     "strict": true,
     "exactOptionalPropertyTypes": true,
@@ -36,5 +37,6 @@
     "*.config.mjs",
     "*.config.ts",
     ".react-router/types/**/*"
-  ]
+  ],
+  "exclude": ["src/components", "src/lib/auth", "src/lib/utils.ts"]
 }

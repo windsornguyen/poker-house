@@ -157,6 +157,28 @@ export default defineConfig({
     overrides: [
       ...Array.from({length: MAX_DEPTH + 1}, (_, depth) => staysInWeb(depth)),
       {
+        // Copied from the shadcn and Better Auth UI registries, kept as shipped
+        // so `shadcn add --overwrite` can update it.
+        files: [
+          WEB + 'src/components/**',
+          WEB + 'src/lib/auth/**',
+          WEB + 'src/lib/utils.ts',
+        ],
+        rules: {
+          'jsdoc-js/require-jsdoc': 'off',
+          'typescript/explicit-module-boundary-types': 'off',
+          'eslint-js/no-restricted-imports': 'off',
+          'eslint-js/no-restricted-syntax': 'off',
+          'eslint-js/no-restricted-properties': 'off',
+          'max-lines': 'off',
+          'max-lines-per-function': 'off',
+          eqeqeq: 'off',
+          'typescript/consistent-type-assertions': 'off',
+          'react/set-state-in-effect': 'off',
+          'react/preserve-manual-memoization': 'off',
+        },
+      },
+      {
         // Each generated type alias restates the documented schema above it.
         files: [WEB + 'src/contract/contract.ts'],
         rules: {'jsdoc-js/require-jsdoc': 'off'},

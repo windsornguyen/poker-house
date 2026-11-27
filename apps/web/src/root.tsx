@@ -1,6 +1,7 @@
 import type {JSX, ReactNode} from 'react';
 import {Links, Meta, Outlet, Scripts, ScrollRestoration} from 'react-router';
 
+import './styles/theme.css';
 import './styles/tokens.css';
 import './styles/base.css';
 import './styles/dock.css';
