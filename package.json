@@ -16,6 +16,7 @@
     "demo": "uv run --package poker-house-server python -m poker_house_server.play --game 'poker_house(num_players=2,blinds=1 2,stack_sizes=200 200)' --bot poker_house_server.poker_bot:make_call_bot --seat-bot 1=poker_house_server.poker_bot:make_raise_bot --spectate --structured --state seat_view --server-per-seat --port 8787",
     "bot:call": "uv run --package poker-house-server python -m poker_house_server.remote_bot_server --port 9001 --bot poker_house_server.poker_bot:make_call_bot",
     "bot:raise": "uv run --package poker-house-server python -m poker_house_server.remote_bot_server --port 9002 --bot poker_house_server.poker_bot:make_raise_bot",
+    "deploy:dm": "pnpm --filter @poker-house/deploy provision",
     "test:engine": "uv run --all-packages python -m unittest discover -s packages/python/engine/tests -p '*_test.py'",
     "test:server": "uv run --all-packages python -m unittest discover -s apps/server/tests -p '*_test.py'",
     "test:web": "pnpm --filter @poker-house/web test",

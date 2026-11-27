@@ -23,6 +23,22 @@ or a trusted LAN; it is not a public competitive service. The oracle view
 intentionally exposes all cards for research. Binding beyond localhost
 requires `--host` and, when accessed by a network name, `--allow-host`.
 
+## Deploy to a Dedalus Machine
+
+`pnpm deploy:dm` provisions one Dedalus Machine that runs Postgres on localhost
+and this server behind a password-protected port. It deploys the pushed
+`HEAD` commit and can be rerun to update it.
+
+```sh
+export DEDALUS_API_KEY=dsk_...
+export POKER_HOUSE_PORT_PASSWORD=abcd1234
+export POKER_HOUSE_MACHINE_ID=...   # omit to create a Machine
+pnpm deploy:dm
+```
+
+The port password keeps strangers out. Everyone who has it sees every seat's
+cards in the analysis view, so share it only with trusted players.
+
 [HTTP contract](src/poker_house_server/CONTRACT.md) ·
 [Remote bot protocol](src/poker_house_server/REMOTE_BOTS.md)
 

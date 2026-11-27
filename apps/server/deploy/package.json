@@ -1,0 +1,23 @@
+{
+	"name": "@poker-house/deploy",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Provisions Poker House on a Dedalus Machine.",
+	"license": "Apache-2.0",
+	"type": "module",
+	"scripts": {
+		"provision": "node provision.ts",
+		"check": "tsc -p . && oxlint --type-aware && oxfmt --check .",
+		"format": "oxfmt ."
+	},
+	"dependencies": {
+		"dedalus": "0.8.0"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.11",
+		"oxfmt": "0.80.0",
+		"oxlint": "1.95.0",
+		"oxlint-tsgolint": "7.0.2009",
+		"typescript": "7.0.2"
+	}
+}
