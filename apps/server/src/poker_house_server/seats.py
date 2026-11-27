@@ -111,7 +111,7 @@ class Seat:
             these settings, or a human seat is asked to autoplay.
         """
         controller = controllers.create(spec, game, seed=seed)
-        _check_autoplay(controller, autoplay)
+        check_autoplay(controller, autoplay)
         return cls(spec=spec, controller=controller, autoplay=autoplay)
 
     @classmethod
@@ -200,13 +200,13 @@ class Seat:
         if error is None:
             assert controller is not None
             try:
-                _check_autoplay(controller, self.autoplay)
+                check_autoplay(controller, self.autoplay)
             except controllers.UnavailableError as e:
                 error = e
         if error is not None and refuse:
             if isinstance(error, (controllers.UnavailableError, builds.OverBudgetError)):
                 raise errors.ControllerUnavailableError(
-                    _unavailable_message(self.spec.kind, error), seat=index
+                    unavailable_message(self.spec.kind, error), seat=index
                 ) from error
             raise error
         self.build = None
@@ -218,7 +218,7 @@ class Seat:
             )
             return
         self.status = contract.SeatStatus.UNAVAILABLE
-        self.message = _unavailable_message(self.spec.kind, error)
+        self.message = unavailable_message(self.spec.kind, error)
         self.failure = contract.ControllerFailure(
             error=(
                 controllers.TIMEOUT
@@ -276,13 +276,13 @@ OnBuilt = Callable[[builds.Build[controllers.Controller]], None]
 OnSeatBuilt = Callable[[int, builds.Build[controllers.Controller]], None]
 
 
-def _check_autoplay(controller: controllers.Controller, autoplay: bool) -> None:
+def check_autoplay(controller: controllers.Controller, autoplay: bool) -> None:
     """Refuses to autoplay a human seat."""
     if autoplay and isinstance(controller, controllers.Human):
         raise controllers.UnavailableError("A human seat cannot autoplay.")
 
 
-def _unavailable_message(kind: str, error: Exception) -> str:
+def unavailable_message(kind: str, error: Exception) -> str:
     """Says, for every viewer, why the controller `kind` was not built."""
     label = controllers.label(kind)
     if isinstance(error, controllers.UnavailableError):

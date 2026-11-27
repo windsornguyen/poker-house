@@ -94,7 +94,7 @@ def shown(value: object) -> str:
     return f"{text[:_MAX_SHOWN]}..."
 
 
-def _characters(count: int) -> str:
+def characters(count: int) -> str:
     """Returns "1 character" or "`count` characters"."""
     return "1 character" if count == 1 else f"{count} characters"
 
@@ -174,11 +174,11 @@ class Setting:
             if not self.choices or len(set(self.choices)) != len(self.choices):
                 raise ValueError(f"Setting {self.name!r} has no choices, or repeats one.")
             for choice in self.choices:
-                self._check_declared(choice, "choice")
+                self.check_declared(choice, "choice")
         if self.default is not REQUIRED:
-            self._check_declared(self.default, "default")
+            self.check_declared(self.default, "default")
 
-    def _check_declared(self, value: contract.ParameterValue, what: str) -> None:
+    def check_declared(self, value: contract.ParameterValue, what: str) -> None:
         """Raises ValueError if the setting refuses its own `value`."""
         try:
             self.parse(value)
@@ -207,7 +207,7 @@ class Setting:
         result.update((keyword, value) for keyword, value in optional.items() if value is not None)
         return result
 
-    def _bounds(self) -> str:
+    def bounds(self) -> str:
         """Describes the values the setting's bounds admit."""
         if self.minimum is not None and self.maximum is not None:
             return f"lies in [{self.minimum}, {self.maximum}]"
@@ -217,14 +217,14 @@ class Setting:
             return f"is at most {self.maximum}"
         return "is a finite number"
 
-    def _lengths(self) -> str:
+    def lengths(self) -> str:
         """Describes the lengths the setting's length bounds admit."""
         if self.min_length is not None and self.max_length is not None:
             return f"{self.min_length} to {self.max_length} characters long"
         if self.min_length is not None:
-            return f"at least {_characters(self.min_length)} long"
+            return f"at least {characters(self.min_length)} long"
         assert self.max_length is not None, self.name
-        return f"at most {_characters(self.max_length)} long"
+        return f"at most {characters(self.max_length)} long"
 
     def parse(self, value: contract.ParameterValue) -> contract.ParameterValue:
         """Returns `value` as the setting's type.
@@ -248,11 +248,11 @@ class Setting:
             )
         parsed: contract.ParameterValue
         if isinstance(value, str):
-            parsed = self._parse_string(value)
+            parsed = self.parse_string(value)
         elif isinstance(value, bool):
             return value  # A boolean, for a boolean setting.
         else:
-            parsed = self._parse_number(value)
+            parsed = self.parse_number(value)
         if self.choices is not None and parsed not in self.choices:
             raise InvalidSettingError(
                 f"Setting {self.name!r} is one of "
@@ -261,13 +261,13 @@ class Setting:
             )
         return parsed
 
-    def _parse_string(self, value: str) -> str:
+    def parse_string(self, value: str) -> str:
         """Returns `value`, a string, if its length and pattern are admitted."""
         if (self.min_length is not None and len(value) < self.min_length) or (
             self.max_length is not None and len(value) > self.max_length
         ):
             raise InvalidSettingError(
-                f"Setting {self.name!r} is {self._lengths()}, so it cannot be {shown(value)}."
+                f"Setting {self.name!r} is {self.lengths()}, so it cannot be {shown(value)}."
             )
         if self.pattern is not None and re.search(self.pattern, value) is None:
             raise InvalidSettingError(
@@ -276,7 +276,7 @@ class Setting:
             )
         return value
 
-    def _parse_number(self, value: int | float) -> int | float:
+    def parse_number(self, value: int | float) -> int | float:
         """Returns `value`, a number, as the setting's type, if within bounds."""
         try:
             number = float(value)
@@ -288,7 +288,7 @@ class Setting:
             or (self.maximum is not None and number > self.maximum)
         ):
             raise InvalidSettingError(
-                f"Setting {self.name!r} {self._bounds()}, so it cannot be {shown(value)}."
+                f"Setting {self.name!r} {self.bounds()}, so it cannot be {shown(value)}."
             )
         return int(value) if self.kind is int else float(value)
 

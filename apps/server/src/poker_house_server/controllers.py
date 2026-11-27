@@ -171,7 +171,7 @@ class Random:
         return int(rng.choice(state.legal_actions(seat)))
 
 
-def _build_human(
+def build_human(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue], seed: int
 ) -> Controller:
     """Builds the human controller, which takes no settings and no seed."""
@@ -179,7 +179,7 @@ def _build_human(
     return Human()
 
 
-def _build_random(
+def build_random(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue], seed: int
 ) -> Controller:
     """Builds the random controller, which takes no settings."""
@@ -189,24 +189,24 @@ def _build_random(
 
 register(
     HUMAN,
-    Kind("Human", (), reads_full_state=False, build=_build_human),
+    Kind("Human", (), reads_full_state=False, build=build_human),
 )
 # Reads only the seat's legal actions.
 register(
     RANDOM,
-    Kind("Random", (), reads_full_state=False, build=_build_random),
+    Kind("Random", (), reads_full_state=False, build=build_random),
 )
 register(REMOTE, remote_bot.kind())
 
 
-def _describe(name: str, kind: Kind) -> contract.Controller:
+def describe(name: str, kind: Kind) -> contract.Controller:
     """Returns the contract's description of the controller `name`."""
     return contract.Controller(name=name, label=kind.label, config_schema=kind.config_schema())
 
 
 def registered() -> tuple[contract.Controller, ...]:
     """Returns every controller, `human` first."""
-    return tuple(_describe(name, kind) for name, kind in kinds().items())
+    return tuple(describe(name, kind) for name, kind in kinds().items())
 
 
 def descriptors(game: pyspiel.Game) -> tuple[Descriptor, ...]:
@@ -219,7 +219,7 @@ def descriptors(game: pyspiel.Game) -> tuple[Descriptor, ...]:
       One descriptor per controller, `human` first.
     """
     return tuple(
-        Descriptor(_describe(name, kind), kind.unavailable_reason(game))
+        Descriptor(describe(name, kind), kind.unavailable_reason(game))
         for name, kind in kinds().items()
     )
 

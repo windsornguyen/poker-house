@@ -73,7 +73,7 @@ class StructKind(enum.Enum):
 
 
 # Whether each game, under given parameters, provides each kind of struct;
-# keyed by `_struct_key`. pyspiel offers no non-throwing check (a game without
+# keyed by `struct_key`. pyspiel offers no non-throwing check (a game without
 # the struct API throws from `State::ToStruct` or
 # `State::ToObservationStruct`, and pyspiel prints every C++ SpielError it
 # raises: "OpenSpiel exception: ToStruct is not implemented."), so each game is
@@ -84,7 +84,7 @@ _STRUCT_SUPPORT: dict[tuple[object, ...], bool] = {}
 _STRUCT_SUPPORT_LOCK = threading.Lock()
 
 
-def _struct_key(
+def struct_key(
     kind: StructKind,
     name: str,
     turn_based: bool,
@@ -119,21 +119,19 @@ def struct_support(
     Returns:
       Whether the game's states provide the struct.
     """
-    key = _struct_key(kind, name, turn_based, parameters)
+    key = struct_key(kind, name, turn_based, parameters)
     with _STRUCT_SUPPORT_LOCK:
         known = _STRUCT_SUPPORT.get(key)
         if known is None:
             state = game.new_initial_state()
             known = (
-                _probe_struct(state)
-                if kind == StructKind.STATE
-                else _probe_observation_struct(state)
+                probe_struct(state) if kind == StructKind.STATE else probe_observation_struct(state)
             )
             _STRUCT_SUPPORT[key] = known
     return known
 
 
-def _probe_struct(state: pyspiel.State) -> bool:
+def probe_struct(state: pyspiel.State) -> bool:
     """Asks a state for its structured JSON; the one probe per game."""
     try:
         state.to_json()
@@ -142,7 +140,7 @@ def _probe_struct(state: pyspiel.State) -> bool:
     return True
 
 
-def _probe_observation_struct(state: pyspiel.State) -> bool:
+def probe_observation_struct(state: pyspiel.State) -> bool:
     """Asks a state for player 0's observation struct; one probe per game."""
     try:
         state.to_observation_struct(0).to_json()

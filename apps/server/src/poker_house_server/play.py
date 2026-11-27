@@ -66,7 +66,7 @@ STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 LaunchError = child_servers.LaunchError
 
 
-def _request(
+def request(
     method: str,
     url: str,
     body: Mapping[str, Any] | None = None,
@@ -116,7 +116,7 @@ def bot_unready(bot_url: str) -> str | None:
     does once its bot is loaded.
     """
     try:
-        health = _request("GET", bot_url + remote_bot.HEALTH_PATH)
+        health = request("GET", bot_url + remote_bot.HEALTH_PATH)
     except LaunchError as e:
         return str(e)
     if not isinstance(health, dict) or health.get("ok") is not True:
@@ -197,7 +197,7 @@ class Running:
         child_servers.stop_all((self._gui, *self._bots))
 
 
-def _start_bot(
+def start_bot(
     options: Options,
     bot: SeatBot,
     label: str,
@@ -235,7 +235,7 @@ def _start_bot(
     return url
 
 
-def _start_bots(
+def start_bots(
     options: Options,
     who: Seating,
     out: TextIO,
@@ -248,7 +248,7 @@ def _start_bots(
     urls: dict[tuple[int | None, SeatBot], str] = {}
     for i, served in enumerate(who.servers()):
         label = "bot" if i == 0 else f"bot {i + 1}"
-        urls[served] = _start_bot(options, served[1], label, out, started)
+        urls[served] = start_bot(options, served[1], label, out, started)
     return {seat: urls[who.server_of(seat)] for seat in who.bots}
 
 
@@ -288,7 +288,7 @@ def launch(
     bots: list[child_servers.ChildServer] = []
     gui: child_servers.ChildServer | None = None
     try:
-        bot_urls = _start_bots(options, who, out, bots)
+        bot_urls = start_bots(options, who, out, bots)
         gui_args = [
             "--host",
             options.host,
@@ -319,7 +319,7 @@ def launch(
         # The API is asked on loopback, which the GUI server always accepts.
         port = urllib.parse.urlsplit(gui_url).port
         local_api = f"http://127.0.0.1:{port}/api"
-        frame = _request(
+        frame = request(
             "POST",
             f"{local_api}/sessions?viewer=oracle",
             session_body(options, bot_urls, num_players),

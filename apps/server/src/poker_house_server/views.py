@@ -98,8 +98,8 @@ def build(position: Position, viewer: contract.Viewer) -> frame.Frame:
     omniscient = is_omniscient(position.loaded, viewer)
     state = position.state
     mover = plies.to_move(state)
-    history = tuple(_history_entry(ply, viewer, omniscient) for ply in position.history)
-    legal_actions = _legal_actions(position, viewer, omniscient, mover)
+    history = tuple(history_entry(ply, viewer, omniscient) for ply in position.history)
+    legal_actions = build_legal_actions(position, viewer, omniscient, mover)
     return frame.Frame(
         session=(
             position.info
@@ -109,22 +109,22 @@ def build(position: Position, viewer: contract.Viewer) -> frame.Frame:
         viewer=viewer,
         omniscient=omniscient,
         status=position.status,
-        seats=tuple(_seat(seat, viewer, omniscient) for seat in position.seats),
+        seats=tuple(build_seat(seat, viewer, omniscient) for seat in position.seats),
         ply=position.ply,
         num_plies=len(position.history),
         to_move=mover,
         legal_actions=legal_actions,
-        chance_outcomes=_chance_outcomes(position, omniscient, mover),
+        chance_outcomes=build_chance_outcomes(position, omniscient, mover),
         history=history,
         rewards=history[position.ply - 1].rewards if position.ply else None,
         returns=(tuple(float(value) for value in state.returns()) if state.is_terminal() else None),
         state_text=str(state) if omniscient else None,
-        observation_text=_seat_text(position, viewer, observation=True),
-        information_state_text=_seat_text(position, viewer, observation=False),
+        observation_text=seat_text(position, viewer, observation=True),
+        information_state_text=seat_text(position, viewer, observation=False),
         struct=(
             json.loads(state.to_json()) if omniscient and position.loaded.provides_struct else None
         ),
-        observation_struct=_observation_struct(position, viewer),
+        observation_struct=build_observation_struct(position, viewer),
         presentation=presenters.present(
             position.loaded.name,
             state,
@@ -134,7 +134,7 @@ def build(position: Position, viewer: contract.Viewer) -> frame.Frame:
     )
 
 
-def _history_entry(
+def history_entry(
     ply: plies.Ply, viewer: contract.Viewer, omniscient: bool
 ) -> contract.HistoryEntry:
     """Shows one ply: in full to its own seat and to an omniscient viewer.
@@ -165,7 +165,9 @@ def _history_entry(
     )
 
 
-def _seat(seat: contract.SeatView, viewer: contract.Viewer, omniscient: bool) -> contract.SeatView:
+def build_seat(
+    seat: contract.SeatView, viewer: contract.Viewer, omniscient: bool
+) -> contract.SeatView:
     """Shows a seat, withholding its failure message and notice from most.
 
     A failure message reaches only an omniscient viewer; a notice, only an
@@ -180,7 +182,7 @@ def _seat(seat: contract.SeatView, viewer: contract.Viewer, omniscient: bool) ->
     )
 
 
-def _legal_actions(
+def build_legal_actions(
     position: Position,
     viewer: contract.Viewer,
     omniscient: bool,
@@ -200,7 +202,7 @@ def _legal_actions(
     )
 
 
-def _chance_outcomes(
+def build_chance_outcomes(
     position: Position, omniscient: bool, mover: contract.ToMove
 ) -> tuple[contract.ChanceOutcome, ...] | None:
     """Lists the chance outcomes a client may choose, to omniscient viewers."""
@@ -223,7 +225,7 @@ def _chance_outcomes(
     )
 
 
-def _seat_text(position: Position, viewer: contract.Viewer, *, observation: bool) -> str | None:
+def seat_text(position: Position, viewer: contract.Viewer, *, observation: bool) -> str | None:
     """Returns a seat viewer's observation or information state text."""
     loaded = position.loaded
     provided = loaded.provides_observation if observation else loaded.provides_information_state
@@ -234,7 +236,7 @@ def _seat_text(position: Position, viewer: contract.Viewer, *, observation: bool
     return str(position.state.information_state_string(viewer.seat))
 
 
-def _observation_struct(position: Position, viewer: contract.Viewer) -> contract.Json:
+def build_observation_struct(position: Position, viewer: contract.Viewer) -> contract.Json:
     """Returns a seat viewer's observation as the game's structured JSON.
 
     The game builds the struct for the seat, so it holds only what the seat may

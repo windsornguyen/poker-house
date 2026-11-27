@@ -102,7 +102,7 @@ def public_action_label(state: pyspiel.State, action: int) -> str | None:
     return label
 
 
-def _checked_json(value: object, what: str) -> contract.JsonValue:
+def checked_json(value: object, what: str) -> contract.JsonValue:
     """Returns `value` after checking that it encodes as strict JSON."""
     try:
         json.dumps(value, allow_nan=False)
@@ -141,13 +141,13 @@ def present(
         hints = tuple(
             contract.ActionHint(
                 id=action,
-                hint=_checked_json(described[action], f"The {game} hint"),
+                hint=checked_json(described[action], f"The {game} hint"),
             )
             for action in legal_actions
             if action in described
         )
     return contract.Presentation(
         renderer=adapter.renderer,
-        view=_checked_json(view, f"The {game} view"),
+        view=checked_json(view, f"The {game} view"),
         actions=hints,
     )

@@ -207,9 +207,7 @@ class RemoteBot:
         self.last_notice: str | None = None
         self.last_output: contract.BotOutput | None = None
 
-    def _send(
-        self, path: str, body: bytes | None, timeout: float
-    ) -> tuple[int, contract.JsonValue]:
+    def send(self, path: str, body: bytes | None, timeout: float) -> tuple[int, contract.JsonValue]:
         """Sends a request to the bot server, with its configured token."""
         url = self._url + path
         return remote_bot_http.send(url, body, timeout, token_for(url))
@@ -221,13 +219,13 @@ class RemoteBot:
           RemoteBotUnreachableError: If it cannot be reached or answers otherwise.
           RemoteBotReplyError: If its body is not JSON.
         """
-        status, _ = self._send(HEALTH_PATH, None, CHECK_TIMEOUT_SECONDS)
+        status, _ = self.send(HEALTH_PATH, None, CHECK_TIMEOUT_SECONDS)
         if not 200 <= status < 300:
             raise RemoteBotUnreachableError(
                 f"The bot server's {HEALTH_PATH} answered HTTP {status}."
             )
 
-    def _timeout(self) -> float:
+    def timeout(self) -> float:
         """How long to wait for a reply: within the move budget."""
         budget = move_budget.seconds()
         limit = budget - _MARGIN_SECONDS if budget > 2 * _MARGIN_SECONDS else (budget / 2)
@@ -257,7 +255,7 @@ class RemoteBot:
         """
         self.last_notice = None
         self.last_output = None
-        status, reply = self._send(MOVE_PATH, self.request(state, seat), self._timeout())
+        status, reply = self.send(MOVE_PATH, self.request(state, seat), self.timeout())
         if status in remote_bot_http.REFUSAL_STATUSES:
             raise RemoteBotRefusedError(
                 f"The bot server refused (HTTP {status}): {remote_bot_http.refusal_text(reply)}."
@@ -273,7 +271,7 @@ class RemoteBot:
         return action
 
 
-def _build(
+def build_bot(
     game: pyspiel.Game, config: Mapping[str, contract.ParameterValue], seed: int
 ) -> controller_registry.Controller:
     """Builds a remote bot, checking its bot server answers.
@@ -299,6 +297,6 @@ def kind() -> controller_registry.Kind:
         "Remote bot",
         remote_bot_config.settings(),
         reads_full_state=False,
-        build=_build,
+        build=build_bot,
         config_refusal=config_refusal,
     )

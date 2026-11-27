@@ -56,7 +56,7 @@ class RemoteBotReplyError(RuntimeError):
     """The bot server's reply is not the protocol's."""
 
 
-def _connection(url: str, timeout: float) -> tuple[http.client.HTTPConnection, str]:
+def open_connection(url: str, timeout: float) -> tuple[http.client.HTTPConnection, str]:
     """Returns a connection to `url`'s host and the path to request there.
 
     `http.client` uses no proxy (a loopback bot behind an environment proxy
@@ -97,7 +97,7 @@ def send(
         headers["Content-Type"] = "application/json"
     if token is not None:
         headers["Authorization"] = f"Bearer {token}"
-    connection, path = _connection(url, timeout)
+    connection, path = open_connection(url, timeout)
     try:
         connection.request("GET" if body is None else "POST", path, body=body, headers=headers)
         response = connection.getresponse()
@@ -184,7 +184,7 @@ def parse_reply(reply: contract.JsonValue, legal: Sequence[int]) -> tuple[int, s
     return action, notice
 
 
-def _number(value: object) -> float | None:
+def as_number(value: object) -> float | None:
     """Returns `value` as a finite float, or None if it is not one."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -234,7 +234,7 @@ def parse_bot_output(
                     f"The bot server's policy entry {controller_settings.shown(item)}"
                     " is not an object."
                 )
-            action, prob = item.get("action"), _number(item.get("prob"))
+            action, prob = item.get("action"), as_number(item.get("prob"))
             if (
                 isinstance(action, bool)
                 or not isinstance(action, int)
@@ -264,7 +264,7 @@ def parse_bot_output(
             raise RemoteBotReplyError(f"The bot server's policy sums to {total:g}, over 1.")
     number = None
     if value is not None:
-        number = _number(value)
+        number = as_number(value)
         if number is None:
             raise RemoteBotReplyError(
                 f"The bot server's value {controller_settings.shown(value)} is not a finite number."

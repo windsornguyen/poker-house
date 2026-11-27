@@ -187,7 +187,7 @@ def seating(options: Options, num_players: int) -> Seating:
     )
 
 
-def _seat_values(
+def seat_values(
     parser: argparse.ArgumentParser, flag: str, values: Sequence[str]
 ) -> dict[int, str]:
     """Returns `flag`'s SEAT=VALUE arguments as a map from seat to value.
@@ -296,7 +296,7 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
         ),
     )
     args = parser.parse_args(argv)
-    bots = _seat_values(parser, "--seat-bot", args.seat_bot)
+    bots = seat_values(parser, "--seat-bot", args.seat_bot)
     seat_bots = {seat: SeatBot(bots[seat]) for seat in sorted(bots)}
     return Options(
         game=args.game,

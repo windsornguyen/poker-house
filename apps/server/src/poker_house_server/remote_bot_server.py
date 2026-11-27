@@ -166,7 +166,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         """Logs a request through absl."""
         logging.info("%s %s", self.address_string(), format % args)
 
-    def _send(self, status: int, body: dict[str, Any]) -> None:
+    def send(self, status: int, body: dict[str, Any]) -> None:
         """Sends a JSON reply."""
         data = json.dumps(body).encode()
         self.send_response(status)
@@ -175,7 +175,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _authorized(self) -> bool:
+    def authorized(self) -> bool:
         """Whether the request carries the server's token; answers 401 if not."""
         token = self.server.token
         if token is None:
@@ -183,7 +183,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         given = self.headers.get("Authorization", "")
         if hmac.compare_digest(given.encode(), f"Bearer {token}".encode()):
             return True
-        self._send(
+        self.send(
             http.HTTPStatus.UNAUTHORIZED,
             {"error": "a bearer token is required", "reason": "unauthorized"},
         )
@@ -191,23 +191,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Answers /health."""
-        if not self._authorized():
+        if not self.authorized():
             return
         if self.path == remote_bot.HEALTH_PATH:
-            self._send(http.HTTPStatus.OK, {"ok": True, "name": self.server.name})
+            self.send(http.HTTPStatus.OK, {"ok": True, "name": self.server.name})
         else:
-            self._send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
+            self.send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
 
     def do_POST(self) -> None:
         """Answers a move request."""
-        if not self._authorized():
+        if not self.authorized():
             return
         if self.path != remote_bot.MOVE_PATH:
-            self._send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
+            self.send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
             return
         length = int(self.headers.get("Content-Length", "0"))
         if not 0 < length <= MAX_BODY_BYTES:
-            self._send(
+            self.send(
                 http.HTTPStatus.BAD_REQUEST,
                 {"error": "bad body length", "reason": "bad_request"},
             )
@@ -215,7 +215,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         try:
             request = json.loads(self.rfile.read(length))
         except json.JSONDecodeError:
-            self._send(
+            self.send(
                 http.HTTPStatus.BAD_REQUEST,
                 {"error": "the body is not JSON", "reason": "bad_request"},
             )
@@ -223,19 +223,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         try:
             result = self.server.bot.move(request)
         except ValueError as e:
-            self._send(
+            self.send(
                 http.HTTPStatus.UNPROCESSABLE_ENTITY,
                 {"error": str(e), "reason": "bot_refused"},
             )
             return
         except Exception:
             logging.exception("The bot failed on %s.", self.path)
-            self._send(
+            self.send(
                 http.HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": "the bot failed; see the bot server's log"},
             )
             return
-        self._send(http.HTTPStatus.OK, reply_of(result, self.server.notice))
+        self.send(http.HTTPStatus.OK, reply_of(result, self.server.notice))
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

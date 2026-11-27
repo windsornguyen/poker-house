@@ -119,7 +119,7 @@ def host_name(authority: str) -> str:
     return authority
 
 
-def _has_body(headers: email.message.Message) -> bool:
+def has_body(headers: email.message.Message) -> bool:
     """Whether a request's headers announce a body."""
     length = headers.get("Content-Length", "0").strip()
     return "Transfer-Encoding" in headers or length != "0"
@@ -134,87 +134,87 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Answers a GET request."""
-        self._handle()
+        self.dispatch()
 
     def do_HEAD(self) -> None:
         """Answers a HEAD request."""
-        self._handle()
+        self.dispatch()
 
     def do_POST(self) -> None:
         """Answers a POST request."""
-        self._handle()
+        self.dispatch()
 
     def do_PUT(self) -> None:
         """Answers a PUT request."""
-        self._handle()
+        self.dispatch()
 
     def do_DELETE(self) -> None:
         """Answers a DELETE request."""
-        self._handle()
+        self.dispatch()
 
     def log_message(self, format: str, *args: object) -> None:
         """Logs a request through absl rather than to stderr."""
         logging.info("%s %s", self.address_string(), format % args)
 
-    def _handle(self) -> None:
+    def dispatch(self) -> None:
         """Answers the request, refusing it if it fails a transport check."""
         host = host_name(self.headers.get("Host", ""))
         if host not in self.server.allowed_hosts:
             self.close_connection = True
-            self._send_text(http.HTTPStatus.FORBIDDEN, f"Host {host!r} is refused.")
+            self.send_text(http.HTTPStatus.FORBIDDEN, f"Host {host!r} is refused.")
             return
         path = urllib.parse.urlsplit(self.path).path
         is_api = path.startswith(api_lib.PREFIX)
-        if self.command not in _BODY_METHODS and _has_body(self.headers):
+        if self.command not in _BODY_METHODS and has_body(self.headers):
             # The body is never read, so the connection cannot carry another
             # request: its bytes would be parsed as one.
             message = f"A {self.command} request has no body."
             if is_api:
-                self._refuse(message)
+                self.refuse(message)
             else:
                 self.close_connection = True
-                self._send_text(http.HTTPStatus.BAD_REQUEST, message)
+                self.send_text(http.HTTPStatus.BAD_REQUEST, message)
             return
         if is_api:
-            self._handle_api()
+            self.handle_api()
         else:
-            self._handle_client(path)
+            self.handle_client(path)
 
-    def _handle_api(self) -> None:
+    def handle_api(self) -> None:
         """Answers an API request."""
         body = b""
         if self.command == "DELETE":
-            refusal = self._check_origin()
+            refusal = self.check_origin()
             if refusal is not None:
-                self._refuse(refusal)
+                self.refuse(refusal)
                 return
         if self.command in _BODY_METHODS:
-            refusal = self._check_origin() or self._check_body()
+            refusal = self.check_origin() or self.check_body()
             if refusal is not None:
-                self._refuse(refusal)
+                self.refuse(refusal)
                 return
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
         if self.server.api.is_events(self.command, self.path):
-            self._stream_events()
+            self.stream_events()
             return
         try:
             response = self.server.api.handle(self.command, self.path, body)
         except Exception:
             logging.exception("%s %s failed.", self.command, self.path)
-            self._send_text(
+            self.send_text(
                 http.HTTPStatus.INTERNAL_SERVER_ERROR,
                 "The server failed; its log has the details.",
             )
             return
-        self._send_json(response.status, response.body)
+        self.send_json(response.status, response.body)
 
-    def _stream_events(self) -> None:
+    def stream_events(self) -> None:
         """Streams the viewer's live frame as Server-Sent Events."""
         try:
             session, viewer = self.server.api.subscribe(self.path)
         except errors.RequestError as error:
             body = error.to_error()
-            self._send_json(body.code.http_status, contract.to_json(body))
+            self.send_json(body.code.http_status, contract.to_json(body))
             return
         self.close_connection = True
         self.send_response(http.HTTPStatus.OK)
@@ -237,7 +237,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         except BrokenPipeError, ConnectionResetError:
             return
 
-    def _check_origin(self) -> str | None:
+    def check_origin(self) -> str | None:
         """Returns why the request's origin is refused, or None."""
         origin = self.headers.get("Origin")
         if origin is None:
@@ -253,7 +253,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return refused
         return None if same else refused
 
-    def _check_body(self) -> str | None:
+    def check_body(self) -> str | None:
         """Returns why the request's body is refused, or None."""
         if self.headers.get_content_type() != "application/json":
             return "The body must be application/json."
@@ -264,41 +264,41 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return f"The body must be at most {MAX_BODY_BYTES} bytes."
         return None
 
-    def _handle_client(self, path: str) -> None:
+    def handle_client(self, path: str) -> None:
         """Answers a request for the client."""
         if self.command not in ("GET", "HEAD"):
             self.close_connection = True
-            self._send_text(http.HTTPStatus.METHOD_NOT_ALLOWED, f"{path} accepts GET and HEAD.")
+            self.send_text(http.HTTPStatus.METHOD_NOT_ALLOWED, f"{path} accepts GET and HEAD.")
             return
         asset = self.server.client.find(path)
         if asset is not None:
-            self._send(http.HTTPStatus.OK, asset.content, asset.content_type)
+            self.send(http.HTTPStatus.OK, asset.content, asset.content_type)
         elif self.server.client.built:
-            self._send_text(http.HTTPStatus.NOT_FOUND, f"There is no file {path}.")
+            self.send_text(http.HTTPStatus.NOT_FOUND, f"There is no file {path}.")
         else:
-            self._send_text(
+            self.send_text(
                 http.HTTPStatus.NOT_FOUND,
                 f"The client is not built in {self.server.client.root}. Run "
                 "`npm ci && npm run build` in apps/web; the API is served "
                 f"under {api_lib.PREFIX} either way.",
             )
 
-    def _refuse(self, message: str) -> None:
+    def refuse(self, message: str) -> None:
         """Refuses a malformed API request with the contract's error body."""
         error = errors.Error(code=errors.ErrorCode.BAD_REQUEST, message=message)
         self.close_connection = True
-        self._send_json(error.code.http_status, contract.to_json(error))
+        self.send_json(error.code.http_status, contract.to_json(error))
 
-    def _send_json(self, status: http.HTTPStatus, body: object) -> None:
+    def send_json(self, status: http.HTTPStatus, body: object) -> None:
         """Sends a JSON response."""
         content = json.dumps(body, allow_nan=False, separators=(",", ":"))
-        self._send(status, content.encode(), "application/json")
+        self.send(status, content.encode(), "application/json")
 
-    def _send_text(self, status: http.HTTPStatus, text: str) -> None:
+    def send_text(self, status: http.HTTPStatus, text: str) -> None:
         """Sends a plain-text response, for requests outside the contract."""
-        self._send(status, text.encode(), "text/plain; charset=utf-8")
+        self.send(status, text.encode(), "text/plain; charset=utf-8")
 
-    def _send(self, status: http.HTTPStatus, content: bytes, content_type: str) -> None:
+    def send(self, status: http.HTTPStatus, content: bytes, content_type: str) -> None:
         """Sends a complete response; a `HEAD` response omits the content."""
         self.send_response(status)
         self.send_header("Content-Type", content_type)

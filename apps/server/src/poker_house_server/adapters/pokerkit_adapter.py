@@ -40,7 +40,7 @@ _VARIANTS = {
 _BOARD_SIZES = (0, 3, 1, 1)
 
 
-def _observation(state: pyspiel.State, seat: int) -> PokerObservation:
+def read_observation(state: pyspiel.State, seat: int) -> PokerObservation:
     """Reads the engine's typed private observation, never its full state."""
     return cast(
         "PokerObservation",
@@ -48,7 +48,7 @@ def _observation(state: pyspiel.State, seat: int) -> PokerObservation:
     )
 
 
-def _chips(amount: float) -> int:
+def format_chips(amount: float) -> int:
     """Requires integral chips, as the board's betting notation does."""
     chips = int(amount)
     if chips != amount:
@@ -56,7 +56,7 @@ def _chips(amount: float) -> int:
     return chips
 
 
-def _move(observation: PokerObservation, action: int) -> tuple[str, str]:
+def format_move(observation: PokerObservation, action: int) -> tuple[str, str]:
     """Names a legal move and its ACPC hand-total betting token."""
     moves = {move["id"]: move for move in observation["actions"]}
     move = moves[action]
@@ -72,14 +72,14 @@ def _move(observation: PokerObservation, action: int) -> tuple[str, str]:
             - observation["stacks"][player]
             - observation["bets"][player]
         )
-        amount = _chips(base + move["amount"])
+        amount = format_chips(base + move["amount"])
         words, token = f"Bet{amount}", f"r{amount}"
     else:
         raise ValueError(f"The Hold'em board cannot name the move {kind!r}.")
     return f"player={player} move={words}", token
 
 
-def _history(
+def read_history(
     state: pyspiel.State, viewpoint: adapter.Viewpoint
 ) -> tuple[list[contract.JsonValue], str]:
     """Projects recorded moves into the board's hand-total notation.
@@ -93,7 +93,7 @@ def _history(
     rounds: list[list[str]] = [[]]
     for action in state.history():
         player = replay.current_player()
-        observation = _observation(replay, max(0, player))
+        observation = read_observation(replay, max(0, player))
         street = observation["street_index"]
         if street is None:
             raise ValueError("A recorded move has no betting street.")
@@ -101,7 +101,9 @@ def _history(
             rounds.append([])
         after = replay.child(action)
         if replay.is_chance_node():
-            public = len(_observation(after, 0)["board_cards"]) > len(observation["board_cards"])
+            public = len(read_observation(after, 0)["board_cards"]) > len(
+                observation["board_cards"]
+            )
             code = repr(game.int_to_card[action])
             label = (
                 f"player=-1 move=Deal {code}"
@@ -109,24 +111,24 @@ def _history(
                 else "Chance outcome (hidden)"
             )
         else:
-            label, token = _move(observation, action)
+            label, token = format_move(observation, action)
             rounds[street].append(token)
         labels.append(label)
         replay = after
-    street = _observation(state, 0)["street_index"]
+    street = read_observation(state, 0)["street_index"]
     if street is not None:
         while len(rounds) <= street:
             rounds.append([])
     return labels, "/".join("".join(round_) for round_ in rounds)
 
 
-def _hands(state: pyspiel.State, viewpoint: adapter.Viewpoint) -> list[str]:
+def format_hands(state: pyspiel.State, viewpoint: adapter.Viewpoint) -> list[str]:
     """Combines only the card views the viewer may read.
 
     Another seat's observation is the public authority for a spectator: a
     player's own observation would also contain that player's private hand.
     """
-    observations = [_observation(state, seat) for seat in range(state.num_players())]
+    observations = [read_observation(state, seat) for seat in range(state.num_players())]
     hands = []
     for seat in range(state.num_players()):
         observer = seat if viewpoint.sees_private(seat) else (seat + 1) % len(observations)
@@ -155,24 +157,26 @@ class PokerkitAdapter(adapter.Adapter):
         self, state: pyspiel.State, viewpoint: adapter.Viewpoint
     ) -> dict[str, contract.JsonValue]:
         """Returns public table amounts and only the viewer's known cards."""
-        observation = _observation(state, 0)
-        initial = _observation(state.get_game().new_initial_state(), 0)
-        history, betting = _history(state, viewpoint)
+        observation = read_observation(state, 0)
+        initial = read_observation(state.get_game().new_initial_state(), 0)
+        history, betting = read_history(state, viewpoint)
         count = state.num_players()
         starting = observation["starting_stacks"]
         contributions = (
             [0] * count
             if state.is_terminal()
             else [
-                _chips(start - stack)
+                format_chips(start - stack)
                 for start, stack in zip(starting, observation["stacks"], strict=True)
             ]
         )
         title, betting_kind, holes = _VARIANTS[observation["variant"]]
-        ante = _chips(initial["starting_stacks"][0] - initial["stacks"][0] - initial["bets"][0])
+        ante = format_chips(
+            initial["starting_stacks"][0] - initial["stacks"][0] - initial["bets"][0]
+        )
         struct: dict[str, contract.JsonValue] = {
             "board_cards": "".join(observation["board_cards"]),
-            "player_hands": _hands(state, viewpoint),
+            "player_hands": format_hands(state, viewpoint),
             "player_contributions": contributions,
             "starting_stacks": list(starting),
             "pot_size": observation["total_pot"],
@@ -208,15 +212,15 @@ class PokerkitAdapter(adapter.Adapter):
         del viewpoint
         if not actions:
             return {}
-        observation = _observation(state, state.current_player())
-        return {action: {"label": _move(observation, action)[0]} for action in actions}
+        observation = read_observation(state, state.current_player())
+        return {action: {"label": format_move(observation, action)[0]} for action in actions}
 
     def public_action_label(self, state: pyspiel.State, action: int) -> str | None:
         """Exposes betting and board cards while withholding hole-card deals."""
         if not state.is_chance_node():
-            return _move(_observation(state, state.current_player()), action)[0]
-        before = _observation(state, 0)["board_cards"]
-        after = _observation(state.child(action), 0)["board_cards"]
+            return format_move(read_observation(state, state.current_player()), action)[0]
+        before = read_observation(state, 0)["board_cards"]
+        after = read_observation(state.child(action), 0)["board_cards"]
         if len(after) > len(before):
             return f"player=-1 move=Deal {after[-1]}"
         return None

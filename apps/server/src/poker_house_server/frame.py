@@ -96,13 +96,13 @@ class Frame:
         return self.ply == self.num_plies
 
     def __post_init__(self) -> None:
-        self._check_seats()
-        self._check_history()
-        self._check_position()
-        self._check_audience()
-        self._check_presentation()
+        self.check_seats()
+        self.check_history()
+        self.check_position()
+        self.check_audience()
+        self.check_presentation()
 
-    def _check_seats(self) -> None:
+    def check_seats(self) -> None:
         """Checks the seats against the session and its status."""
         contract.require(
             tuple(seat.seat for seat in self.seats) == tuple(range(self.session.num_seats)),
@@ -130,7 +130,7 @@ class Frame:
             "A session in play is paused exactly when a seat's controller has failed.",
         )
 
-    def _check_history(self) -> None:
+    def check_history(self) -> None:
         """Checks the history and the rewards against the session."""
         num_seats = self.session.num_seats
         contract.require(
@@ -153,7 +153,7 @@ class Frame:
             "The frame's rewards are those of the action that reached it.",
         )
 
-    def _check_position(self) -> None:
+    def check_position(self) -> None:
         """Checks who acts at the position against what is offered."""
         num_seats = self.session.num_seats
         contract.require(
@@ -188,7 +188,7 @@ class Frame:
             "Chance outcomes are served only at a chance node under the expose policy.",
         )
 
-    def _check_audience(self) -> None:
+    def check_audience(self) -> None:
         """Checks that the frame holds nothing its viewer may not see."""
         viewer = self.viewer
         is_oracle = viewer.kind == contract.ViewerKind.ORACLE
@@ -254,7 +254,7 @@ class Frame:
             "A seat sees its own actions.",
         )
 
-    def _check_presentation(self) -> None:
+    def check_presentation(self) -> None:
         """Checks the adapter's hints against the legal actions offered."""
         if self.presentation is None:
             return

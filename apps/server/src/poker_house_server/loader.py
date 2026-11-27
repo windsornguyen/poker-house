@@ -101,7 +101,7 @@ class LoadedGame:
         Decided once per game and parameters, on first use, by
         `loader_support.struct_support`.
         """
-        return self._struct_support(loader_support.StructKind.STATE)
+        return self.struct_support(loader_support.StructKind.STATE)
 
     @property
     def provides_observation_struct(self) -> bool:
@@ -110,9 +110,9 @@ class LoadedGame:
         Decided once per game and parameters, on first use, by
         `loader_support.struct_support`.
         """
-        return self._struct_support(loader_support.StructKind.OBSERVATION)
+        return self.struct_support(loader_support.StructKind.OBSERVATION)
 
-    def _struct_support(self, kind: loader_support.StructKind) -> bool:
+    def struct_support(self, kind: loader_support.StructKind) -> bool:
         """Whether the game provides the struct `kind`."""
         return loader_support.struct_support(
             kind,
@@ -182,11 +182,11 @@ def load(name: str, parameters: Mapping[str, contract.ParameterValue]) -> Loaded
     reason = unavailable_reason(game_type)
     if reason is not None:
         raise UnavailableError(f"{name} cannot be served. {reason}")
-    parameters = _widen(game_type, parameters)
-    base = _load_or_refuse(name, parameters, turn_based=False)
+    parameters = widen(game_type, parameters)
+    base = load_or_refuse(name, parameters, turn_based=False)
     turn_based = game_type.dynamics == _GameType.Dynamics.SIMULTANEOUS
-    game = _load_or_refuse(name, parameters, turn_based=True) if turn_based else base
-    _new_initial_state(game, name)
+    game = load_or_refuse(name, parameters, turn_based=True) if turn_based else base
+    new_initial_state(game, name)
     served_type = game.get_type()
     return LoadedGame(
         name=name,
@@ -208,7 +208,7 @@ def load(name: str, parameters: Mapping[str, contract.ParameterValue]) -> Loaded
     )
 
 
-def _widen(
+def widen(
     game_type: pyspiel.GameType,
     parameters: Mapping[str, contract.ParameterValue],
 ) -> dict[str, contract.ParameterValue]:
@@ -227,7 +227,7 @@ def _widen(
     return widened
 
 
-def _load_or_refuse(
+def load_or_refuse(
     name: str,
     parameters: Mapping[str, contract.ParameterValue],
     *,
@@ -259,7 +259,7 @@ def _load_or_refuse(
         ) from error
 
 
-def _new_initial_state(game: pyspiel.Game, name: str) -> pyspiel.State:
+def new_initial_state(game: pyspiel.Game, name: str) -> pyspiel.State:
     """Builds the initial state; some games check parameters only here.
 
     As when loading, what the game raised is logged, not sent.
@@ -292,12 +292,12 @@ def build_catalogue() -> catalogue.Catalogue:
     """
     return catalogue.Catalogue(
         games=tuple(
-            dataclasses.replace(entry, renderer=_renderer_of(entry)) for entry in _loaded_entries()
+            dataclasses.replace(entry, renderer=renderer_of(entry)) for entry in loaded_entries()
         )
     )
 
 
-def _renderer_of(entry: catalogue.CatalogueEntry) -> str | None:
+def renderer_of(entry: catalogue.CatalogueEntry) -> str | None:
     """The renderer of `entry`'s adapter now; None when it has none."""
     if not entry.loadable:
         return None
@@ -306,14 +306,14 @@ def _renderer_of(entry: catalogue.CatalogueEntry) -> str | None:
 
 
 @functools.cache
-def _loaded_entries() -> tuple[catalogue.CatalogueEntry, ...]:
+def loaded_entries() -> tuple[catalogue.CatalogueEntry, ...]:
     """Every registered game's entry, loaded once; renderers are read later."""
-    return tuple(_catalogue_entry(game_type) for _, game_type in sorted(registered_types().items()))
+    return tuple(catalogue_entry(game_type) for _, game_type in sorted(registered_types().items()))
 
 
-def _catalogue_entry(game_type: pyspiel.GameType) -> catalogue.CatalogueEntry:
+def catalogue_entry(game_type: pyspiel.GameType) -> catalogue.CatalogueEntry:
     """Describes one game, loading it with its defaults to check it serves."""
-    reason, loaded = _default_availability(game_type)
+    reason, loaded = default_availability(game_type)
     declared = catalogue.Information(game_type.information.name.lower())
     # A game served as hiding information is listed as of imperfect
     # information whatever its type declares, so that no client takes it
@@ -344,7 +344,7 @@ def _catalogue_entry(game_type: pyspiel.GameType) -> catalogue.CatalogueEntry:
         min_seats=max(1, game_type.min_num_players),
         max_seats=game_type.max_num_players,
         num_players=None if loaded is None else loaded.num_seats,
-        parameters=_parameter_specs(game_type),
+        parameters=parameter_specs(game_type),
         loadable=reason is None,
         unavailable_reason=reason,
         controllers=controller_names,
@@ -353,7 +353,7 @@ def _catalogue_entry(game_type: pyspiel.GameType) -> catalogue.CatalogueEntry:
     )
 
 
-def _default_availability(
+def default_availability(
     game_type: pyspiel.GameType,
 ) -> tuple[str | None, LoadedGame | None]:
     """Returns why the default game cannot be served, or the game loaded.
@@ -386,7 +386,7 @@ _PARAMETER_TYPES: tuple[tuple[type[object], catalogue.ParameterType], ...] = (
 )
 
 
-def _parameter_specs(
+def parameter_specs(
     game_type: pyspiel.GameType,
 ) -> tuple[catalogue.ParameterSpec, ...]:
     """Describes the game's scalar parameters, ordered by name."""

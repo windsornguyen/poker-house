@@ -102,7 +102,7 @@ _PYTHON_TYPES = {
 }
 
 
-def _has_type(value: contract.ParameterValue, kind: ParameterType) -> bool:
+def has_type(value: contract.ParameterValue, kind: ParameterType) -> bool:
     """Whether `value` has type `kind`; a boolean is not a number."""
     if isinstance(value, bool) and kind != ParameterType.BOOL:
         return False
@@ -137,7 +137,7 @@ class ParameterSpec:
 
     def __post_init__(self) -> None:
         contract.require(
-            _has_type(self.default, self.type),
+            has_type(self.default, self.type),
             f"Parameter {self.name} defaults to {self.default!r}, not a {self.type}.",
         )
         is_range = self.kind == ParameterKind.RANGE
@@ -159,7 +159,7 @@ class ParameterSpec:
         if self.choices is not None:
             contract.require(
                 self.default in self.choices
-                and all(_has_type(choice, self.type) for choice in self.choices),
+                and all(has_type(choice, self.type) for choice in self.choices),
                 f"Parameter {self.name} chooses its default among {self.type}s.",
             )
 

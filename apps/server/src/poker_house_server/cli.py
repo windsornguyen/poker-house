@@ -54,7 +54,7 @@ DISCLAIMER = (
 )
 
 
-def _seconds(value: str) -> float:
+def parse_seconds(value: str) -> float:
     """Parses a positive, finite number of seconds, for argparse."""
     try:
         seconds = float(value)
@@ -112,7 +112,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--move-budget-seconds",
-        type=_seconds,
+        type=parse_seconds,
         default=controllers.DEFAULT_MOVE_BUDGET_SECONDS,
         metavar="SECONDS",
         help=(
@@ -122,7 +122,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--build-budget-seconds",
-        type=_seconds,
+        type=parse_seconds,
         default=builds.DEFAULT_BUDGET_SECONDS,
         metavar="SECONDS",
         help=(
@@ -288,13 +288,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
         # Flushed, so the line is not held back when stdout is a pipe or a file.
         print(
-            f"Serving Poker House at {_display_url(server, args.host)}",
+            f"Serving Poker House at {display_url(server, args.host)}",
             flush=True,
         )
         server.serve_forever()
 
 
-def _display_url(server: server_lib.Server, host: str) -> str:
+def display_url(server: server_lib.Server, host: str) -> str:
     """Returns a URL to open the server at; loopback for a wildcard bind."""
     if host in _WILDCARD_HOSTS:
         return f"http://localhost:{server.server_address[1]}/"

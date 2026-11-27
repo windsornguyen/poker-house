@@ -90,7 +90,7 @@ class Session:
                 for descriptor in controllers_lib.descriptors(loaded.game)
             ),
         )
-        self._seats = seats.Seats(loaded.num_seats, loaded.game, seed=seed, on_built=self._built)
+        self._seats = seats.Seats(loaded.num_seats, loaded.game, seed=seed, on_built=self.built)
         self._state = loaded.game.new_initial_state()
         self._plies: list[plies.Ply] = []
         # How many chance outcomes the session has sampled; never rewound.
@@ -147,7 +147,7 @@ class Session:
             session._seats.assign(
                 dict(enumerate(zip(controllers, autoplay or [False] * num_seats, strict=False)))
             )
-            session._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+            session.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
         return session
 
     @property
@@ -165,8 +165,8 @@ class Session:
     def frame(self, viewer: contract.Viewer) -> frame_lib.Frame:
         """Returns the live position, as `viewer` may see it."""
         with self._lock:
-            self._check_viewer(viewer)
-            return self._build(self._state, len(self._plies), viewer)
+            self.check_viewer(viewer)
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     @property
     def closed(self) -> bool:
@@ -190,13 +190,13 @@ class Session:
           None if nothing changed within `timeout` or the session is closed.
         """
         with self._lock:
-            self._check_viewer(viewer)
+            self.check_viewer(viewer)
             self._changed.wait_for(lambda: self._version != version or self._closed, timeout)
             if self._closed or self._version == version:
                 return self._version, None
-            return self._version, self._build(self._state, len(self._plies), viewer)
+            return self._version, self.build_frame(self._state, len(self._plies), viewer)
 
-    def _touch(self) -> None:
+    def touch(self) -> None:
         """Records a change, wakes every `wait`, and tells `on_change`."""
         self._version += 1
         self._changed.notify_all()
@@ -265,11 +265,11 @@ class Session:
           ReplayUnsupportedError: If the rebuilt position differs from play.
         """
         with self._lock:
-            self._check_viewer(viewer)
+            self.check_viewer(viewer)
             if not 0 <= step <= len(self._plies):
                 raise errors.NotFoundError(f"There is no ply {step}.", ply=step)
-            state, _ = self._rebuild(step)
-            return self._build(state, step, viewer)
+            state, _ = self.rebuild(step)
+            return self.build_frame(state, step, viewer)
 
     def apply_action(
         self, viewer: contract.Viewer, action: int, *, ply: int | None = None
@@ -297,15 +297,15 @@ class Session:
           IllegalActionError: If `action` is not legal there; nothing changes.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            state, played = self._position_to_play(viewer, ply)
+            self.check_viewer(viewer)
+            state, played = self.position_to_play(viewer, ply)
             seat = plies.to_move(state).seat
             if seat is None or not self._seats[seat].is_human:
                 raise errors.NotYourTurnError("No human seat is to move.", seat=seat)
             if viewer.kind != contract.ViewerKind.ORACLE and viewer.seat != seat:
                 raise errors.NotYourTurnError(f"Seat {seat} is to move.", seat=seat)
-            self._play_from(state, played, action)
-            return self._build(self._state, len(self._plies), viewer)
+            self.play_from(state, played, action)
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     def apply_chance(
         self, viewer: contract.Viewer, outcome: int, *, ply: int | None = None
@@ -331,15 +331,15 @@ class Session:
           ControllerFailedError: If an autoplaying seat's controller then fails.
         """
         with self._lock:
-            self._check_viewer(viewer)
+            self.check_viewer(viewer)
             if self._chance_policy != contract.ChancePolicy.EXPOSE:
                 raise errors.NotYourTurnError("The server resolves chance nodes.")
-            self._check_omniscient(viewer, "chooses chance outcomes")
-            state, played = self._position_to_play(viewer, ply)
+            self.check_omniscient(viewer, "chooses chance outcomes")
+            state, played = self.position_to_play(viewer, ply)
             if not state.is_chance_node():
                 raise errors.NotYourTurnError("Chance is not to move.")
-            self._play_from(state, played, outcome)
-            return self._build(self._state, len(self._plies), viewer)
+            self.play_from(state, played, outcome)
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     def advance(self, viewer: contract.Viewer, *, max_plies: int | None = 1000) -> frame_lib.Frame:
         """Lets controllers play their seats, whether or not they autoplay.
@@ -362,11 +362,11 @@ class Session:
             fails; the actions applied stand.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            self._check_not_paused()
-            self._settle(max_plies, autoplay_only=False)
-            self._check_not_paused()
-            return self._build(self._state, len(self._plies), viewer)
+            self.check_viewer(viewer)
+            self.check_not_paused()
+            self.settle(max_plies, autoplay_only=False)
+            self.check_not_paused()
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     def undo(self, viewer: contract.Viewer) -> frame_lib.Frame:
         """Takes back an action a seat chose, and every ply after it.
@@ -388,15 +388,15 @@ class Session:
             spectator never has.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            step = self._last_action(viewer)
+            self.check_viewer(viewer)
+            step = self.last_action(viewer)
             if step is None:
                 raise errors.NothingToUndoError("There is no action to undo.")
-            self._state, rebuilt = self._rebuild(step)
+            self._state, rebuilt = self.rebuild(step)
             self._plies = list(rebuilt)
             self._seats.clear_failures()
-            self._touch()
-            return self._build(self._state, step, viewer)
+            self.touch()
+            return self.build_frame(self._state, step, viewer)
 
     def reset(self, viewer: contract.Viewer, *, history: Sequence[int] = ()) -> frame_lib.Frame:
         """Restarts the live game from `history`, keeping the seats.
@@ -419,14 +419,14 @@ class Session:
           IllegalActionError: If an action of `history` is illegal; nothing changes.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            self._check_participant(viewer, "resets the game")
+            self.check_viewer(viewer)
+            self.check_participant(viewer, "resets the game")
             self._state, rebuilt = plies.rebuild(self._loaded.game, history)
             self._plies = list(rebuilt)
             self._seats.clear_failures()
-            self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
-            self._touch()
-            return self._build(self._state, len(self._plies), viewer)
+            self.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+            self.touch()
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     def set_controller(
         self,
@@ -458,14 +458,14 @@ class Session:
             a human seat is asked to autoplay.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            self._check_participant(viewer, "changes who plays a seat")
+            self.check_viewer(viewer)
+            self.check_participant(viewer, "changes who plays a seat")
             if not 0 <= seat < len(self._seats):
                 raise errors.NotFoundError(f"There is no seat {seat}.", seat=seat)
             self._seats.assign({seat: (spec, autoplay)})
-            self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
-            self._touch()
-            return self._build(self._state, len(self._plies), viewer)
+            self.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+            self.touch()
+            return self.build_frame(self._state, len(self._plies), viewer)
 
     def check_closer(self, viewer: contract.Viewer) -> None:
         """Refuses a viewer that may not close the session.
@@ -479,34 +479,34 @@ class Session:
           NotYourTurnError: If `viewer` is a spectator.
         """
         with self._lock:
-            self._check_viewer(viewer)
-            self._check_participant(viewer, "closes the session")
+            self.check_viewer(viewer)
+            self.check_participant(viewer, "closes the session")
 
-    def _built(self, index: int, build: builds.Build[controllers_lib.Controller]) -> None:
+    def built(self, index: int, build: builds.Build[controllers_lib.Controller]) -> None:
         """Finishes the seat `build` prepares, if it still does, and plays on."""
         with self._lock:
             seat = self._seats[index]
             if seat.build is not build:
                 return  # Finished in its request, or superseded.
             seat.finish(index, refuse=False)
-            self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
-            self._touch()
+            self.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+            self.touch()
 
-    def _position_to_play(
+    def position_to_play(
         self, viewer: contract.Viewer, ply: int | None
     ) -> tuple[pyspiel.State, list[plies.Ply]]:
         """Returns the live or a rebuilt earlier position, and its plies."""
         if ply is None or ply == len(self._plies):
-            self._check_not_paused()
+            self.check_not_paused()
             return self._state, list(self._plies)
         if not 0 <= ply < len(self._plies):
             raise errors.NotFoundError(f"There is no ply {ply}.", ply=ply)
-        self._check_omniscient(viewer, "plays from an earlier position")
-        state, rebuilt = self._rebuild(ply)
+        self.check_omniscient(viewer, "plays from an earlier position")
+        state, rebuilt = self.rebuild(ply)
         return state, list(rebuilt)
 
-    def _play_from(self, state: pyspiel.State, played: list[plies.Ply], action: int) -> None:
-        """Applies `action` at `state`, from `_position_to_play`, making it live.
+    def play_from(self, state: pyspiel.State, played: list[plies.Ply], action: int) -> None:
+        """Applies `action` at `state`, from `position_to_play`, making it live.
 
         An illegal action changes nothing. Playing from an earlier position
         resumes a paused session. Then chance and autoplaying seats move.
@@ -522,11 +522,11 @@ class Session:
         self._state, self._plies = state, played
         if branched:
             self._seats.clear_failures()
-        self._touch()
-        self._settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
-        self._check_not_paused()
+        self.touch()
+        self.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
+        self.check_not_paused()
 
-    def _check_viewer(self, viewer: contract.Viewer) -> None:
+    def check_viewer(self, viewer: contract.Viewer) -> None:
         """Refuses a viewer the game cannot show anything it may see."""
         if viewer.seat is not None and not 0 <= viewer.seat < len(self._seats):
             raise errors.NotFoundError(f"There is no seat {viewer.seat}.", seat=viewer.seat)
@@ -535,37 +535,37 @@ class Session:
                 f"{self.game_name} has no seat views.", seat=viewer.seat
             )
 
-    def _check_omniscient(self, viewer: contract.Viewer, what: str) -> None:
+    def check_omniscient(self, viewer: contract.Viewer, what: str) -> None:
         """Refuses a viewer that may not see the full state."""
         if not views.is_omniscient(self._loaded, viewer):
             raise errors.NotYourTurnError(
                 f"{self.game_name} hides information, so only the oracle {what}."
             )
 
-    def _check_participant(self, viewer: contract.Viewer, what: str) -> None:
+    def check_participant(self, viewer: contract.Viewer, what: str) -> None:
         """Refuses a spectator, who watches the game and never changes it."""
         if viewer.kind == contract.ViewerKind.SPECTATOR:
             raise errors.NotYourTurnError(f"A spectator never {what}.")
 
-    def _check_not_paused(self) -> None:
+    def check_not_paused(self) -> None:
         """Refuses to move a paused session."""
         failed = self._seats.failed
         if failed is not None:
             raise errors.ControllerFailedError(seat=failed)
 
-    def _apply(self, action: int) -> None:
+    def apply(self, action: int) -> None:
         """Applies a legal action or chance outcome to the live state."""
         self._plies.append(plies.apply(self._state, action, ply=len(self._plies)))
-        self._touch()
+        self.touch()
 
-    def _resolve_chance(self) -> None:
+    def resolve_chance(self) -> None:
         """Samples chance outcomes while the `auto` policy has one due."""
         while self._chance_policy == contract.ChancePolicy.AUTO and self._state.is_chance_node():
             seed = seats.derive_seed(self._seed, "chance", self._draws)
             self._draws += 1
-            self._apply(plies.sample_chance(self._state, random.Random(seed)))
+            self.apply(plies.sample_chance(self._state, random.Random(seed)))
 
-    def _settle(self, max_plies: int | None, *, autoplay_only: bool) -> None:
+    def settle(self, max_plies: int | None, *, autoplay_only: bool) -> None:
         """Resolves automatic chance and lets seats move, as `advance` describes.
 
         Only autoplaying seats move if `autoplay_only`. Stopping after `max_plies`
@@ -576,12 +576,12 @@ class Session:
           autoplay_only: Whether only autoplaying seats move.
         """
         played = 0
-        self._resolve_chance()
-        while played != max_plies and self._play_seat(autoplay_only=autoplay_only):
+        self.resolve_chance()
+        while played != max_plies and self.play_seat(autoplay_only=autoplay_only):
             played += 1
-            self._resolve_chance()
+            self.resolve_chance()
 
-    def _play_seat(self, *, autoplay_only: bool) -> bool:
+    def play_seat(self, *, autoplay_only: bool) -> bool:
         """Lets the controller of the seat to move play; returns whether it did.
 
         Nothing plays at a chance node, at the end of the game, while a seat is
@@ -605,12 +605,12 @@ class Session:
         action = seat.choose_action(state, index)
         if action is None:
             return False
-        self._apply(action)
+        self.apply(action)
         ply = self._plies[-1]
         self._plies[-1] = dataclasses.replace(ply, bot_output=seat.output)
         return True
 
-    def _last_action(self, viewer: contract.Viewer) -> int | None:
+    def last_action(self, viewer: contract.Viewer) -> int | None:
         """Returns the index of the last ply `viewer` may take back, or None."""
         for index in reversed(range(len(self._plies))):
             seat = self._plies[index].seat
@@ -622,7 +622,7 @@ class Session:
                 return None  # Another person has acted since.
         return None
 
-    def _rebuild(self, step: int) -> tuple[pyspiel.State, tuple[plies.Ply, ...]]:
+    def rebuild(self, step: int) -> tuple[pyspiel.State, tuple[plies.Ply, ...]]:
         """Rebuilds the position after `step` plies, checking it against play."""
         try:
             return plies.rebuild(
@@ -638,7 +638,9 @@ class Session:
                 f"{error.ply} does not reproduce it."
             ) from error
 
-    def _build(self, state: pyspiel.State, step: int, viewer: contract.Viewer) -> frame_lib.Frame:
+    def build_frame(
+        self, state: pyspiel.State, step: int, viewer: contract.Viewer
+    ) -> frame_lib.Frame:
         """Builds the frame of the position after `step` plies."""
         seat_views = self._seats.views()
         position = views.Position(

@@ -73,7 +73,7 @@ class _Settings:
 _SETTINGS = _Settings()
 
 
-def _check_seconds(value: float, what: str, *, zero: bool) -> float:
+def check_seconds(value: float, what: str, *, zero: bool) -> float:
     """Returns `value` as a float, if it is finite and positive (or `zero`)."""
     if not (math.isfinite(value) and (value > 0 or (zero and value == 0))):
         bound = "non-negative" if zero else "positive"
@@ -87,7 +87,7 @@ def set_budget_seconds(value: float) -> None:
     Raises:
       ValueError: If `value` is not positive and finite.
     """
-    _SETTINGS.budget = _check_seconds(value, "build budget", zero=False)
+    _SETTINGS.budget = check_seconds(value, "build budget", zero=False)
 
 
 def budget_seconds() -> float:
@@ -101,7 +101,7 @@ def set_wait_seconds(value: float) -> None:
     Raises:
       ValueError: If `value` is not non-negative and finite.
     """
-    _SETTINGS.wait = _check_seconds(value, "build wait", zero=True)
+    _SETTINGS.wait = check_seconds(value, "build wait", zero=True)
 
 
 def wait_seconds() -> float:
@@ -150,13 +150,11 @@ class Build[T]:
             if self._timer is not None:
                 raise RuntimeError(f"{self._name} has started already.")
             budget = _SETTINGS.budget
-            self._timer = threading.Timer(
-                budget, self._finish, args=(None, OverBudgetError(budget))
-            )
+            self._timer = threading.Timer(budget, self.finish, args=(None, OverBudgetError(budget)))
         # Daemons, so a build that never returns cannot keep the process alive.
         self._timer.daemon = True
         self._timer.start()
-        threading.Thread(target=self._run, name=self._name, daemon=True).start()
+        threading.Thread(target=self.run, name=self._name, daemon=True).start()
 
     def wait(self, timeout: float) -> bool:
         """Waits up to `timeout` seconds; returns whether the build finished."""
@@ -181,17 +179,17 @@ class Build[T]:
             raise RuntimeError(f"{self._name} has not finished.")
         return self._result, self._error
 
-    def _run(self) -> None:
+    def run(self) -> None:
         """Makes the call, and finishes with what it returned or raised."""
         try:
             result = self._call()
         # Handed to whoever reads the outcome, which raises or records it.
         except Exception as e:
-            self._finish(None, e)
+            self.finish(None, e)
         else:
-            self._finish(result, None)
+            self.finish(result, None)
 
-    def _finish(self, result: T | None, error: Exception | None) -> None:
+    def finish(self, result: T | None, error: Exception | None) -> None:
         """Records the first outcome, and tells `on_done`; drops any later one."""
         with self._lock:
             if self._finished.is_set():

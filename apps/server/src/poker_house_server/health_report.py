@@ -35,8 +35,8 @@ _PACKAGE_PATH = pathlib.Path("apps", "server", "src", "poker_house_server")
 def build() -> health.Health:
     """Returns the server's health report."""
     return health.Health(
-        version=_version(),
-        revision=_own_revision(),
+        version=package_version(),
+        revision=own_revision(),
         capabilities=health.Capabilities(
             controllers=controllers.registered(),
             chance_policies=tuple(contract.ChancePolicy),
@@ -45,7 +45,7 @@ def build() -> health.Health:
 
 
 @functools.cache
-def _version() -> str:
+def package_version() -> str:
     """Returns the installed Poker House server package's version."""
     try:
         return importlib.metadata.version("poker-house-server")
@@ -54,7 +54,7 @@ def _version() -> str:
 
 
 @functools.cache
-def _own_revision() -> str | None:
+def own_revision() -> str | None:
     """Returns the commit of the source tree this package runs from, if any."""
     return revision(_SOURCE_DIR)
 

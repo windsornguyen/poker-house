@@ -71,13 +71,13 @@ class ChildServer:
             start_new_session=True,
         )
         try:
-            self._pump = threading.Thread(target=self._read, daemon=True)
+            self._pump = threading.Thread(target=self.read, daemon=True)
             self._pump.start()
         except BaseException:
             signal_group(self.process, signal.SIGKILL)
             raise
 
-    def _read(self) -> None:
+    def read(self) -> None:
         """Copies the child's output and log to `out`; notes its ready line."""
         assert self.process.stdout is not None
         with self.process.stdout as output:
@@ -116,14 +116,14 @@ class ChildServer:
                     f"The {self.label} server closed its output before it listened "
                     f"and is still running {REAP_SECONDS:g} s later."
                 ) from None
-            raise self._exited(code)
+            raise self.exited(code)
         # Its output is still open after `seconds`, long past any closing race.
         polled = self.process.poll()
         if polled is not None:
-            raise self._exited(polled)
+            raise self.exited(polled)
         raise LaunchError(f"The {self.label} server did not listen within {seconds:g} s.")
 
-    def _exited(self, code: int) -> LaunchError:
+    def exited(self, code: int) -> LaunchError:
         """The error for a child that exited with `code` before it listened."""
         return LaunchError(
             f"The {self.label} server exited with code {code} before it "

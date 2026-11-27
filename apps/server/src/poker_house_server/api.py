@@ -58,12 +58,12 @@ class Response:
     body: contract.JsonValue
 
 
-def _ok(value: object) -> Response:
+def ok(value: object) -> Response:
     """Answers with a contract object."""
     return Response(http.HTTPStatus.OK, contract.to_json(value))
 
 
-def _refusal(error: errors.Error) -> Response:
+def refusal(error: errors.Error) -> Response:
     """Answers with an error body and its status."""
     return Response(error.code.http_status, contract.to_json(error))
 
@@ -114,7 +114,7 @@ class _Request:
             raise errors.BadRequestError(f"{where}: {first['msg']}.") from e
 
 
-def _spec(seat: request.SeatConfig) -> controllers.Spec:
+def spec(seat: request.SeatConfig) -> controllers.Spec:
     """Returns the controller a seat asks for."""
     return controllers.Spec(seat.controller, seat.config)
 
@@ -123,7 +123,7 @@ _Handler = Callable[[Any, _Request], Response]
 _Route = tuple[str, re.Pattern[str], _Handler]
 
 
-def _route(method: str, path: str, handler: _Handler) -> _Route:
+def route(method: str, path: str, handler: _Handler) -> _Route:
     """Compiles a route under `PREFIX`; `{name}` matches one path segment."""
     pattern = re.sub(r"{(\w+)}", r"(?P<\1>[^/]+)", PREFIX + path)
     return method, re.compile(pattern), handler
@@ -172,10 +172,10 @@ class Api:
         url = urllib.parse.urlsplit(target)
         query = urllib.parse.parse_qs(url.query, keep_blank_values=True)
         try:
-            handler, path = self._match(method, url.path)
+            handler, path = self.match_route(method, url.path)
             return handler(self, _Request(query, body, path))
         except errors.RequestError as error:
-            return _refusal(error.to_error())
+            return refusal(error.to_error())
 
     def is_events(self, method: str, target: str) -> bool:
         """Whether the request subscribes to a session's events."""
@@ -201,7 +201,7 @@ class Api:
         session.frame(viewer)
         return session, viewer
 
-    def _match(self, method: str, path: str) -> tuple[_Handler, dict[str, str]]:
+    def match_route(self, method: str, path: str) -> tuple[_Handler, dict[str, str]]:
         """Returns the handler for a request and its path parameters."""
         methods = []
         for route_method, pattern, handler in self._ROUTES:
@@ -217,15 +217,15 @@ class Api:
             )
         raise errors.NotFoundError(f"There is no route {path}.")
 
-    def _health(self, unused_request: _Request) -> Response:
+    def health(self, unused_request: _Request) -> Response:
         """Answers with the health report."""
-        return _ok(self._health_of())
+        return ok(self._health_of())
 
-    def _catalogue(self, unused_request: _Request) -> Response:
+    def catalogue(self, unused_request: _Request) -> Response:
         """Answers with the catalogue."""
-        return _ok(self._catalogue_of())
+        return ok(self._catalogue_of())
 
-    def _create(self, req: _Request) -> Response:
+    def create(self, req: _Request) -> Response:
         """Starts a session, keeping it only if the viewer may see it."""
         viewer, body = req.viewer(), req.decode(request.CreateSession)
         session = self._sessions.create(
@@ -233,7 +233,7 @@ class Api:
             body.parameters,
             seed=body.seed,
             chance_policy=body.chance_policy,
-            controllers=[_spec(seat) for seat in body.seats],
+            controllers=[spec(seat) for seat in body.seats],
             autoplay=[seat.autoplay for seat in body.seats],
         )
         try:
@@ -241,74 +241,74 @@ class Api:
         except errors.RequestError:
             self._sessions.delete(session.id)
             raise
-        return _ok(frame)
+        return ok(frame)
 
-    def _frame(self, req: _Request) -> Response:
+    def get_frame(self, req: _Request) -> Response:
         """Answers with the live position."""
         viewer = req.viewer()
-        return _ok(self._sessions.get(req.session_id).frame(viewer))
+        return ok(self._sessions.get(req.session_id).frame(viewer))
 
-    def _replay(self, req: _Request) -> Response:
+    def replay(self, req: _Request) -> Response:
         """Answers with an earlier position."""
         viewer, ply = req.viewer(), req.index("ply")
         session = self._sessions.get(req.session_id)
-        return _ok(session.replay_frame(viewer, ply))
+        return ok(session.replay_frame(viewer, ply))
 
-    def _action(self, req: _Request) -> Response:
+    def action(self, req: _Request) -> Response:
         """Plays a seat's action."""
         viewer, body = req.viewer(), req.decode(request.ApplyAction)
         session = self._sessions.get(req.session_id)
-        return _ok(session.apply_action(viewer, body.action, ply=body.ply))
+        return ok(session.apply_action(viewer, body.action, ply=body.ply))
 
-    def _chance(self, req: _Request) -> Response:
+    def chance(self, req: _Request) -> Response:
         """Chooses a chance outcome."""
         viewer, body = req.viewer(), req.decode(request.ApplyChanceOutcome)
         session = self._sessions.get(req.session_id)
-        return _ok(session.apply_chance(viewer, body.outcome, ply=body.ply))
+        return ok(session.apply_chance(viewer, body.outcome, ply=body.ply))
 
-    def _advance(self, req: _Request) -> Response:
+    def advance(self, req: _Request) -> Response:
         """Lets controllers play, at most `request.MAX_ADVANCE_PLIES` actions."""
         viewer, body = req.viewer(), req.decode(request.Advance)
         session = self._sessions.get(req.session_id)
-        return _ok(session.advance(viewer, max_plies=body.limit))
+        return ok(session.advance(viewer, max_plies=body.limit))
 
-    def _undo(self, req: _Request) -> Response:
+    def undo(self, req: _Request) -> Response:
         """Undoes the latest choice of a seat."""
         viewer = req.viewer()
-        return _ok(self._sessions.get(req.session_id).undo(viewer))
+        return ok(self._sessions.get(req.session_id).undo(viewer))
 
-    def _reset(self, req: _Request) -> Response:
+    def reset(self, req: _Request) -> Response:
         """Restarts the game."""
         viewer, body = req.viewer(), req.decode(request.Reset)
         session = self._sessions.get(req.session_id)
-        return _ok(session.reset(viewer, history=body.history or ()))
+        return ok(session.reset(viewer, history=body.history or ()))
 
-    def _close(self, req: _Request) -> Response:
+    def close(self, req: _Request) -> Response:
         """Forgets a session; any viewer but a spectator closes it."""
         viewer = req.viewer()
         session = self._sessions.get(req.session_id)
         session.check_closer(viewer)
         self._sessions.delete(req.session_id)
-        return _ok(contract.SessionClosed(id=req.session_id))
+        return ok(contract.SessionClosed(id=req.session_id))
 
-    def _seat(self, req: _Request) -> Response:
+    def set_seat(self, req: _Request) -> Response:
         """Changes a seat's controller."""
         viewer, seat = req.viewer(), req.index("seat")
         body = req.decode(request.SeatConfig)
         session = self._sessions.get(req.session_id)
-        return _ok(session.set_controller(viewer, seat, _spec(body), autoplay=body.autoplay))
+        return ok(session.set_controller(viewer, seat, spec(body), autoplay=body.autoplay))
 
     _ROUTES: tuple[_Route, ...] = (
-        _route("GET", "health", _health),
-        _route("GET", "games", _catalogue),
-        _route("POST", "sessions", _create),
-        _route("GET", "sessions/{id}", _frame),
-        _route("DELETE", "sessions/{id}", _close),
-        _route("GET", "sessions/{id}/plies/{ply}", _replay),
-        _route("POST", "sessions/{id}/actions", _action),
-        _route("POST", "sessions/{id}/chance", _chance),
-        _route("POST", "sessions/{id}/advance", _advance),
-        _route("POST", "sessions/{id}/undo", _undo),
-        _route("POST", "sessions/{id}/reset", _reset),
-        _route("PUT", "sessions/{id}/seats/{seat}", _seat),
+        route("GET", "health", health),
+        route("GET", "games", catalogue),
+        route("POST", "sessions", create),
+        route("GET", "sessions/{id}", get_frame),
+        route("DELETE", "sessions/{id}", close),
+        route("GET", "sessions/{id}/plies/{ply}", replay),
+        route("POST", "sessions/{id}/actions", action),
+        route("POST", "sessions/{id}/chance", chance),
+        route("POST", "sessions/{id}/advance", advance),
+        route("POST", "sessions/{id}/undo", undo),
+        route("POST", "sessions/{id}/reset", reset),
+        route("PUT", "sessions/{id}/seats/{seat}", set_seat),
     )

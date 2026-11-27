@@ -37,7 +37,7 @@ _PREFERENCES: dict[Style, dict[str, int]] = {
 }
 
 
-def _actions(
+def actions(
     observation: Mapping[str, contract.JsonValue],
 ) -> list[PokerAction]:
     """Decodes the fields these example policies consume at the JSON boundary."""
@@ -83,7 +83,7 @@ def choose_action(observation: Mapping[str, contract.JsonValue], style: Style) -
     """
     priorities = _PREFERENCES[style]
     action = min(
-        _actions(observation),
+        actions(observation),
         key=lambda item: (priorities[item["kind"]], item["amount"], item["id"]),
     )
     return action["id"]
