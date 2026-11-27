@@ -143,7 +143,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     accounts = json.loads(pathlib.Path(os.environ["POKER_HOUSE_ACCOUNTS"]).read_text())
     tight, odds = (
-        Seat(name, strategies.STRATEGIES[name], client.Player(args.site, **accounts[name]))
+        Seat(name, strategies.STRATEGIES[name], client.Player(args.site, accounts[name]["key"]))
         for name in ("tight", "pot_odds")
     )
     if args.room_hands is not None:
