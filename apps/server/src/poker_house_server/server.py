@@ -200,7 +200,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self.stream_events()
             return
         try:
-            response = self.app.api.handle(self.command, self.path, body)
+            response = self.app.api.handle(self.command, self.path, body, self.player)
         except Exception:
             logging.exception("%s %s failed.", self.command, self.path)
             self.send_text(
@@ -210,10 +210,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         self.send_json(response.status, response.body)
 
+    @property
+    def player(self) -> str | None:
+        """The Worker's signed player header, which the API verifies."""
+        return self.headers.get(api_lib.PLAYER_HEADER)
+
     def stream_events(self) -> None:
-        """Streams the viewer's live frame as Server-Sent Events."""
+        """Streams the viewer's live frame as Server-Sent Events.
+
+        Each frame is sent only while the player may still take the view, so a
+        view that another player's arrival closes ends with an `refused` event.
+        """
         try:
-            session, viewer = self.app.api.subscribe(self.path)
+            session, viewer, player = self.app.api.subscribe(self.path, self.player)
         except errors.RequestError as error:
             body = error.to_error()
             self.send_json(body.code.http_status, contract.to_json(body))
@@ -235,6 +244,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                         return
                     self.wfile.write(b": keepalive\n\n")
                 else:
+                    try:
+                        session.authorize(viewer, player)
+                    except errors.RequestError:
+                        self.wfile.write(b"event: refused\ndata:\n\n")
+                        self.wfile.flush()
+                        return
                     data = json.dumps(
                         contract.to_json(frame), allow_nan=False, separators=(",", ":")
                     )

@@ -416,6 +416,8 @@ export type CreateSession = z.infer<typeof CreateSession>;
  *     settings do not satisfy its `config_schema`.
  *   CONTROLLER_FAILED: A seat's controller failed and the session is paused.
  *   NOTHING_TO_UNDO: The live game has no action to undo.
+ *   UNAUTHORIZED: The request names no signed-in player.
+ *   ROOM_FULL: Every human seat of the room is taken.
  */
 export const ErrorCode = z.enum([
   'bad_request',
@@ -428,6 +430,8 @@ export const ErrorCode = z.enum([
   'controller_unavailable',
   'controller_failed',
   'nothing_to_undo',
+  'unauthorized',
+  'room_full',
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;
 
@@ -465,6 +469,7 @@ export type Error = z.infer<typeof Error>;
  *   seed: The chance generator's seed; null for every viewer but the oracle,
  *     since it determines every chance outcome to come.
  *   controllers: The controllers that can play a seat of this game.
+ *   code: The room code another player joins the session with.
  */
 export const SessionInfo = z.strictObject({
   id: z.string(),
@@ -479,6 +484,7 @@ export const SessionInfo = z.strictObject({
   hides_information: z.boolean(),
   seed: z.int().nullable(),
   controllers: z.array(Controller),
+  code: z.string(),
 });
 export type SessionInfo = z.infer<typeof SessionInfo>;
 
@@ -556,6 +562,7 @@ export type SeatStatus = z.infer<typeof SeatStatus>;
  *     remote bot reporting something it recovered from; null when it gave
  *     none. Only the seat's own viewer and omniscient viewers receive it. It
  *     has no effect on play.
+ *   taken: Whether a player holds the seat.
  */
 export const SeatView = z.strictObject({
   seat: z.int(),
@@ -569,6 +576,7 @@ export const SeatView = z.strictObject({
   status: SeatStatus,
   message: z.string().nullable(),
   notice: z.string().nullable(),
+  taken: z.boolean(),
 });
 export type SeatView = z.infer<typeof SeatView>;
 

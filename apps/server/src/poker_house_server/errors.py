@@ -23,7 +23,7 @@ refusal the same way: `to_error()` gives the body, and its code the status.
 
 import enum
 import http
-from typing import ClassVar
+from typing import ClassVar, Self
 
 import pydantic.dataclasses
 
@@ -45,29 +45,31 @@ class ErrorCode(enum.StrEnum):
         settings do not satisfy its `config_schema`.
       CONTROLLER_FAILED: A seat's controller failed and the session is paused.
       NOTHING_TO_UNDO: The live game has no action to undo.
+      UNAUTHORIZED: The request names no signed-in player.
+      ROOM_FULL: Every human seat of the room is taken.
     """
 
-    BAD_REQUEST = "bad_request"
-    NOT_FOUND = "not_found"
-    METHOD_NOT_ALLOWED = "method_not_allowed"
-    GAME_UNAVAILABLE = "game_unavailable"
-    VIEWER_UNAVAILABLE = "viewer_unavailable"
-    NOT_YOUR_TURN = "not_your_turn"
-    ILLEGAL_ACTION = "illegal_action"
-    CONTROLLER_UNAVAILABLE = "controller_unavailable"
-    CONTROLLER_FAILED = "controller_failed"
-    NOTHING_TO_UNDO = "nothing_to_undo"
+    http_status: http.HTTPStatus
 
-    @property
-    def http_status(self) -> http.HTTPStatus:
-        """The HTTP status a response with this code carries."""
-        if self == ErrorCode.BAD_REQUEST:
-            return http.HTTPStatus.BAD_REQUEST
-        if self == ErrorCode.NOT_FOUND:
-            return http.HTTPStatus.NOT_FOUND
-        if self == ErrorCode.METHOD_NOT_ALLOWED:
-            return http.HTTPStatus.METHOD_NOT_ALLOWED
-        return http.HTTPStatus.CONFLICT
+    def __new__(cls, value: str, http_status: http.HTTPStatus) -> Self:
+        """Makes a code whose responses carry `http_status`."""
+        member = str.__new__(cls, value)
+        member._value_ = value
+        member.http_status = http_status
+        return member
+
+    BAD_REQUEST = "bad_request", http.HTTPStatus.BAD_REQUEST
+    NOT_FOUND = "not_found", http.HTTPStatus.NOT_FOUND
+    METHOD_NOT_ALLOWED = "method_not_allowed", http.HTTPStatus.METHOD_NOT_ALLOWED
+    GAME_UNAVAILABLE = "game_unavailable", http.HTTPStatus.CONFLICT
+    VIEWER_UNAVAILABLE = "viewer_unavailable", http.HTTPStatus.CONFLICT
+    NOT_YOUR_TURN = "not_your_turn", http.HTTPStatus.CONFLICT
+    ILLEGAL_ACTION = "illegal_action", http.HTTPStatus.CONFLICT
+    CONTROLLER_UNAVAILABLE = "controller_unavailable", http.HTTPStatus.CONFLICT
+    CONTROLLER_FAILED = "controller_failed", http.HTTPStatus.CONFLICT
+    NOTHING_TO_UNDO = "nothing_to_undo", http.HTTPStatus.CONFLICT
+    UNAUTHORIZED = "unauthorized", http.HTTPStatus.UNAUTHORIZED
+    ROOM_FULL = "room_full", http.HTTPStatus.CONFLICT
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
@@ -198,3 +200,15 @@ class NothingToUndoError(RequestError):
     """The live game has no action to undo."""
 
     code = ErrorCode.NOTHING_TO_UNDO
+
+
+class UnauthorizedError(RequestError):
+    """The request names no signed-in player."""
+
+    code = ErrorCode.UNAUTHORIZED
+
+
+class RoomFullError(RequestError):
+    """Every human seat of the room is taken."""
+
+    code = ErrorCode.ROOM_FULL

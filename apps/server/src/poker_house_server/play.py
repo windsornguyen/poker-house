@@ -29,6 +29,7 @@ import http.client
 import json
 import os
 import re
+import secrets
 import signal
 import sys
 import threading
@@ -41,9 +42,13 @@ from typing import TextIO
 import pydantic
 import pyspiel
 
-from poker_house_server import child_servers, cli, contract, play_config, remote_bot
+from poker_house_server import api, child_servers, cli, contract, play_config, remote_bot
 from poker_house_server import frame as frame_lib
 from poker_house_server import request as request_contract
+
+# The account a local launch plays as, and the key its own server checks it with.
+LOCAL_PLAYER = "local"
+LOCAL_PLAYER_KEY = secrets.token_hex(32)
 
 Options = play_config.Options
 SeatBot = play_config.SeatBot
@@ -83,7 +88,10 @@ def request(
     """
     parts = urllib.parse.urlsplit(url)
     target = parts.path + (f"?{parts.query}" if parts.query else "")
-    headers = {"Accept": "application/json"}
+    headers = {
+        "Accept": "application/json",
+        api.PLAYER_HEADER: api.signed_player(LOCAL_PLAYER, LOCAL_PLAYER_KEY),
+    }
     data = None
     if body is not None:
         data = json.dumps(body).encode()
@@ -299,7 +307,7 @@ def launch(
         gui = child_servers.ChildServer(
             "gui",
             [options.python, "-m", "poker_house_server", *gui_args],
-            os.environ,
+            {**os.environ, api.PLAYER_KEY_ENV: LOCAL_PLAYER_KEY},
             _GUI_READY,
             out,
         )

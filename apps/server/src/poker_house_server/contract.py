@@ -252,6 +252,7 @@ class SeatView:
         remote bot reporting something it recovered from; null when it gave
         none. Only the seat's own viewer and omniscient viewers receive it. It
         has no effect on play.
+      taken: Whether a player holds the seat.
     """
 
     seat: int
@@ -262,6 +263,7 @@ class SeatView:
     status: SeatStatus = SeatStatus.READY
     message: str | None = None
     notice: str | None = None
+    taken: bool = False
 
     def __post_init__(self) -> None:
         require(
@@ -518,6 +520,7 @@ class SessionInfo:
       seed: The chance generator's seed; null for every viewer but the oracle,
         since it determines every chance outcome to come.
       controllers: The controllers that can play a seat of this game.
+      code: The room code another player joins the session with.
     """
 
     id: str
@@ -529,6 +532,7 @@ class SessionInfo:
     hides_information: bool
     seed: int | None
     controllers: tuple[Controller, ...]
+    code: str
 
     def __post_init__(self) -> None:
         require(self.num_seats >= 1, f"A session cannot have {self.num_seats} seats.")

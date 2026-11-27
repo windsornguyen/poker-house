@@ -48,6 +48,7 @@ class Journal:
         self.database.insert(
             db.StoredSession(
                 id=session.id,
+                code=session.code,
                 game=session.game_name,
                 parameters=session.parameters,
                 seed=session.seed,
@@ -75,6 +76,12 @@ class Journal:
             kept += 1
         self.database.record(session.id, kept, current[kept:], session.returns)
         self.saved[session.id] = current
+
+    def claim(self, session: session_lib.Session, seat: int) -> None:
+        """Records who holds `seat` of `session`."""
+        player = session.holders[seat]
+        if player is not None:
+            self.database.claim(session.id, seat, player)
 
     def load(self, session_id: str) -> session_lib.Session | None:
         """Rebuilds a stored session, or returns None if there is none."""
@@ -120,6 +127,7 @@ class SessionStore:
         chance_policy: contract.ChancePolicy,
         controllers: Sequence[controllers_lib.Spec],
         autoplay: Sequence[bool] = (),
+        player: str,
     ) -> session_lib.Session:
         """Starts a session and stores it; see `session.Session.create`.
 
@@ -133,6 +141,7 @@ class SessionStore:
           controllers: Who plays each seat, in seat order.
           autoplay: Whether each seat's controller plays as soon as it is to move,
             in seat order; empty for none.
+          player: The account that starts the session, at its first human seat.
 
         Returns:
           The session started.
@@ -147,14 +156,18 @@ class SessionStore:
             chance_policy=chance_policy,
             controllers=controllers,
             autoplay=autoplay,
+            player=player,
         )
         if self.journal is not None:
             self.journal.follow(
                 session,
                 [
-                    db.StoredSeat(spec, play)
-                    for spec, play in zip(
-                        controllers, autoplay or [False] * len(controllers), strict=True
+                    db.StoredSeat(spec, play, holder)
+                    for spec, play, holder in zip(
+                        controllers,
+                        autoplay or [False] * len(controllers),
+                        session.holders,
+                        strict=True,
                     )
                 ],
             )
@@ -192,6 +205,37 @@ class SessionStore:
         if session is None:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         return session
+
+    def join(self, code: str, player: str) -> tuple[session_lib.Session, int]:
+        """Seats `player` in the room `code`, or finds the seat they hold there.
+
+        Raises:
+          errors.NotFoundError: If no room has the code.
+          errors.RoomFullError: If every human seat is held by another player.
+        """
+        with self._lock:
+            found = next((s for s in self._sessions.values() if s.code == code), None)
+        session_id = found.id if found is not None else self.find(code)
+        session = self.get(session_id)
+
+        seat = session.claim(player)
+        if seat is None:
+            raise errors.RoomFullError("Every seat at this table is taken.")
+
+        if self.journal is not None:
+            self.journal.claim(session, seat)
+        return session, seat
+
+    def find(self, code: str) -> str:
+        """Returns the id of the stored session with room code `code`.
+
+        Raises:
+          errors.NotFoundError: If no room has the code.
+        """
+        session_id = None if self.journal is None else self.journal.database.find(code)
+        if session_id is None:
+            raise errors.NotFoundError(f"There is no room {code!r}.")
+        return session_id
 
     def delete(self, session_id: str) -> None:
         """Forgets the session with id `session_id`.

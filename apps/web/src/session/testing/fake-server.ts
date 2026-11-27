@@ -48,6 +48,8 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   controller_unavailable: 409,
   controller_failed: 409,
   nothing_to_undo: 409,
+  unauthorized: 401,
+  room_full: 409,
 };
 
 /** A request the fake received. */
@@ -243,11 +245,13 @@ export class FakeServer {
       status: 'ready',
       message: null,
       notice: null,
+      taken: false,
     }));
     const body: Frame = {
       session: {
         id,
         game: 'count',
+        code: 'ROOM42',
         parameters: {},
         num_seats: SEATS,
         chance_policy: 'auto',

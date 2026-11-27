@@ -10,6 +10,7 @@ create table if not exists poker.player (
 
 create table if not exists poker.session (
     id text primary key check (id ~ '^[0-9a-f]{16}$'),
+    code text not null unique check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),
     game text not null,
     parameters jsonb not null,
     seed bigint not null,
@@ -30,6 +31,7 @@ create table if not exists poker.seat (
     controller text not null,
     config jsonb not null,
     autoplay boolean not null,
+    player text,
     primary key (session_id, seat)
 );
 

@@ -6,3 +6,12 @@ begin
       foreign key (email) references poker.player (email) on delete cascade;
   end if;
 end $$;
+
+-- A seat is held by an account, and opens again when the account goes.
+do $$
+begin
+  if not exists (select from pg_constraint where conname = 'seat_player_user') then
+    alter table poker.seat add constraint seat_player_user
+      foreign key (player) references auth."user" (id) on delete set null;
+  end if;
+end $$;

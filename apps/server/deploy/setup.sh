@@ -13,6 +13,7 @@ readonly APP_USER=poker-house
 readonly APP_DIR=/opt/poker-house
 readonly ENV_FILE=/etc/poker-house/db.env
 readonly AUTH_ENV_FILE=/etc/poker-house/auth.env
+readonly GAME_ENV_FILE=/etc/poker-house/game.env
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/opt/node/bin:$PATH"
@@ -31,6 +32,10 @@ fi
 if [[ ! -f $AUTH_ENV_FILE ]]; then
   printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
   chmod 600 "$AUTH_ENV_FILE"
+fi
+if [[ ! -f $GAME_ENV_FILE ]]; then
+  printf 'POKER_HOUSE_PLAYER_KEY=%s\n' "$(openssl rand -hex 32)" >"$GAME_ENV_FILE"
+  chmod 600 "$GAME_ENV_FILE"
 fi
 grep -q '^MAIL_KEY=' "$AUTH_ENV_FILE" || printf 'MAIL_KEY=%s\n' "$(openssl rand -hex 32)" >>"$AUTH_ENV_FILE"
 sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
@@ -92,6 +97,7 @@ After=network-online.target postgresql.service
 User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
+EnvironmentFile=$GAME_ENV_FILE
 ExecStart=$APP_DIR/.venv/bin/python -m poker_house_server --host 0.0.0.0 --port 8787 ${allow_hosts[*]}
 Restart=on-failure
 

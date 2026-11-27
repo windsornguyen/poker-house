@@ -241,6 +241,18 @@ def enable_crash_stacks() -> None:
         faulthandler.enable(all_threads=True)
 
 
+def player_key() -> str:
+    """Returns the key the Worker signs player headers with.
+
+    Raises:
+      SystemExit: If the environment holds no key.
+    """
+    key = os.environ.get(api.PLAYER_KEY_ENV, "")
+    if not key:
+        raise SystemExit(f"{api.PLAYER_KEY_ENV} must be set.")
+    return key
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Serves until interrupted or terminated, then shuts down cleanly."""
     args = parse_args(argv)
@@ -267,6 +279,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             store.SessionStore(journal=journal),
             catalogue=loader.build_catalogue,
             health=health_report.build,
+            player_key=player_key(),
         ),
         static.ClientFiles(args.client_dir),
         allowed_hosts(args.host, args.allow_host),

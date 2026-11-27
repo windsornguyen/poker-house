@@ -17,6 +17,7 @@ class StoredSeat:
 
     spec: controllers.Spec
     autoplay: bool
+    player: str | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -33,6 +34,7 @@ class StoredSession:
     """A session as stored."""
 
     id: str
+    code: str
     game: str
     parameters: Mapping[str, contract.ParameterValue]
     seed: int
@@ -56,10 +58,11 @@ class Database:
         """Records a new session and its seats."""
         with self.lock, self.connection.transaction():
             self.connection.execute(
-                "insert into poker.session (id, game, parameters, seed, chance_policy)"
-                " values (%s, %s, %s, %s, %s)",
+                "insert into poker.session (id, code, game, parameters, seed, chance_policy)"
+                " values (%s, %s, %s, %s, %s, %s)",
                 (
                     stored.id,
+                    stored.code,
                     stored.game,
                     Jsonb(dict(stored.parameters)),
                     stored.seed,
@@ -67,10 +70,17 @@ class Database:
                 ),
             )
             self.connection.cursor().executemany(
-                "insert into poker.seat (session_id, seat, controller, config, autoplay)"
-                " values (%s, %s, %s, %s, %s)",
+                "insert into poker.seat (session_id, seat, controller, config, autoplay, player)"
+                " values (%s, %s, %s, %s, %s, %s)",
                 [
-                    (stored.id, index, seat.spec.kind, Jsonb(dict(seat.spec.config)), seat.autoplay)
+                    (
+                        stored.id,
+                        index,
+                        seat.spec.kind,
+                        Jsonb(dict(seat.spec.config)),
+                        seat.autoplay,
+                        seat.player,
+                    )
                     for index, seat in enumerate(stored.seats)
                 ],
             )
@@ -118,13 +128,14 @@ class Database:
         """Returns the stored session, or None if there is none."""
         with self.lock:
             row = self.connection.execute(
-                "select game, parameters, seed, chance_policy from poker.session where id = %s",
+                "select code, game, parameters, seed, chance_policy from poker.session"
+                " where id = %s",
                 (session_id,),
             ).fetchone()
             if row is None:
                 return None
             seats = self.connection.execute(
-                "select controller, config, autoplay from poker.seat"
+                "select controller, config, autoplay, player from poker.seat"
                 " where session_id = %s order by seat",
                 (session_id,),
             ).fetchall()
@@ -132,16 +143,19 @@ class Database:
                 "select seat, action, bot_output from poker.ply where session_id = %s order by ply",
                 (session_id,),
             ).fetchall()
-        game, parameters, seed, chance_policy = row
+        code, game, parameters, seed, chance_policy = row
         return StoredSession(
             id=session_id,
+            code=code,
             game=game,
             parameters=PARAMETERS.validate_python(parameters),
             seed=seed,
             chance_policy=contract.ChancePolicy(chance_policy),
             seats=tuple(
-                StoredSeat(controllers.Spec(kind, PARAMETERS.validate_python(config)), autoplay)
-                for kind, config, autoplay in seats
+                StoredSeat(
+                    controllers.Spec(kind, PARAMETERS.validate_python(config)), autoplay, player
+                )
+                for kind, config, autoplay, player in seats
             ),
             plies=tuple(
                 StoredPly(
@@ -150,6 +164,22 @@ class Database:
                 for seat, action, output in played
             ),
         )
+
+    def claim(self, session_id: str, seat: int, player: str) -> None:
+        """Records `player` holding `seat`."""
+        with self.lock:
+            self.connection.execute(
+                "update poker.seat set player = %s where session_id = %s and seat = %s",
+                (player, session_id, seat),
+            )
+
+    def find(self, code: str) -> str | None:
+        """Returns the id of the session with room code `code`, or None."""
+        with self.lock:
+            row = self.connection.execute(
+                "select id from poker.session where code = %s", (code,)
+            ).fetchone()
+        return None if row is None else row[0]
 
     def delete(self, session_id: str) -> None:
         """Forgets a session, its seats and its plies."""

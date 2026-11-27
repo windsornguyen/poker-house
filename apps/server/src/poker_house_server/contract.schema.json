@@ -488,7 +488,7 @@
       "type": "object"
     },
     "ErrorCode": {
-      "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.",
+      "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.\n  UNAUTHORIZED: The request names no signed-in player.\n  ROOM_FULL: Every human seat of the room is taken.",
       "enum": [
         "bad_request",
         "not_found",
@@ -499,7 +499,9 @@
         "illegal_action",
         "controller_unavailable",
         "controller_failed",
-        "nothing_to_undo"
+        "nothing_to_undo",
+        "unauthorized",
+        "room_full"
       ],
       "type": "string"
     },
@@ -1036,7 +1038,7 @@
     },
     "SeatView": {
       "additionalProperties": false,
-      "description": "One seat of a session.\n\nAttributes:\n  seat: The seat index, which is the OpenSpiel player id.\n  controller: The `Controller.name` playing the seat.\n  config: The controller's settings, satisfying its `config_schema`.\n    Every viewer receives them, so they hold no secret.\n  autoplay: Whether the server plays the seat's moves as soon as it is to\n    move, rather than on an advance request. Never true for a human seat.\n  failure: Why the controller failed, or null while it plays.\n  status: Whether the controller is ready, being built, or could not be\n    built.\n  message: Why the seat is not ready, for every viewer: what the server is\n    doing while it is `preparing`, or why it is `unavailable`; null when it\n    is `ready`, and optional while it is `preparing`.\n  notice: The controller's short note about its latest choice, such as a\n    remote bot reporting something it recovered from; null when it gave\n    none. Only the seat's own viewer and omniscient viewers receive it. It\n    has no effect on play.",
+      "description": "One seat of a session.\n\nAttributes:\n  seat: The seat index, which is the OpenSpiel player id.\n  controller: The `Controller.name` playing the seat.\n  config: The controller's settings, satisfying its `config_schema`.\n    Every viewer receives them, so they hold no secret.\n  autoplay: Whether the server plays the seat's moves as soon as it is to\n    move, rather than on an advance request. Never true for a human seat.\n  failure: Why the controller failed, or null while it plays.\n  status: Whether the controller is ready, being built, or could not be\n    built.\n  message: Why the seat is not ready, for every viewer: what the server is\n    doing while it is `preparing`, or why it is `unavailable`; null when it\n    is `ready`, and optional while it is `preparing`.\n  notice: The controller's short note about its latest choice, such as a\n    remote bot reporting something it recovered from; null when it gave\n    none. Only the seat's own viewer and omniscient viewers receive it. It\n    has no effect on play.\n  taken: Whether a player holds the seat.",
       "properties": {
         "seat": {
           "type": "integer"
@@ -1098,6 +1100,9 @@
               "type": "null"
             }
           ]
+        },
+        "taken": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -1108,7 +1113,8 @@
         "failure",
         "status",
         "message",
-        "notice"
+        "notice",
+        "taken"
       ],
       "type": "object"
     },
@@ -1127,7 +1133,7 @@
     },
     "SessionInfo": {
       "additionalProperties": false,
-      "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.",
+      "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.\n  code: The room code another player joins the session with.",
       "properties": {
         "id": {
           "type": "string"
@@ -1181,6 +1187,9 @@
             "$ref": "#/$defs/Controller"
           },
           "type": "array"
+        },
+        "code": {
+          "type": "string"
         }
       },
       "required": [
@@ -1192,7 +1201,8 @@
         "turn_based",
         "hides_information",
         "seed",
-        "controllers"
+        "controllers",
+        "code"
       ],
       "type": "object"
     },

@@ -22,6 +22,8 @@ errors.
 """
 
 import dataclasses
+import hashlib
+import hmac
 import http
 import re
 import urllib.parse
@@ -42,6 +44,17 @@ from poker_house_server import session as session_lib
 PREFIX = "/api/"
 
 _T = TypeVar("_T")
+
+# The header the Worker names the signed-in account in, signed with the player key.
+PLAYER_HEADER = "X-Poker-Player"
+PLAYER_KEY_ENV = "POKER_HOUSE_PLAYER_KEY"
+
+
+def signed_player(player: str, key: str) -> str:
+    """Returns the player header naming `player`, signed with `key`."""
+    digest = hmac.new(key.encode(), player.encode(), hashlib.sha256).hexdigest()
+    return f"{player}.{digest}"
+
 
 _NON_NEGATIVE_INTEGER = re.compile(r"0|[1-9][0-9]*")
 
@@ -78,6 +91,7 @@ class _Request:
     query: dict[str, list[str]]
     body: bytes
     path: dict[str, str]
+    player: str | None
 
     @property
     def session_id(self) -> str:
@@ -99,6 +113,16 @@ class _Request:
         if _NON_NEGATIVE_INTEGER.fullmatch(value):
             return contract.Viewer(contract.ViewerKind.SEAT, int(value))
         raise errors.BadRequestError(f"Viewer {value!r} is not oracle, spectator or a seat index.")
+
+    def signed_in(self) -> str:
+        """The account the Worker vouches for.
+
+        Raises:
+          UnauthorizedError: If the request names no signed-in player.
+        """
+        if not self.player:
+            raise errors.UnauthorizedError("Sign in to play.")
+        return self.player
 
     def index(self, name: str) -> int:
         """Returns the path parameter `name`, a non-negative integer."""
@@ -147,6 +171,7 @@ class Api:
         *,
         catalogue: Callable[[], catalogue_lib.Catalogue],
         health: Callable[[], health_lib.Health],
+        player_key: str,
     ) -> None:
         """Initializes the API.
 
@@ -154,18 +179,33 @@ class Api:
           sessions: Holds the sessions the API creates and serves.
           catalogue: Returns the catalogue of every game.
           health: Returns the server's health report.
+          player_key: The key the Worker signs the player header with.
         """
         self._sessions = sessions
+        self._player_key = player_key
         self._catalogue_of = catalogue
         self._health_of = health
 
-    def handle(self, method: str, target: str, body: bytes = b"") -> Response:
+    def identify(self, header: str | None) -> str | None:
+        """Returns the account a signed player header names, or None for any other."""
+        if header is None:
+            return None
+
+        player, _, _ = header.rpartition(".")
+        if not player or not hmac.compare_digest(header, signed_player(player, self._player_key)):
+            return None
+        return player
+
+    def handle(
+        self, method: str, target: str, body: bytes = b"", player_header: str | None = None
+    ) -> Response:
         """Answers one request.
 
         Args:
           method: The HTTP method.
           target: The request target: an API path and its query string.
           body: The request body.
+          player_header: The Worker's signed player header, or None.
 
         Returns:
           The response. A request the contract refuses (an `errors.RequestError`)
@@ -176,7 +216,7 @@ class Api:
         query = urllib.parse.parse_qs(url.query, keep_blank_values=True)
         try:
             handler, path = self.match_route(method, url.path)
-            return handler(self, _Request(query, body, path))
+            return handler(self, _Request(query, body, path, self.identify(player_header)))
         except errors.RequestError as error:
             return refusal(error.to_error())
 
@@ -185,8 +225,10 @@ class Api:
         path = urllib.parse.urlsplit(target).path
         return method == "GET" and _EVENTS.fullmatch(path) is not None
 
-    def subscribe(self, target: str) -> tuple[session_lib.Session, contract.Viewer]:
-        """Returns the session and viewer an events request subscribes.
+    def subscribe(
+        self, target: str, player_header: str | None
+    ) -> tuple[session_lib.Session, contract.Viewer, str]:
+        """Returns the session, viewer and player an events request subscribes.
 
         Raises:
           errors.RequestError: If the session or viewer does not exist.
@@ -198,11 +240,11 @@ class Api:
             urllib.parse.parse_qs(url.query, keep_blank_values=True),
             b"",
             match.groupdict(),
+            self.identify(player_header),
         )
-        viewer = req.viewer()
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
         session.frame(viewer)
-        return session, viewer
+        return session, viewer, req.signed_in()
 
     def match_route(self, method: str, path: str) -> tuple[_Handler, dict[str, str]]:
         """Returns the handler for a request and its path parameters."""
@@ -228,9 +270,17 @@ class Api:
         """Answers with the catalogue."""
         return ok(self._catalogue_of())
 
+    def seated(self, req: _Request) -> tuple[session_lib.Session, contract.Viewer]:
+        """The session the request concerns, and the viewer its player may take there."""
+        viewer, player = req.viewer(), req.signed_in()
+        session = self._sessions.get(req.session_id)
+        session.authorize(viewer, player)
+        return session, viewer
+
     def create(self, req: _Request) -> Response:
-        """Starts a session, keeping it only if the viewer may see it."""
-        viewer, body = req.viewer(), req.decode(request.CreateSession)
+        """Starts a session with its player seated, keeping it only if the viewer may see it."""
+        viewer, player = req.viewer(), req.signed_in()
+        body = req.decode(request.CreateSession)
         session = self._sessions.create(
             body.game,
             body.parameters,
@@ -238,73 +288,78 @@ class Api:
             chance_policy=body.chance_policy,
             controllers=[spec(seat) for seat in body.seats],
             autoplay=[seat.autoplay for seat in body.seats],
+            player=player,
         )
         try:
+            session.authorize(viewer, player)
             frame = session.frame(viewer)
         except errors.RequestError:
             self._sessions.delete(session.id)
             raise
         return ok(frame)
 
+    def join(self, req: _Request) -> Response:
+        """Seats the player in a room by its code, and answers with their seat's view."""
+        session, seat = self._sessions.join(req.path["code"].upper(), req.signed_in())
+        return ok(session.frame(contract.Viewer(contract.ViewerKind.SEAT, seat)))
+
     def get_frame(self, req: _Request) -> Response:
         """Answers with the live position."""
-        viewer = req.viewer()
-        return ok(self._sessions.get(req.session_id).frame(viewer))
+        session, viewer = self.seated(req)
+        return ok(session.frame(viewer))
 
     def replay(self, req: _Request) -> Response:
         """Answers with an earlier position."""
-        viewer, ply = req.viewer(), req.index("ply")
-        session = self._sessions.get(req.session_id)
-        return ok(session.replay_frame(viewer, ply))
+        session, viewer = self.seated(req)
+        return ok(session.replay_frame(viewer, req.index("ply")))
 
     def action(self, req: _Request) -> Response:
         """Plays a seat's action."""
-        viewer, body = req.viewer(), req.decode(request.ApplyAction)
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
+        body = req.decode(request.ApplyAction)
         return ok(session.apply_action(viewer, body.action, ply=body.ply))
 
     def chance(self, req: _Request) -> Response:
         """Chooses a chance outcome."""
-        viewer, body = req.viewer(), req.decode(request.ApplyChanceOutcome)
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
+        body = req.decode(request.ApplyChanceOutcome)
         return ok(session.apply_chance(viewer, body.outcome, ply=body.ply))
 
     def advance(self, req: _Request) -> Response:
         """Lets controllers play, at most `request.MAX_ADVANCE_PLIES` actions."""
-        viewer, body = req.viewer(), req.decode(request.Advance)
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
+        body = req.decode(request.Advance)
         return ok(session.advance(viewer, max_plies=body.limit))
 
     def undo(self, req: _Request) -> Response:
         """Undoes the latest choice of a seat."""
-        viewer = req.viewer()
-        return ok(self._sessions.get(req.session_id).undo(viewer))
+        session, viewer = self.seated(req)
+        return ok(session.undo(viewer))
 
     def reset(self, req: _Request) -> Response:
         """Restarts the game."""
-        viewer, body = req.viewer(), req.decode(request.Reset)
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
+        body = req.decode(request.Reset)
         return ok(session.reset(viewer, history=body.history or ()))
 
     def close(self, req: _Request) -> Response:
         """Forgets a session; any viewer but a spectator closes it."""
-        viewer = req.viewer()
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
         session.check_closer(viewer)
         self._sessions.delete(req.session_id)
         return ok(contract.SessionClosed(id=req.session_id))
 
     def set_seat(self, req: _Request) -> Response:
         """Changes a seat's controller."""
-        viewer, seat = req.viewer(), req.index("seat")
-        body = req.decode(request.SeatConfig)
-        session = self._sessions.get(req.session_id)
+        session, viewer = self.seated(req)
+        seat, body = req.index("seat"), req.decode(request.SeatConfig)
         return ok(session.set_controller(viewer, seat, spec(body), autoplay=body.autoplay))
 
     _ROUTES: tuple[_Route, ...] = (
         route("GET", "health", health),
         route("GET", "games", catalogue),
         route("POST", "sessions", create),
+        route("POST", "rooms/{code}/join", join),
         route("GET", "sessions/{id}", get_frame),
         route("DELETE", "sessions/{id}", close),
         route("GET", "sessions/{id}/plies/{ply}", replay),

@@ -9,6 +9,7 @@ interface Env {
   readonly EMAIL: SendEmail;
   readonly MAIL_KEY: string;
   readonly MAIL_FROM: string;
+  readonly PLAYER_KEY: string;
 }
 
 /** An email the Machine may ask for: the site page its link must open. */
@@ -93,6 +94,27 @@ async function sendMail(
   return new Response(null, {status: 204});
 }
 
+/** The player header naming `player`, signed so the game server can trust it. */
+async function signedPlayer(player: string, key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const hmac = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    {name: 'HMAC', hash: 'SHA-256'},
+    false,
+    ['sign'],
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    hmac,
+    encoder.encode(player),
+  );
+  const hex = Array.from(new Uint8Array(signature), byte =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
+  return `${player}.${hex}`;
+}
+
 /** Forwards `request` to `origin`, unlocking its Dedalus port with `key`. */
 function forward(
   request: Request,
@@ -132,6 +154,10 @@ export default {
     const game = new Request(request);
     game.headers.delete('Cookie');
     game.headers.delete('Origin');
+    game.headers.set(
+      'X-Poker-Player',
+      await signedPlayer(session.user.id, env.PLAYER_KEY),
+    );
     return forward(game, env.API_ORIGIN, env.PORT_KEY);
   },
 } satisfies ExportedHandler<Env>;
