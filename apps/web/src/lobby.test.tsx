@@ -26,6 +26,7 @@ const ENTRY = {
   name: 'doggybank',
   loadable: true,
   unavailable_reason: null,
+  num_players: 2,
 } as CatalogueEntry;
 
 let rendered: Rendered | undefined;
@@ -118,6 +119,42 @@ describe('the poker lobby', () => {
     expect(
       rendered.container.querySelector('[role="alert"]')?.textContent,
     ).toContain('stack at least as large as the big blind');
+  });
+});
+
+describe('opening a table', () => {
+  it.each([
+    ['Open a table · 200 chips', {controller: 'human', autoplay: false}],
+    ['Practice against a bot', {controller: 'random', autoplay: true}],
+  ])('opens %s at the first seat', async (label, opponent) => {
+    const seated = frame();
+    const fetch = server(seated);
+    const open = vi.fn();
+    rendered = render(
+      <PokerLobby
+        entry={ENTRY}
+        client={new SessionClient({fetch})}
+        onOpen={open}
+      />,
+    );
+    const button = [...rendered.container.querySelectorAll('button')].find(
+      candidate => candidate.textContent === label,
+    );
+    if (button === undefined) throw new Error(`No ${label} button.`);
+    await act(async () => {
+      button.click();
+      await Promise.resolve();
+    });
+
+    const [url, init] = sent(fetch)[0] ?? [];
+    expect(url).toBe('/api/sessions?viewer=0');
+    if (typeof init?.body !== 'string') throw new Error('No JSON body.');
+    expect(JSON.parse(init.body)).toMatchObject({
+      game: 'doggybank',
+      parameters: {stack_sizes: '200 200'},
+      seats: [{controller: 'human'}, opponent],
+    });
+    expect(open).toHaveBeenCalledWith(seated);
   });
 });
 

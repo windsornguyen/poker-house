@@ -34,12 +34,6 @@
   font-size: 32px;
 }
 
-.lobby__intro a {
-  display: inline-block;
-  margin-top: 12px;
-  color: var(--color-accent);
-}
-
 .lobby__form {
   display: grid;
   gap: 20px;

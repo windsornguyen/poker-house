@@ -21,6 +21,7 @@
 
 import type {
   Catalogue,
+  CreateSession,
   Error as ErrorBody,
   ErrorCode,
   Frame,
@@ -56,29 +57,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   ledger_unavailable: 503,
 };
 
-/** The fixed properties of a fake session, with the seed only the oracle sees. */
-function sessionInfo(
-  id: string,
-  hidesInformation: boolean,
-  staked: boolean,
-  seed: number | null,
-): Frame['session'] {
-  return {
-    id,
-    game: 'count',
-    code: 'ROOM42',
-    staked,
-    next: null,
-    parameters: {},
-    num_seats: SEATS,
-    chance_policy: 'auto',
-    turn_based: false,
-    hides_information: hidesInformation,
-    seed,
-    controllers: HEALTH.capabilities.controllers,
-  };
-}
-
 /** A request the fake received. */
 export interface Received {
   readonly method: string;
@@ -106,6 +84,8 @@ export interface FakeServerOptions {
   readonly hidesInformation?: boolean;
   /** Whether every hand is played for chips. */
   readonly staked?: boolean;
+  /** The name the catalogue lists the game under; `count` when omitted. */
+  readonly game?: string;
 }
 
 interface Session {
@@ -119,6 +99,9 @@ export class FakeServer {
   readonly received: Received[] = [];
   private readonly hidesInformation: boolean;
   private readonly staked: boolean;
+  private readonly game: string;
+  // The player's chips off the tables.
+  private balance = 1000;
   private readonly sessions = new Map<string, Session>();
   private held: Array<() => void> | null = null;
   private refusal: [ErrorCode, string] | null = null;
@@ -126,6 +109,7 @@ export class FakeServer {
   constructor(options: FakeServerOptions = {}) {
     this.hidesInformation = options.hidesInformation ?? false;
     this.staked = options.staked ?? false;
+    this.game = options.game ?? 'count';
   }
 
   readonly fetch: Fetch = async (url, init) => {
@@ -176,12 +160,13 @@ export class FakeServer {
     if (path === '/api/health') return json(HEALTH);
     if (path === '/api/games') return json(this.catalogue());
     if (path === '/api/me') {
-      return json({balance: 1000, kind: 'person', seats: []});
+      return json({balance: this.balance, kind: 'person', seats: []});
     }
     const viewer = parseViewer(viewerName);
     const field = (name: string): unknown =>
       (body as Record<string, unknown>)[name];
     if (method === 'POST' && path === '/api/sessions') {
+      this.buyIn(body as CreateSession);
       const id = `session-${String(this.sessions.size + 1)}`;
       const seed = field('seed');
       const session: Session = {
@@ -282,12 +267,7 @@ export class FakeServer {
       taken: false,
     }));
     const body: Frame = {
-      session: sessionInfo(
-        id,
-        this.hidesInformation,
-        this.staked,
-        viewer.kind === 'oracle' ? seed : null,
-      ),
+      session: this.sessionInfo(id, viewer.kind === 'oracle' ? seed : null),
       viewer,
       omniscient,
       status: history.length === LENGTH ? 'terminal' : 'playing',
@@ -319,13 +299,43 @@ export class FakeServer {
     return json(body);
   }
 
+  // As the server does, a table whose every seat is a person's plays for
+  // chips: its creator buys in with the stack.
+  private buyIn({seats, parameters}: CreateSession): void {
+    const stacks = parameters['stack_sizes'];
+    if (
+      seats.every(seat => seat.controller === 'human') &&
+      typeof stacks === 'string'
+    ) {
+      this.balance -= Number(stacks.split(' ')[0]);
+    }
+  }
+
+  /** The fixed properties of a session, with the seed only the oracle sees. */
+  private sessionInfo(id: string, seed: number | null): Frame['session'] {
+    return {
+      id,
+      game: this.game,
+      code: 'ROOM42',
+      staked: this.staked,
+      next: null,
+      parameters: {},
+      num_seats: SEATS,
+      chance_policy: 'auto',
+      turn_based: false,
+      hides_information: this.hidesInformation,
+      seed,
+      controllers: HEALTH.capabilities.controllers,
+    };
+  }
+
   private catalogue(): Catalogue {
     const game = CATALOGUE.games[0];
     if (game === undefined) throw new Error('The catalogue lists no game.');
     const information = this.hidesInformation
       ? 'imperfect_information'
       : 'perfect_information';
-    return {...CATALOGUE, games: [{...game, information}]};
+    return {...CATALOGUE, games: [{...game, name: this.game, information}]};
   }
 }
 

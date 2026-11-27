@@ -30,7 +30,9 @@ import type {
   CreateSession,
   Frame,
   Me,
+  Viewer,
 } from './contract/contract.ts';
+import {BUY_IN, defaultSession, tableSession} from './game/game-defaults.ts';
 import {openRoom} from './game/game-page.tsx';
 import type {SessionClient} from './session/client.ts';
 
@@ -38,6 +40,7 @@ import './lobby.css';
 
 const ROOM_CODE_LENGTH = 6;
 const GAME = 'doggybank';
+const FIRST_SEAT: Viewer = {kind: 'seat', seat: 0};
 
 /** The two bot endpoints and the hand's integer-chip stakes. */
 export interface MatchSettings {
@@ -94,7 +97,7 @@ export function pokerMatchRequest(settings: MatchSettings): CreateSession {
   };
 }
 
-/** Creates a hand between independent bot servers, or opens a manual table. */
+/** Opens a table, practice against a bot, or a hand between bot servers. */
 export function PokerLobby({
   entry,
   client,
@@ -135,7 +138,9 @@ export function PokerLobby({
           and legal actions, then returns a move.
         </p>
         <p>Watch the hand, inspect every decision, and replay the result.</p>
-        <a href="/game/doggybank">Open a manual table</a>
+        {entry?.loadable === true && (
+          <OpenTable entry={entry} client={client} onOpen={onOpen} />
+        )}
       </div>
       <MatchForm
         entry={entry}
@@ -212,6 +217,61 @@ function Chips({client}: {readonly client: SessionClient}): JSX.Element | null {
           </TableBody>
         </Table>
       )}
+      {error !== null && <p role="alert">{error}</p>}
+    </div>
+  );
+}
+
+// Opens a table at its first seat: one played for chips, whose buy-in the
+// player confirms by pressing the button, or practice against a bot for
+// nothing.
+function OpenTable({
+  entry,
+  client,
+  onOpen,
+}: {
+  readonly entry: CatalogueEntry;
+  readonly client: SessionClient;
+  readonly onOpen: (frame: Frame) => void;
+}): JSX.Element {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function open(
+    request: (entry: CatalogueEntry) => CreateSession,
+  ): Promise<void> {
+    setPending(true);
+    setError(null);
+    try {
+      onOpen(await client.create(FIRST_SEAT, request(entry)));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          disabled={pending}
+          onClick={() => {
+            void open(tableSession);
+          }}
+        >
+          Open a table · {BUY_IN} chips
+        </Button>
+        <Button
+          variant="outline"
+          disabled={pending}
+          onClick={() => {
+            void open(defaultSession);
+          }}
+        >
+          Practice against a bot
+        </Button>
+      </div>
       {error !== null && <p role="alert">{error}</p>}
     </div>
   );

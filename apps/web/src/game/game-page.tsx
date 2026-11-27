@@ -101,7 +101,7 @@ export function GamePage(props: GamePageProps): JSX.Element {
  * `viewSeat`) when the game has it. Every page starts afresh: a seat chosen
  * on another page never carries over, and none is kept outside analysis.
  */
-// Every seat of a new table is a player's, so its creator sits at the first.
+// The player who opens a table sits at its first seat.
 const FIRST_SEAT: Viewer = {kind: 'seat', seat: 0};
 const SPECTATOR: Viewer = {kind: 'spectator', seat: null};
 

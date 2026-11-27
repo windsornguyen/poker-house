@@ -219,7 +219,7 @@ describe('App, on a game page', () => {
     const create = server.received.find(({method}) => method === 'POST');
     expect(create?.body).toMatchObject({
       game: 'count',
-      seats: [{controller: 'human'}, {controller: 'human'}],
+      seats: [{controller: 'human'}, {controller: 'random', autoplay: true}],
     });
     click(legal('one'));
     await until(() => {
@@ -231,6 +231,20 @@ describe('App, on a game page', () => {
     const id = url.searchParams.get('session');
     expect(id).not.toBeNull();
     expect(server.history(id ?? '')).toEqual([1]);
+  });
+});
+
+describe('App, opening a table', () => {
+  it('moves no chips when its address names no session', async () => {
+    server = new FakeServer({game: 'doggybank'});
+    open('/game/doggybank');
+    await until(() => {
+      expect(new URL(window.location.href).searchParams.get('session')).toBe(
+        'session-1',
+      );
+    });
+    const me = await new SessionClient({fetch: server.fetch}).me();
+    expect(me.balance).toBe(1000);
   });
 });
 

@@ -15,29 +15,38 @@
 import type {
   CatalogueEntry,
   CreateSession,
+  SeatConfig,
   Viewer,
 } from '../contract/contract.ts';
 import {viewerParameter} from '../session/client.ts';
 import {HUMAN_SEAT} from '../setup/parameters.ts';
 
-// The parameters a game page opens a game with, where they are not the
-// game's own defaults. A new poker table is played for chips, so its stack is
-// its buy-in: 200 chips at 1/2 blinds, within a new player's 1,000.
+/** The stack of a new poker table, which is its buy-in when played for chips. */
+export const BUY_IN = 200;
+
+// The parameters a table opens with, where they are not the game's own
+// defaults: 200-chip stacks at 1/2 blinds, a buy-in within a new player's
+// 1,000. Practice against a bot plays the same stacks for nothing.
 const OPENING_PARAMETERS: Readonly<
   Record<string, CreateSession['parameters']>
 > = {
-  doggybank: {blinds: '1 2', stack_sizes: '200 200'},
+  doggybank: {
+    blinds: '1 2',
+    stack_sizes: `${String(BUY_IN)} ${String(BUY_IN)}`,
+  },
 };
 
+const BOT_SEAT: SeatConfig = {controller: 'random', config: {}, autoplay: true};
+
 /**
- * The request that opens a game of `entry` with its defaults: every seat
- * played by a person, and chance sampled by the server. A few games open
- * with parameters of their own, such as Go on its smallest board and gin
- * rummy on Oklahoma rules.
+ * The request that opens a table of `entry` whose every seat is a person's,
+ * with chance sampled by the server. The server plays such a table for
+ * chips: its creator buys in with the stack. Only the lobby's Open a table
+ * button sends it.
  *
  * @throws Error when the server cannot serve the game.
  */
-export function defaultSession(entry: CatalogueEntry): CreateSession {
+export function tableSession(entry: CatalogueEntry): CreateSession {
   if (entry.num_players === null) {
     throw new Error(`${entry.name} is not loadable, so it has no seats.`);
   }
@@ -47,6 +56,22 @@ export function defaultSession(entry: CatalogueEntry): CreateSession {
     seats: Array.from({length: entry.num_players}, () => HUMAN_SEAT),
     chance_policy: 'auto',
     seed: null,
+  };
+}
+
+/**
+ * The request a game page opens with when its address names no session:
+ * practice against a bot. The player sits at the first seat and the random
+ * controller plays every other on autoplay, so the table is played for
+ * nothing and a page load never moves chips.
+ *
+ * @throws Error when the server cannot serve the game.
+ */
+export function defaultSession(entry: CatalogueEntry): CreateSession {
+  const table = tableSession(entry);
+  return {
+    ...table,
+    seats: table.seats.map((seat, index) => (index === 0 ? seat : BOT_SEAT)),
   };
 }
 
