@@ -1,4 +1,4 @@
-import {ensureSession} from '@better-auth-ui/core';
+import {fetchSession} from '@better-auth-ui/core';
 import {useAuthenticate} from '@better-auth-ui/react';
 import type {JSX} from 'react';
 import {redirect} from 'react-router';
@@ -29,7 +29,7 @@ export async function clientLoader({
 }: {
   request: Request;
 }): Promise<null> {
-  const session = await ensureSession(queryClient, authClient);
+  const session = await fetchSession(queryClient, authClient);
   if (session === null) {
     const {pathname, search} = new URL(request.url);
     throw redirect(

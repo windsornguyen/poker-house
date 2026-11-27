@@ -24,11 +24,12 @@ import {defineConfig} from 'vite-plus';
 
 import {thirdPartyNotices} from './scripts/third_party_notices.ts';
 
-// The server `npm run dev` sends the client's API requests to:
-// `python -m poker_house_server`, on its default port unless
-// POKER_HOUSE_SERVER names another. The request keeps its own Host and
+// `pnpm dev` sends /api/auth to apps/auth (POKER_HOUSE_AUTH) and the rest
+// of /api to `python -m poker_house_server` (POKER_HOUSE_SERVER), as the
+// Worker does in production. The request keeps its own Host and
 // Origin, the dev server's, so the server's same-origin check passes.
 const API_SERVER = process.env['POKER_HOUSE_SERVER'] ?? 'http://127.0.0.1:8787';
+const AUTH_SERVER = process.env['POKER_HOUSE_AUTH'] ?? 'http://127.0.0.1:8788';
 
 export default defineConfig({
   plugins: [
@@ -38,7 +39,12 @@ export default defineConfig({
     thirdPartyNotices(),
   ],
   resolve: {tsconfigPaths: true},
-  server: {proxy: {'/api': {target: API_SERVER, changeOrigin: false}}},
+  server: {
+    proxy: {
+      '/api/auth': {target: AUTH_SERVER, changeOrigin: false},
+      '/api': {target: API_SERVER, changeOrigin: false},
+    },
+  },
   test: {
     environment: 'jsdom',
     // Browser tests use jsdom's origin-scoped storage, not Node's file store.
