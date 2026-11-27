@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 
 import type {HistoryEntry} from '../contract/contract.ts';
 import {historyRows, rowText} from './history_rows.ts';

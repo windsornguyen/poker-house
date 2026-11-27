@@ -14,7 +14,7 @@
 
 import {Orientation, type SerializedDockview} from 'dockview-core';
 import {act, type JSX} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {enter} from '../testing/input.ts';
 import {only, render, type Rendered} from '../testing/render.tsx';

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vite-plus/test';
 
 import {ANALYSIS_VIEW_SEAT_KEY} from '../game/bottom_seat.ts';
 import {enter, labelled} from '../testing/input.ts';

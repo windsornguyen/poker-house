@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import type {Viewer} from '../contract/contract.ts';
 import {SessionClient, sameViewer, viewerParameter} from './client.ts';

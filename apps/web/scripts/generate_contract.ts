@@ -24,10 +24,11 @@
 
 /// <reference types="node" />
 
+import {execFileSync} from 'node:child_process';
 import {readFile, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-
-import * as prettier from 'prettier';
+import process from 'node:process';
+import {fileURLToPath} from 'node:url';
 
 import {isEntryPoint} from './entry_point.ts';
 
@@ -344,8 +345,12 @@ export async function generateContract(): Promise<string> {
   const header = ownText.slice(0, ownText.indexOf('\n\n'));
   const types = schemaToTypeScript(JSON.parse(schemaText));
   const source = `${header}\n\n${NOTICE}\n\n${types}`;
-  const options = await prettier.resolveConfig(CONTRACT_PATH);
-  return prettier.format(source, {...options, filepath: CONTRACT_PATH});
+  const vp = fileURLToPath(import.meta.resolve('vite-plus/bin'));
+  return execFileSync(
+    process.execPath,
+    [vp, 'fmt', '--stdin-filepath', CONTRACT_PATH],
+    {input: source, encoding: 'utf8'},
+  );
 }
 
 if (isEntryPoint(import.meta.filename)) {

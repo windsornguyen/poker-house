@@ -15,7 +15,7 @@
 // Input as a user gives it, and the layout jsdom does not do.
 
 import {act} from 'react';
-import {vi} from 'vitest';
+import {vi} from 'vite-plus/test';
 
 /** Types `text` into `input`, replacing its value, as React observes it. */
 export function typeInto(input: HTMLInputElement, text: string): void {

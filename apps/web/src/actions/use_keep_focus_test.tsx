@@ -14,7 +14,7 @@
 
 import {act, type JSX, useRef} from 'react';
 import {createRoot, type Root} from 'react-dom/client';
-import {afterEach, beforeEach, describe, expect, it} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it} from 'vite-plus/test';
 
 import {only} from '../testing/render.tsx';
 import {useKeepFocus} from './use_keep_focus.ts';

@@ -14,7 +14,7 @@
 
 import type {JSX} from 'react';
 import {act, useEffect} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import type {Rendered} from '../testing/render.tsx';
 import {render} from '../testing/render.tsx';

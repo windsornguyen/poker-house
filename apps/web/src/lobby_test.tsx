@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {act} from 'react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import type {CatalogueEntry} from './contract/contract.ts';
 import {PokerLobby} from './lobby.tsx';

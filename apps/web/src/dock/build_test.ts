@@ -18,7 +18,7 @@ import {
   type DockviewApi,
   type SerializedDockview,
 } from 'dockview-core';
-import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeAll, describe, expect, it, vi} from 'vite-plus/test';
 
 import {buildDock, openPanel} from './build.ts';
 import {definePanels} from './panels.ts';

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {act} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {fakeColorScheme} from '../testing/color_scheme.ts';
 import type {Rendered} from '../testing/render.tsx';

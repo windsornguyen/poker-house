@@ -14,7 +14,7 @@
 
 import {act} from 'react';
 import {type Root, createRoot} from 'react-dom/client';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {playBlocker} from '../actions/play_blocker.ts';
 import type {Frame, SeatConfig, SeatView} from '../contract/contract.ts';

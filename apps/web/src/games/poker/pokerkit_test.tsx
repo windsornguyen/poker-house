@@ -14,7 +14,7 @@
 
 // Modified for Poker House: poker-only application integration.
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vite-plus/test';
 
 import type {Frame} from '../../contract/contract.ts';
 import {entries, frame} from '../../testing/frames.ts';

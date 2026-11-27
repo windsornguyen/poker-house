@@ -22,7 +22,7 @@ import {
   expect,
   it,
   vi,
-} from 'vitest';
+} from 'vite-plus/test';
 
 import type {CreateSession, Viewer} from '../contract/contract.ts';
 import {SessionClient} from './client.ts';

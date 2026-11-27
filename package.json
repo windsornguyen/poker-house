@@ -4,10 +4,6 @@
   "private": true,
   "description": "A poker arena for independently hosted strategy bots.",
   "license": "Apache-2.0",
-  "packageManager": "pnpm@10.30.3",
-  "engines": {
-    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
-  },
   "scripts": {
     "setup": "uv sync --all-packages --group check && pnpm install && pnpm build",
     "dev": "uv run --package poker-house-server python -m poker_house_server --port 8787",
@@ -24,5 +20,12 @@
     "check": "pnpm --filter @poker-house/web check && pnpm check:server && pnpm test && pnpm build",
     "check:server": "uv run --all-packages --group check ruff format --check && uv run --all-packages --group check ruff check && uv run --all-packages --group check ty check",
     "typecheck": "uv run --all-packages --group check ty check"
-  }
+  },
+  "devDependencies": {
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+  },
+  "packageManager": "pnpm@10.30.3"
 }

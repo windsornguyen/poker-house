@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The style gate, `npm run lint:style`. It refuses the styling that makes
+// The style gate, part of `pnpm check`. It refuses the styling that makes
 // text hard to read or a colour impossible to theme:
 //
 // - a colour written anywhere but src/styles/tokens.css, the one place both
@@ -39,7 +39,7 @@
 // Opacity, filters and how a disabled control looks are not refused: a
 // game board keeps its own faded controls, washed-out ghost cards and
 // hover filters. The lesson the gates keep is the one about text: the
-// contrast check (`npm run contrast`) measures every text colour.
+// contrast check (scripts/contrast_check.ts) measures every text colour.
 //
 // It reads every stylesheet under src/, the inline styles of its HTML, and
 // in TypeScript the literal values of JSX `style` attributes, of the JSX

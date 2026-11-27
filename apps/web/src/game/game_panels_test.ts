@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 
 import {arrange} from '../dock/arrangement.ts';
 import {GAME_PANELS} from './game_panels.ts';

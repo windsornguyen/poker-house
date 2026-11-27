@@ -65,7 +65,7 @@ function copyBySelection(text: string): boolean {
   area.focus({preventScroll: true});
   area.select();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- the only path outside a secure context.
+    // Deprecated, but the only path outside a secure context.
     return document.execCommand('copy');
   } finally {
     if (focused instanceof HTMLElement) {
@@ -84,7 +84,6 @@ function copyBySelection(text: string): boolean {
 async function writeClipboard(text: string): Promise<boolean> {
   try {
     // Absent outside a secure context, whatever the type says.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (navigator.clipboard !== undefined) {
       await navigator.clipboard.writeText(text);
       return true;

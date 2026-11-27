@@ -181,7 +181,9 @@ export interface CatalogueEntry {
  *   SAMPLED_STOCHASTIC: Chance outcomes are sampled inside the state.
  */
 export type ChanceMode =
-  'deterministic' | 'explicit_stochastic' | 'sampled_stochastic';
+  | 'deterministic'
+  | 'explicit_stochastic'
+  | 'sampled_stochastic';
 
 /**
  * A chance outcome at a chance node.
@@ -434,7 +436,9 @@ export interface HistoryEntry {
  *   IMPERFECT_INFORMATION: Some state is hidden from some players.
  */
 export type Information =
-  'one_shot' | 'perfect_information' | 'imperfect_information';
+  | 'one_shot'
+  | 'perfect_information'
+  | 'imperfect_information';
 
 /**
  * Any JSON value.

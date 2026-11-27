@@ -14,7 +14,7 @@
 
 import type {JSX} from 'react';
 import {act, useEffect} from 'react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {fakeColorScheme} from '../testing/color_scheme.ts';
 import type {Rendered} from '../testing/render.tsx';

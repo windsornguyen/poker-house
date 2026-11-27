@@ -9,3 +9,4 @@ test-results/
 /addons/
 .react-router/
 .wrangler/
+.vitest/

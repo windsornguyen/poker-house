@@ -16,7 +16,7 @@
 
 import {readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 
 import {DOCK_TOKENS} from './dock_theme.ts';
 
@@ -29,6 +29,6 @@ describe('dock.css', () => {
     const read = new Set(
       [...css.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token),
     );
-    expect([...read].sort()).toEqual([...DOCK_TOKENS].sort());
+    expect(read).toEqual(new Set(DOCK_TOKENS));
   });
 });

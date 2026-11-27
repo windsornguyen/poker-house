@@ -17,7 +17,7 @@
 import {FIRST_PAINT_THEME} from '../root.tsx';
 import {runInThisContext} from 'node:vm';
 
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {fakeColorScheme} from '../testing/color_scheme.ts';
 import type {ThemePreference} from './theme.ts';

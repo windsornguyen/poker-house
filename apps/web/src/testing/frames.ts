@@ -15,7 +15,7 @@
 // Frames and sessions built directly, for components that take a session as
 // a property.
 
-import {vi} from 'vitest';
+import {vi} from 'vite-plus/test';
 
 import type {Action, Frame, HistoryEntry} from '../contract/contract.ts';
 import type {SessionCommands} from '../session/session_store.ts';

@@ -14,7 +14,7 @@
 
 import type {IDockviewPanelProps} from 'dockview-core';
 import {act, type JSX} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {button, only, render, type Rendered} from '../testing/render.tsx';
 import {Dock} from './dock.tsx';

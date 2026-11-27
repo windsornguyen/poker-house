@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {Orientation, type SerializedDockview} from 'dockview-core';
-import {beforeEach, describe, expect, it} from 'vitest';
+import {beforeEach, describe, expect, it} from 'vite-plus/test';
 
 import {
   EMPTY_STORE,

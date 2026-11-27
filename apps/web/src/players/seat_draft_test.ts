@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it} from 'vite-plus/test';
 
 import type {SeatView} from '../contract/contract.ts';
 import type {SeatDraft} from './seat_draft.ts';

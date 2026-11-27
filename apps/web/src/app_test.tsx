@@ -15,7 +15,7 @@
 // Modified for Poker House: poker-only application integration.
 
 import {act} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {App} from './app.tsx';
 import {SessionClient} from './session/client.ts';

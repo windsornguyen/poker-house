@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The contrast gate, `npm run contrast`. In both themes it resolves the
+// The contrast gate, part of `pnpm check`. In both themes it resolves the
 // design tokens and the dock's variables to colours and measures each pair
 // that is drawn one on the other against WCAG 2.2's minimum contrast ratio:
 // 4.5:1 for text (success criterion 1.4.3) and 3:1 for the focus ring and a

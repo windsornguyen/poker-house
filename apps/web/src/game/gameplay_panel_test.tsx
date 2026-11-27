@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {act} from 'react';
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vite-plus/test';
 
 import type {CatalogueEntry} from '../contract/contract.ts';
 import {TransportError} from '../session/errors.ts';

@@ -18,7 +18,7 @@ import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vite-plus/test';
 
 import {themeVariables} from './contrast_check.ts';
 import {lintClient, lintCss, lintHtml, lintScript} from './style_lint.ts';

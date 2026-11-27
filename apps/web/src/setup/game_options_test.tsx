@@ -15,7 +15,7 @@
 // Modified for Poker House: poker-specific settings copy.
 
 import {type JSX, act, useState} from 'react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import type {
   CreateSession,

@@ -17,7 +17,7 @@
 import {realpathSync} from 'node:fs';
 import process from 'node:process';
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it} from 'vite-plus/test';
 
 import {isEntryPoint} from './entry_point.ts';
 

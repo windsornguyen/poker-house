@@ -2,3 +2,8 @@ packages:
   - apps/web
   - apps/server/deploy
   - apps/auth
+catalog:
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
+  vite-plus: 1.8.0
+overrides:
+  vite@*: 'catalog:'

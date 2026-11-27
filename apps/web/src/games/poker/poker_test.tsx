@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {act} from 'react';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import {historyRendererProps} from '../../actions/history_renderer.ts';
 import type {Frame, HistoryEntry} from '../../contract/contract.ts';

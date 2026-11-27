@@ -415,7 +415,7 @@ export function usePokerMotion(
     );
     // Runs on a new table state only (its key): a speed change mid-flight
     // leaves the flight in progress alone.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [key]);
 
   return {motion, ...useLanded(setMotion)};

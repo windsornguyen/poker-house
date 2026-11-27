@@ -38,7 +38,8 @@ export interface RendererProps {
    * after the last; null or absent whenever `play` is null.
    */
   readonly playSequence?:
-    ((actions: readonly number[]) => Promise<Frame>) | null;
+    | ((actions: readonly number[]) => Promise<Frame>)
+    | null;
   /** Whether a request is in flight, during which a press is ignored. */
   readonly busy?: boolean;
 }

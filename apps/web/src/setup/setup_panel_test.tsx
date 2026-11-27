@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {act, type JSX, useState} from 'react';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
 
 import type {CatalogueEntry, Viewer} from '../contract/contract.ts';
 import {GameContext} from '../game/game_context.ts';

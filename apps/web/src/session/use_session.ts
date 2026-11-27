@@ -54,7 +54,7 @@ export function useSession(client: SessionClient, viewer: Viewer): Session {
     if (id === null || busy) return undefined;
     return client.events(id, viewer, store.receive);
     // `shown` names the viewer, whose object may change without it changing.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [client, store, id, shown, busy]);
   // Until the effect passes a new viewer on, the store holds the old one's
   // frame.
