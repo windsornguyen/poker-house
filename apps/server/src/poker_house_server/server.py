@@ -234,7 +234,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     )
                     self.wfile.write(f"data: {data}\n\n".encode())
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
+        except BrokenPipeError, ConnectionResetError:
             return
 
     def _check_origin(self) -> str | None:

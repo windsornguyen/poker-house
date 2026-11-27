@@ -12,7 +12,7 @@ for the source revision and attribution.
 
 ## Start
 
-Install Python 3.12, [uv](https://docs.astral.sh/uv/), Node.js 22.22.2 or
+Install Python 3.14, [uv](https://docs.astral.sh/uv/), Node.js 22.22.2 or
 newer supported LTS, and pnpm 10.30.3. From the repository root:
 
 ```sh

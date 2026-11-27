@@ -28,8 +28,10 @@ import urllib.parse
 from collections.abc import Callable
 from typing import Any, TypeVar
 
+import pydantic
+
 from poker_house_server import catalogue as catalogue_lib
-from poker_house_server import contract, controllers, errors, request, store, wire
+from poker_house_server import contract, controllers, errors, request, store
 from poker_house_server import health as health_lib
 from poker_house_server import session as session_lib
 
@@ -103,8 +105,13 @@ class _Request:
         return int(value)
 
     def decode(self, cls: type[_T]) -> _T:
-        """Returns the body decoded as the request dataclass `cls`."""
-        return wire.decode(cls, wire.parse(self.body))
+        """Returns the body decoded as the request type `cls`."""
+        try:
+            return contract.adapter(cls).validate_json(self.body, strict=True)
+        except pydantic.ValidationError as e:
+            first = e.errors()[0]
+            where = ".".join(str(part) for part in first["loc"]) or "body"
+            raise errors.BadRequestError(f"{where}: {first['msg']}.") from e
 
 
 def _spec(seat: request.SeatConfig) -> controllers.Spec:

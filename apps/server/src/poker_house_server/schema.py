@@ -13,210 +13,85 @@
 # limitations under the License.
 # Modified for Poker House.
 
-"""Generates the JSON Schema of the wire contract.
+"""Writes the API's JSON Schema, from which the web client generates its types.
 
-The schema is derived from the dataclasses and enums of the contract modules;
-the descriptions of types, fields and values come from their docstrings. To
-regenerate the checked-in schema after changing the contract:
-
-  python -m poker_house_server.schema
+python -m poker_house_server.schema
 """
 
-import dataclasses
-import enum
-import inspect
 import json
-import os
-import re
-import types
-import typing
-from collections.abc import Sequence
+import pathlib
 
-from absl import app
+import pydantic
 
 from poker_house_server import catalogue, contract, errors, frame, health, request
 
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "contract.schema.json")
+SCHEMA_PATH = pathlib.Path(__file__).with_name("contract.schema.json")
 
-# Every response body is one of these.
-RESPONSE_TYPES: tuple[type[object], ...] = (
-    frame.Frame,
-    catalogue.Catalogue,
-    health.Health,
-    contract.SessionClosed,
-    errors.Error,
+KEYWORDS = frozenset(
+    {
+        "$ref",
+        "additionalProperties",
+        "anyOf",
+        "const",
+        "description",
+        "enum",
+        "items",
+        "oneOf",
+        "properties",
+        "required",
+        "type",
+    }
 )
 
-# Every request body is one of these.
-REQUEST_TYPES: tuple[type[object], ...] = (
-    request.CreateSession,
-    request.ApplyAction,
-    request.ApplyChanceOutcome,
-    request.Advance,
-    request.Reset,
-    request.SeatConfig,
+type ResponseBody = (
+    frame.Frame | catalogue.Catalogue | health.Health | contract.SessionClosed | errors.Error
+)
+type RequestBody = (
+    request.CreateSession
+    | request.ApplyAction
+    | request.ApplyChanceOutcome
+    | request.Advance
+    | request.Reset
+    | request.SeatConfig
 )
 
-Schema = dict[str, contract.JsonValue]
 
-_DIALECT = "https://json-schema.org/draft/2020-12/schema"
-_PRIMITIVES: dict[type[object], str] = {
-    bool: "boolean",
-    int: "integer",
-    float: "number",
-    str: "string",
-    type(None): "null",
-}
-_ATTRIBUTE = re.compile(r"^  (\w+): (.*)$")
-
-
-def _docstring(cls: type[object]) -> str:
-    """Returns the docstring of `cls`, which every contract type has."""
-    if not cls.__doc__:
-        raise ValueError(f"{cls.__name__} has no docstring.")
-    return inspect.cleandoc(cls.__doc__)
-
-
-def _description(cls: type[object]) -> str:
-    """Returns the prose of a docstring, without its `Attributes:` section."""
-    prose = _docstring(cls).split("\nAttributes:", maxsplit=1)[0].strip()
-    return "\n\n".join(" ".join(part.split()) for part in prose.split("\n\n"))
-
-
-def _attributes(cls: type[object], names: Sequence[str]) -> dict[str, str]:
-    """Returns the description of each name in a docstring's `Attributes:`.
-
-    Args:
-      cls: The documented class.
-      names: The names `cls` must document, and no others.
-
-    Returns:
-      Each name's description, on one line.
-
-    Raises:
-      ValueError: If the docstring does not document exactly `names`.
-    """
-    lines = _docstring(cls).splitlines()
-    if "Attributes:" not in lines:
-        raise ValueError(f"{cls.__name__} documents no attributes.")
-    descriptions: dict[str, str] = {}
-    name = ""
-    for line in lines[lines.index("Attributes:") + 1 :]:
-        if match := _ATTRIBUTE.match(line):
-            name, descriptions[name] = match.groups()
-        elif line.startswith("    ") and name:
-            descriptions[name] += " " + line.strip()
+def keep_client_keywords(schema: contract.JsonValue) -> contract.JsonValue:
+    """Drops the keywords the client's type generator does not read."""
+    if isinstance(schema, list):
+        return [keep_client_keywords(item) for item in schema]
+    if not isinstance(schema, dict):
+        return schema
+    kept: dict[str, contract.JsonValue] = {}
+    for key, value in schema.items():
+        if key not in KEYWORDS:
+            continue
+        if key == "properties" and isinstance(value, dict):
+            kept[key] = {name: keep_client_keywords(field) for name, field in value.items()}
+        elif key in ("enum", "const", "required"):
+            kept[key] = value
         else:
-            break
-    if sorted(descriptions) != sorted(names):
-        raise ValueError(f"{cls.__name__} documents {sorted(descriptions)}, not {sorted(names)}.")
-    return descriptions
+            kept[key] = keep_client_keywords(value)
+    return kept
 
 
-class _Builder:
-    """Accumulates the definitions reachable from the contract's bodies."""
-
-    def __init__(self) -> None:
-        self.definitions: dict[str, Schema] = {}
-
-    def reference(self, cls: type[object]) -> Schema:
-        """Defines `cls` once and returns a reference to its definition."""
-        if cls.__name__ not in self.definitions:
-            self.definitions[cls.__name__] = {}  # Reserved against recursion.
-            if issubclass(cls, enum.Enum):
-                self.definitions[cls.__name__] = self._enum(cls)
-            else:
-                self.definitions[cls.__name__] = self._object(cls)
-        return {"$ref": f"#/$defs/{cls.__name__}"}
-
-    def _enum(self, cls: type[enum.Enum]) -> Schema:
-        """Returns the definition of a string enum."""
-        descriptions = _attributes(cls, [member.name for member in cls])
-        values = "\n".join(f"- `{member.value}`: {descriptions[member.name]}" for member in cls)
-        return {
-            "type": "string",
-            "enum": [str(member.value) for member in cls],
-            "description": f"{_description(cls)}\n\n{values}",
-        }
-
-    def _object(self, cls: type[object]) -> Schema:
-        """Returns the definition of a dataclass."""
-        if not dataclasses.is_dataclass(cls):
-            raise TypeError(f"{cls.__name__} is neither a dataclass nor an enum.")
-        hints = typing.get_type_hints(cls, include_extras=True)
-        names = [field.name for field in dataclasses.fields(cls)]
-        descriptions = _attributes(cls, names)
-        properties: Schema = {
-            name: self.schema_of(hints[name]) | {"description": descriptions[name]}
-            for name in names
-        }
-        return {
-            "type": "object",
-            "description": _description(cls),
-            "properties": properties,
-            "required": list(names),
-            "additionalProperties": False,
-        }
-
-    def schema_of(self, hint: object) -> Schema:
-        """Returns the schema of a type annotation."""
-        origin = typing.get_origin(hint)
-        args = typing.get_args(hint)
-        if origin is typing.Annotated:
-            return {} if contract.ANY_JSON in args[1:] else self.schema_of(args[0])
-        if isinstance(hint, type) and hint in _PRIMITIVES:
-            return {"type": _PRIMITIVES[hint]}
-        if origin is typing.Literal and len(args) == 1:
-            return {"const": args[0]}
-        if origin in (types.UnionType, typing.Union):
-            return self._union(args)
-        if origin is tuple and len(args) == 2 and args[1] is Ellipsis:
-            return {"type": "array", "items": self.schema_of(args[0])}
-        if origin is dict and args[0] is str:
-            return {"type": "object", "additionalProperties": self.schema_of(args[1])}
-        if isinstance(hint, type):
-            return self.reference(hint)
-        raise TypeError(f"The contract cannot carry {hint!r}.")
-
-    def _union(self, members: Sequence[object]) -> Schema:
-        """Returns the schema of a union of types."""
-        if all(isinstance(m, type) and m in _PRIMITIVES for m in members):
-            names = [_PRIMITIVES[m] for m in members if isinstance(m, type)]
-            if "number" in names and "integer" in names:
-                names.remove("integer")  # Every integer is a number.
-            return {"type": list(names)}
-        return {"anyOf": [self.schema_of(member) for member in members]}
-
-
-def build() -> Schema:
-    """Returns the JSON Schema of every request and response body."""
-    builder = _Builder()
-    responses = [builder.reference(cls) for cls in RESPONSE_TYPES]
-    for cls in REQUEST_TYPES:
-        builder.reference(cls)
+def build() -> dict[str, contract.JsonValue]:
+    """Returns the schema of every response and request body."""
+    responses = pydantic.TypeAdapter(ResponseBody).json_schema(mode="serialization")
+    requests = pydantic.TypeAdapter(RequestBody).json_schema(mode="validation")
+    definitions = {**requests["$defs"], **responses["$defs"]}
+    definitions["JsonValue"] = {"description": "Any JSON value."}
     return {
-        "$schema": _DIALECT,
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "Poker House API",
-        "description": (
-            "Every response body is one of these; request bodies are among the "
-            "definitions. Generated by schema.py; do not edit."
-        ),
-        "oneOf": list(responses),
-        "$defs": dict(sorted(builder.definitions.items())),
+        "description": "Every response body is one of these; request bodies are in $defs.",
+        "oneOf": responses["anyOf"],
+        "$defs": {
+            name: keep_client_keywords(definition)
+            for name, definition in sorted(definitions.items())
+        },
     }
 
 
-def render() -> str:
-    """Returns the schema as the text of `contract.schema.json`."""
-    return json.dumps(build(), indent=2) + "\n"
-
-
-def main(argv: Sequence[str]) -> None:
-    if len(argv) > 1:
-        raise app.UsageError("Too many command-line arguments.")
-    with open(SCHEMA_PATH, "w", encoding="utf-8") as f:
-        f.write(render())
-
-
 if __name__ == "__main__":
-    app.run(main)
+    SCHEMA_PATH.write_text(json.dumps(build(), indent=2) + "\n")

@@ -24,8 +24,8 @@ description = "Local poker matches and structured remote bot protocol."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-requires-python = ">=3.12,<3.13"
-dependencies = ["poker-house-engine==0.1.0"]
+requires-python = ">=3.14,<3.15"
+dependencies = ["poker-house-engine==0.1.0", "pydantic==2.13.5"]
 
 [project.scripts]
 poker-house = "poker_house_server.cli:main"

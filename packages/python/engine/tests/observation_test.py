@@ -50,7 +50,7 @@ def _deal(state: pyspiel.State) -> None:
         state.apply_action(state.chance_outcomes()[0][0])
 
 
-def _view(state: pyspiel.State, player: int) -> "pokerkit_wrapper.PokerObservation":
+def _view(state: pyspiel.State, player: int) -> pokerkit_wrapper.PokerObservation:
     return cast(
         "pokerkit_wrapper.PokerObservation",
         json.loads(state.to_observation_struct(player).to_json()),

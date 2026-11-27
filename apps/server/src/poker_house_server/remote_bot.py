@@ -33,6 +33,7 @@ import json
 import urllib.parse
 from collections.abc import Mapping, Sequence
 
+import pydantic
 import pyspiel
 
 from poker_house_server import (
@@ -43,7 +44,6 @@ from poker_house_server import (
     move_budget,
     remote_bot_config,
     remote_bot_http,
-    wire,
 )
 
 NAME = "remote"
@@ -69,7 +69,7 @@ def observation(state: pyspiel.State, seat: int) -> contract.JsonValue:
     name = state.get_game().get_type().short_name
     try:
         observed = information.observation_struct(state, seat)
-    except (pyspiel.SpielError, wire.DecodeError) as e:
+    except (pyspiel.SpielError, pydantic.ValidationError) as e:
         raise RemoteBotObservationError(
             f"{name} cannot provide an observation for seat {seat}."
         ) from e

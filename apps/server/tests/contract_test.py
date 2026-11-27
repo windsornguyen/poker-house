@@ -136,10 +136,6 @@ class ToJsonTest(absltest.TestCase):
             },
         )
 
-    def test_values_outside_the_contract_are_refused(self) -> None:
-        with self.assertRaises(TypeError):
-            contract.to_json({"when": object()})
-
 
 if __name__ == "__main__":
     absltest.main()

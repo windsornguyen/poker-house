@@ -15,12 +15,12 @@
 
 """The health body: what code the server runs and what it can do."""
 
-import dataclasses
+import pydantic.dataclasses
 
 from poker_house_server import contract
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Capabilities:
     """What the server can do, independent of any one game.
 
@@ -40,7 +40,7 @@ class Capabilities:
         contract.require(bool(self.chance_policies), "The server accepts a chance policy.")
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Health:
     """The server's identity and capabilities.
 

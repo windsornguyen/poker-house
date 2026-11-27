@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "PokerKit games and private bot observations for Poker House."
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 dependencies = [
   "absl-py>=2,<3",
   "numpy>=2,<3",

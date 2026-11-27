@@ -21,10 +21,11 @@ decoder) raises one of these or a subclass of one, so the server answers every
 refusal the same way: `to_error()` gives the body, and its code the status.
 """
 
-import dataclasses
 import enum
 import http
 from typing import ClassVar
+
+import pydantic.dataclasses
 
 from poker_house_server import contract
 
@@ -69,7 +70,7 @@ class ErrorCode(enum.StrEnum):
         return http.HTTPStatus.CONFLICT
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Error:
     """A refused request.
 

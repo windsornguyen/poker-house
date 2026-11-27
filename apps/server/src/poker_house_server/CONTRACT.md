@@ -7,7 +7,7 @@ The game server speaks JSON over HTTP. Each response body is a **frame**, the
 This document is the specification of those bodies, of the request bodies,
 and of the routes.
 
-The definitions are Python dataclasses: [`contract.py`](contract.py),
+The definitions are pydantic dataclasses: [`contract.py`](contract.py),
 [`frame.py`](frame.py), [`catalogue.py`](catalogue.py),
 [`health.py`](health.py), [`errors.py`](errors.py) and
 [`request.py`](request.py). Their constructors enforce the invariants below,
@@ -501,6 +501,4 @@ or was not judged.
 
 Edit the definitions, regenerate the schema with
 `python -m poker_house_server.schema`, regenerate the client's types with
-`npm run generate:contract` in `apps/web`, and update this document. A
-`schema_test.py` fails while the checked-in schema is stale, and the client's
-contract test while its types are.
+`pnpm generate:contract` in `apps/web`, and update this document.

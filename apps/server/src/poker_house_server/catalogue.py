@@ -15,8 +15,9 @@
 
 """The catalogue: every game the server knows, and whether it can serve it."""
 
-import dataclasses
 import enum
+
+import pydantic.dataclasses
 
 from poker_house_server import contract
 
@@ -108,7 +109,7 @@ def _has_type(value: contract.ParameterValue, kind: ParameterType) -> bool:
     return isinstance(value, _PYTHON_TYPES[kind])
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class ParameterSpec:
     """A game parameter, as a client needs it to offer the parameter.
 
@@ -163,7 +164,7 @@ class ParameterSpec:
             )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class CatalogueEntry:
     """A game the server knows, and whether it can serve it.
 
@@ -241,7 +242,7 @@ class CatalogueEntry:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Catalogue:
     """Every game the server knows.
 

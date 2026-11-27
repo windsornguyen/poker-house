@@ -534,14 +534,14 @@ class PokerkitWrapper(pyspiel.Game):
             + self.deck_size
         )
 
-    def new_initial_state(self) -> "PokerkitWrapperState":
+    def new_initial_state(self) -> PokerkitWrapperState:
         return PokerkitWrapperState(self)
 
     def make_py_observer(
         self,
         iig_obs_type: pyspiel.IIGObservationType | None = None,
         params: dict[str, int | float | str | bool] | None = None,
-    ) -> "PokerkitWrapperObserver":
+    ) -> PokerkitWrapperObserver:
         return PokerkitWrapperObserver(self, iig_obs_type, params)
 
     def raise_error_if_player_out_of_range(self, player: int) -> None:
@@ -1198,7 +1198,7 @@ class PokerkitWrapperState(pyspiel.State):
             "betting_history": self._observation_betting_history(),
         }
 
-    def _get_betting_history(self, action_converter: "ToAcpcActionConverter | None" = None) -> str:
+    def _get_betting_history(self, action_converter: ToAcpcActionConverter | None = None) -> str:
         """Returns betting history string, mimicking UniversalPoker's.
 
         This betting history is intended to mimic the one provided by the
@@ -1703,7 +1703,7 @@ class PokerkitWrapperAcpcStyle(PokerkitWrapper):
     def game_type(self) -> pyspiel.GameType:
         return _GAME_TYPE_ACPC_STYLE
 
-    def new_initial_state(self) -> "PokerkitWrapperAcpcStyleState":
+    def new_initial_state(self) -> PokerkitWrapperAcpcStyleState:
         return PokerkitWrapperAcpcStyleState(self)
 
 

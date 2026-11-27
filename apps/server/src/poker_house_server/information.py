@@ -24,7 +24,7 @@ decide from `hides_information`.
 
 import pyspiel
 
-from poker_house_server import contract, wire
+from poker_house_server import contract
 
 _PERFECT = pyspiel.GameType.Information.PERFECT_INFORMATION
 
@@ -61,13 +61,4 @@ def observation_struct(state: pyspiel.State, seat: int) -> contract.JsonValue:
     is acceptable for their consumer.
     """
     struct = state.to_observation_struct(seat)
-    observed = contract.to_json(wire.parse(struct.to_json().encode("utf-8")))
-    # STRUCT-GLUE(hearts ObservationStruct): passing can reveal received cards
-    # before the seat's own pass; no consumer may see this struct in that phase.
-    if (
-        state.get_game().get_type().short_name == "hearts"
-        and isinstance(observed, dict)
-        and observed["phase"] == "Pass"
-    ):
-        return None
-    return observed
+    return contract.adapter(contract.JsonValue).validate_json(struct.to_json())

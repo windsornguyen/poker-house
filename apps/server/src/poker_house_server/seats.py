@@ -81,7 +81,7 @@ class Seat:
     output: contract.BotOutput | None = None
 
     @classmethod
-    def human(cls) -> "Seat":
+    def human(cls) -> Seat:
         """Returns a seat the client plays."""
         return cls(
             spec=controllers.HUMAN_SPEC,
@@ -97,7 +97,7 @@ class Seat:
         *,
         autoplay: bool,
         seed: int,
-    ) -> "Seat":
+    ) -> Seat:
         """Returns a seat played as `spec` says, its controller built here.
 
         Args:
@@ -122,8 +122,8 @@ class Seat:
         *,
         autoplay: bool,
         seed: int,
-        on_built: "OnBuilt",
-    ) -> "Seat":
+        on_built: OnBuilt,
+    ) -> Seat:
         """Returns a seat played as `spec` says, its controller to be built.
 
         `spec` is checked here; the build is not started (`build.start`), and

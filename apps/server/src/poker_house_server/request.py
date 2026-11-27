@@ -20,7 +20,7 @@ see CONTRACT.md for the routes. Constructors enforce each body's invariants;
 the request decoder answers a body that breaks them with `bad_request`.
 """
 
-import dataclasses
+import pydantic.dataclasses
 
 from poker_house_server import contract
 
@@ -28,7 +28,7 @@ from poker_house_server import contract
 MAX_ADVANCE_PLIES = 1000
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class SeatConfig:
     """Who plays a seat.
 
@@ -50,7 +50,7 @@ class SeatConfig:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class CreateSession:
     """Starts a session.
 
@@ -76,7 +76,7 @@ class CreateSession:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class ApplyAction:
     """Plays an action for the seat to move.
 
@@ -92,7 +92,7 @@ class ApplyAction:
     ply: int | None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class ApplyChanceOutcome:
     """Chooses the outcome at a chance node under the `expose` policy.
 
@@ -105,7 +105,7 @@ class ApplyChanceOutcome:
     ply: int | None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Advance:
     """Lets controllers play their seats.
 
@@ -136,7 +136,7 @@ class Advance:
         return MAX_ADVANCE_PLIES if self.max_plies is None else self.max_plies
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Reset:
     """Restarts the live game, keeping the session's seats.
 

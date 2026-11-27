@@ -78,7 +78,7 @@ def revision(source_dir: pathlib.Path) -> str | None:
             timeout=10,
             check=True,
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return None
     lines = result.stdout.splitlines()
     if len(lines) != 2:

@@ -26,15 +26,27 @@ Constructors enforce the invariants stated in CONTRACT.md, so a value that
 breaks them cannot be built.
 """
 
-import dataclasses
 import enum
+import functools
 import math
-from typing import Annotated
 
-from poker_house_server import json_value
+import pydantic
+import pydantic.dataclasses
 
-JsonValue = json_value.JsonValue
-to_json = json_value.to_json
+type JsonValue = pydantic.JsonValue
+
+CONFIG = pydantic.ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
+
+
+@functools.cache
+def adapter[T](cls: type[T]) -> pydantic.TypeAdapter[T]:
+    """Returns the cached pydantic adapter of a contract type."""
+    return pydantic.TypeAdapter(cls)
+
+
+def to_json(value: object) -> JsonValue:
+    """Converts a contract value to its wire form."""
+    return adapter(type(value)).dump_python(value, mode="json")
 
 
 # The most characters a seat's `SeatView.notice` holds.
@@ -50,10 +62,7 @@ POLICY_SUM_TOLERANCE = 1e-3
 # The value of a game parameter or a controller setting.
 ParameterValue = bool | int | float | str
 
-# A field that holds any JSON value; `to_json` checks it and the schema
-# leaves it open.
-ANY_JSON = "any JSON value"
-Json = Annotated[object, ANY_JSON]
+Json = pydantic.JsonValue
 
 # The name of the controller that leaves a seat's moves to the client.
 HUMAN = "human"
@@ -142,7 +151,7 @@ class ChancePolicy(enum.StrEnum):
     EXPOSE = "expose"
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class Viewer:
     """The audience a frame is built for.
 
@@ -161,7 +170,7 @@ class Viewer:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class ToMove:
     """Who acts at a position.
 
@@ -180,7 +189,7 @@ class ToMove:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class Controller:
     """A kind of agent that can play a seat.
 
@@ -203,7 +212,7 @@ class Controller:
     unavailable_reason: str | None = None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class ControllerFailure:
     """Why a seat's controller stopped playing.
 
@@ -218,7 +227,7 @@ class ControllerFailure:
     message: str | None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class SeatView:
     """One seat of a session.
 
@@ -284,7 +293,7 @@ class SeatView:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class Action:
     """A legal action at a position.
 
@@ -297,7 +306,7 @@ class Action:
     label: str
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class ActionHint:
     """What a game's adapter says about one legal action, for its renderer.
 
@@ -311,7 +320,7 @@ class ActionHint:
     hint: Json
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class Presentation:
     """A position as the game's adapter presents it to one viewer.
 
@@ -329,7 +338,7 @@ class Presentation:
     actions: tuple[ActionHint, ...] | None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class ChanceOutcome:
     """A chance outcome at a chance node.
 
@@ -350,7 +359,7 @@ class ChanceOutcome:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class PolicyEntry:
     """One action of a bot's policy, with the probability it gave it.
 
@@ -374,7 +383,7 @@ class PolicyEntry:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class BotOutput:
     """What a bot said about one of its choices, beyond the action.
 
@@ -428,7 +437,7 @@ class BotOutput:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class HistoryEntry:
     """One action of the live game, as the viewer may see it.
 
@@ -488,7 +497,7 @@ class HistoryEntry:
         return self.action is None
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class SessionInfo:
     """The fixed properties of a session.
 
@@ -528,7 +537,7 @@ class SessionInfo:
         )
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=CONFIG)
 class SessionClosed:
     """The answer to closing a session: the server has forgotten it.
 

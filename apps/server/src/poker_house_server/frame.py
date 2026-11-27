@@ -19,12 +19,12 @@ A field the viewer may not see is null; an empty list means there is nothing
 to see.
 """
 
-import dataclasses
+import pydantic.dataclasses
 
 from poker_house_server import contract
 
 
-@dataclasses.dataclass(frozen=True)
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Frame:
     """A position of a session, built for one viewer.
 

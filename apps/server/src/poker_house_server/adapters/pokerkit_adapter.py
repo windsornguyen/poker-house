@@ -40,7 +40,7 @@ _VARIANTS = {
 _BOARD_SIZES = (0, 3, 1, 1)
 
 
-def _observation(state: pyspiel.State, seat: int) -> "PokerObservation":
+def _observation(state: pyspiel.State, seat: int) -> PokerObservation:
     """Reads the engine's typed private observation, never its full state."""
     return cast(
         "PokerObservation",
@@ -56,7 +56,7 @@ def _chips(amount: float) -> int:
     return chips
 
 
-def _move(observation: "PokerObservation", action: int) -> tuple[str, str]:
+def _move(observation: PokerObservation, action: int) -> tuple[str, str]:
     """Names a legal move and its ACPC hand-total betting token."""
     moves = {move["id"]: move for move in observation["actions"]}
     move = moves[action]

@@ -109,7 +109,7 @@ class Session:
         chance_policy: contract.ChancePolicy,
         controllers: Sequence[controllers_lib.Spec],
         autoplay: Sequence[bool] = (),
-    ) -> "Session":
+    ) -> Session:
         """Starts a session of a game.
 
         Args:
