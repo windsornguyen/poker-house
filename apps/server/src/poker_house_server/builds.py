@@ -122,7 +122,7 @@ class Build[T]:
         call: Callable[[], T],
         *,
         name: str,
-        on_done: Callable[[Build[_T]], None],
+        on_done: Callable[[Build[T]], None],
     ) -> None:
         """Prepares the build; `start` starts it.
 

@@ -80,7 +80,9 @@ class StructKind(enum.Enum):
 # probed once per kind, on the first frame that asks, and the answer is kept
 # here. The catalogue, which loads every game, never asks, so building it
 # probes nothing.
-_STRUCT_SUPPORT: dict[tuple[object, ...], bool] = {}
+type StructKey = tuple[StructKind, str, bool, tuple[tuple[str, contract.ParameterValue], ...]]
+
+_STRUCT_SUPPORT: dict[StructKey, bool] = {}
 _STRUCT_SUPPORT_LOCK = threading.Lock()
 
 
@@ -89,7 +91,7 @@ def struct_key(
     name: str,
     turn_based: bool,
     parameters: Mapping[str, contract.ParameterValue],
-) -> tuple[object, ...]:
+) -> StructKey:
     """The cache key: the kind, and the game as served with its parameters."""
     return (
         kind,

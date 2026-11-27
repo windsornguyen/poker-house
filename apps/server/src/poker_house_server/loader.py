@@ -378,7 +378,9 @@ def default_availability(
 
 # A parameter's type, from its default's Python type. The first match wins,
 # and bool must come before int: True is an int in Python.
-_PARAMETER_TYPES: tuple[tuple[type[object], catalogue.ParameterType], ...] = (
+_PARAMETER_TYPES: tuple[
+    tuple[type[bool] | type[int] | type[float] | type[str], catalogue.ParameterType], ...
+] = (
     (bool, catalogue.ParameterType.BOOL),
     (int, catalogue.ParameterType.INT),
     (float, catalogue.ParameterType.FLOAT),

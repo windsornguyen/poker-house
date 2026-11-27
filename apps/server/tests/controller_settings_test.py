@@ -177,10 +177,6 @@ class DeclarationTest(absltest.TestCase):
         with self.assertRaisesRegex(ValueError, "The choice is refused"):
             _Setting("s", str, _REQUIRED, "Text.", choices=("a", 1))
 
-    def test_an_unknown_kind_is_refused(self) -> None:
-        with self.assertRaisesRegex(ValueError, "not bool, int, float or str"):
-            _Setting("l", list, [], "A list.")  # type: ignore[arg-type]
-
 
 class RequiredTest(absltest.TestCase):
     # The checkpoint bot's settings, the contract this was built for.

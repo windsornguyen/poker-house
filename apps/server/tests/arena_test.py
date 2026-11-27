@@ -159,7 +159,9 @@ class ArenaTest(absltest.TestCase):
                 hands = structured["hole_cards"]
                 assert isinstance(hands, list)
                 self.assertEqual(hands[1 - seat], [None, None])
-                self.assertTrue(all(isinstance(card, str) for card in hands[seat]))
+                own = hands[seat]
+                assert isinstance(own, list)
+                self.assertTrue(all(isinstance(card, str) for card in own))
                 self.assertNotIn("deck", structured)
                 self.assertNotIn("burn_cards", structured)
 

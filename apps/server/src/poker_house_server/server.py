@@ -128,7 +128,12 @@ def has_body(headers: email.message.Message) -> bool:
 class _Handler(http.server.BaseHTTPRequestHandler):
     """Answers one connection's requests."""
 
-    server: Server
+    @property
+    def app(self) -> Server:
+        """The server this handler answers for."""
+        assert isinstance(self.server, Server)
+        return self.server
+
     protocol_version = "HTTP/1.1"
     server_version = "PokerHouse"
 
@@ -152,14 +157,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         """Answers a DELETE request."""
         self.dispatch()
 
-    def log_message(self, format: str, *args: object) -> None:
-        """Logs a request through absl rather than to stderr."""
-        logging.info("%s %s", self.address_string(), format % args)
-
     def dispatch(self) -> None:
         """Answers the request, refusing it if it fails a transport check."""
         host = host_name(self.headers.get("Host", ""))
-        if host not in self.server.allowed_hosts:
+        if host not in self.app.allowed_hosts:
             self.close_connection = True
             self.send_text(http.HTTPStatus.FORBIDDEN, f"Host {host!r} is refused.")
             return
@@ -194,11 +195,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self.refuse(refusal)
                 return
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-        if self.server.api.is_events(self.command, self.path):
+        if self.app.api.is_events(self.command, self.path):
             self.stream_events()
             return
         try:
-            response = self.server.api.handle(self.command, self.path, body)
+            response = self.app.api.handle(self.command, self.path, body)
         except Exception:
             logging.exception("%s %s failed.", self.command, self.path)
             self.send_text(
@@ -211,7 +212,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def stream_events(self) -> None:
         """Streams the viewer's live frame as Server-Sent Events."""
         try:
-            session, viewer = self.server.api.subscribe(self.path)
+            session, viewer = self.app.api.subscribe(self.path)
         except errors.RequestError as error:
             body = error.to_error()
             self.send_json(body.code.http_status, contract.to_json(body))
@@ -244,7 +245,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return None
         refused = f"Requests from {origin} are refused."
         url = urllib.parse.urlsplit(origin)
-        if url.scheme != "http" or url.hostname not in self.server.allowed_hosts:
+        if url.scheme != "http" or url.hostname not in self.app.allowed_hosts:
             return refused
         own = urllib.parse.urlsplit("//" + self.headers.get("Host", "").strip())
         try:
@@ -270,15 +271,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self.close_connection = True
             self.send_text(http.HTTPStatus.METHOD_NOT_ALLOWED, f"{path} accepts GET and HEAD.")
             return
-        asset = self.server.client.find(path)
+        asset = self.app.client.find(path)
         if asset is not None:
             self.send(http.HTTPStatus.OK, asset.content, asset.content_type)
-        elif self.server.client.built:
+        elif self.app.client.built:
             self.send_text(http.HTTPStatus.NOT_FOUND, f"There is no file {path}.")
         else:
             self.send_text(
                 http.HTTPStatus.NOT_FOUND,
-                f"The client is not built in {self.server.client.root}. Run "
+                f"The client is not built in {self.app.client.root}. Run "
                 "`npm ci && npm run build` in apps/web; the API is served "
                 f"under {api_lib.PREFIX} either way.",
             )
@@ -289,7 +290,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.close_connection = True
         self.send_json(error.code.http_status, contract.to_json(error))
 
-    def send_json(self, status: http.HTTPStatus, body: object) -> None:
+    def send_json(self, status: http.HTTPStatus, body: contract.JsonValue) -> None:
         """Sends a JSON response."""
         content = json.dumps(body, allow_nan=False, separators=(",", ":"))
         self.send(status, content.encode(), "application/json")

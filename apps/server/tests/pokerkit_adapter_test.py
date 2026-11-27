@@ -21,7 +21,7 @@ from collections.abc import Mapping
 import pyspiel
 from absl.testing import absltest
 
-import poker_house_engine.game  # noqa: F401  registers the poker games with pyspiel
+import poker_house_engine.game
 from poker_house_server import adapter, contract, presenters
 
 _GAME = "poker_house"
@@ -203,6 +203,7 @@ class PokerkitAdapterTest(absltest.TestCase):
                 labels = view["historyActionStrings"]
                 assert isinstance(labels, list)
                 self.assertEqual(len(labels), len(state.history()))
+                assert isinstance(state, poker_house_engine.game.PokerkitWrapperState)
                 public = state.deepcopy_wrapped_state()
                 text = json.dumps(view)
                 for seat, cards in enumerate(public.hole_cards):

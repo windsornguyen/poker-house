@@ -29,9 +29,13 @@ breaks them cannot be built.
 import enum
 import functools
 import math
+from typing import TYPE_CHECKING
 
 import pydantic
 import pydantic.dataclasses
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 type JsonValue = pydantic.JsonValue
 
@@ -44,7 +48,7 @@ def adapter[T](cls: type[T]) -> pydantic.TypeAdapter[T]:
     return pydantic.TypeAdapter(cls)
 
 
-def to_json(value: object) -> JsonValue:
+def to_json(value: DataclassInstance) -> JsonValue:
     """Converts a contract value to its wire form."""
     return adapter(type(value)).dump_python(value, mode="json")
 

@@ -112,8 +112,8 @@ class RequestError(Exception):
 
     code: ClassVar[ErrorCode]
 
-    def __init_subclass__(cls, **kwargs: object) -> None:
-        super().__init_subclass__(**kwargs)
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
         if not isinstance(getattr(cls, "code", None), ErrorCode):
             raise TypeError(f"{cls.__name__} declares no ErrorCode `code`.")
 

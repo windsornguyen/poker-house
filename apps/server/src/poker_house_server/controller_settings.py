@@ -57,7 +57,7 @@ _JSON_TYPES: Mapping[SettingType, str] = {
     float: "number",
     str: "string",
 }
-_ACCEPTED: Mapping[SettingType, tuple[type[object], ...]] = {
+_ACCEPTED: Mapping[SettingType, tuple[type[bool] | type[int] | type[float] | type[str], ...]] = {
     bool: (bool,),
     int: (int,),
     float: (int, float),
@@ -86,7 +86,7 @@ class InvalidSettingError(ValueError):
     """
 
 
-def shown(value: object) -> str:
+def shown(value: contract.JsonValue) -> str:
     """Returns `value`'s repr, cut short if a client sent something long."""
     text = repr(value)
     if len(text) <= _MAX_SHOWN:
@@ -306,7 +306,7 @@ def schema(settings: Sequence[Setting]) -> dict[str, contract.Json]:
         "properties": {setting.name: setting.schema() for setting in settings},
         "additionalProperties": False,
     }
-    required = [setting.name for setting in settings if setting.required]
+    required: list[contract.JsonValue] = [setting.name for setting in settings if setting.required]
     if required:
         result["required"] = required
     return result

@@ -10,6 +10,7 @@ check = ["ruff==0.17.6", "ty==0.0.112"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["typings"]
 target-version = "py314"
 
 [tool.ruff.format]
@@ -25,6 +26,10 @@ known-first-party = ["poker_house_engine", "poker_house_server"]
 
 [tool.ty.environment]
 python = "./.venv"
+extra-paths = ["typings"]
+
+[tool.ty.src]
+exclude = ["typings"]
 
 [tool.ty.rules]
 possibly-unresolved-reference = "error"

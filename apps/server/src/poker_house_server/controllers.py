@@ -374,7 +374,7 @@ def choose_with_output(
     # A copy: the controller may play on it, and the position stays as it is.
     copy = state.clone()
 
-    def ask() -> tuple[object, object, object]:
+    def ask() -> tuple[int, str | None, contract.BotOutput | None]:
         action = controller.choose_action(copy, seat)
         return (
             action,

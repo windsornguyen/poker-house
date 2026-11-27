@@ -43,7 +43,6 @@ class StoredSession:
 
 BOT_OUTPUT = pydantic.TypeAdapter(contract.BotOutput)
 PARAMETERS = pydantic.TypeAdapter(dict[str, contract.ParameterValue])
-CONFIG = pydantic.TypeAdapter(dict[str, contract.JsonValue])
 
 
 class Database:
@@ -141,7 +140,7 @@ class Database:
             seed=seed,
             chance_policy=contract.ChancePolicy(chance_policy),
             seats=tuple(
-                StoredSeat(controllers.Spec(kind, CONFIG.validate_python(config)), autoplay)
+                StoredSeat(controllers.Spec(kind, PARAMETERS.validate_python(config)), autoplay)
                 for kind, config, autoplay in seats
             ),
             plies=tuple(

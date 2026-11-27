@@ -14,9 +14,10 @@
 # Modified for Poker House.
 """Hosts a Python poker strategy behind the bot protocol (REMOTE_BOTS.md).
 
-  python -m poker_house_server.remote_bot_server --port 9001 --bot random
+  python -m poker_house_server.remote_bot_server --port 9001 \
+    --bot poker_house_server.poker_bot:make_call_bot
 
-`--bot` is `random` or `MODULE:FACTORY`: a function that takes no arguments
+`--bot` is `MODULE:FACTORY`: a function that takes no arguments
 and returns a bot. A bot has one method, `move(request)`, given the JSON body
 of `POST /move` and returning an action id, or a dict with `action` and the
 optional `notice`, `policy`, `value` and `decided_by`. A ValueError is
@@ -35,13 +36,12 @@ import http.server
 import importlib
 import json
 import os
-import random
 from collections.abc import Sequence
-from typing import Any, Protocol
+from typing import Protocol
 
 from absl import logging
 
-from poker_house_server import remote_bot
+from poker_house_server import contract, remote_bot
 
 MAX_BODY_BYTES = 16 << 20
 
@@ -49,30 +49,19 @@ MAX_BODY_BYTES = 16 << 20
 class Bot(Protocol):
     """What the server hosts."""
 
-    def move(self, request: dict[str, Any]) -> int | dict[str, Any]:
+    def move(self, request: dict[str, contract.JsonValue]) -> int | dict[str, contract.JsonValue]:
         """Returns the action to play, or {"action", "notice", ...}."""
 
 
-class RandomBot:
-    """Plays a uniformly random legal action, from the request's seed."""
-
-    def move(self, request: dict[str, Any]) -> int:
-        """Returns one of the legal actions, drawn uniformly."""
-        actions = request["observation"]["actions"]
-        return int(random.Random(int(request["seed"])).choice(actions)["id"])
-
-
 def load_bot(name: str) -> Bot:
-    """Returns the bot `--bot` names: random or MODULE:FACTORY.
+    """Returns the bot `--bot` names: MODULE:FACTORY.
 
     Raises:
       ValueError: If `name` is neither, or the factory's bot has no `move`.
     """
-    if name == "random":
-        return RandomBot()
     module_name, sep, factory_name = name.partition(":")
     if not sep or not module_name or not factory_name:
-        raise ValueError(f"--bot {name!r} is not random or MODULE:FACTORY.")
+        raise ValueError(f"--bot {name!r} is not MODULE:FACTORY.")
     try:
         module = importlib.import_module(module_name)
     except ImportError as e:
@@ -84,29 +73,16 @@ def load_bot(name: str) -> Bot:
     return bot
 
 
-def reply_of(result: object, notice: str | None) -> dict[str, Any]:
-    """Returns the reply body for a bot's result.
+def reply_of(
+    result: int | dict[str, contract.JsonValue], notice: str | None
+) -> dict[str, contract.JsonValue]:
+    """Returns the reply body for a bot's result, adding `--notice` when it gives none.
 
-    Args:
-      result: What the bot's `move` returned.
-      notice: The server's `--notice`, added when the bot gives none.
-
-    Raises:
-      TypeError: If `result` is neither an int nor a dict with an int
-        `action` or a non-empty `actions`.
+    The game server checks the reply, so a malformed one fails the seat there.
     """
-    if isinstance(result, bool) or not isinstance(result, (int, dict)):
-        raise TypeError(f"The bot returned {result!r}, not an action.")
-    if isinstance(result, int):
-        reply: dict[str, Any] = {"action": result}
-    else:
-        action = result.get("action")
-        line = result.get("actions")
-        if (isinstance(action, bool) or not isinstance(action, int)) and not (
-            isinstance(line, list) and line
-        ):
-            raise TypeError(f"The bot returned {result!r}, with no int action or actions.")
-        reply = dict(result)
+    reply: dict[str, contract.JsonValue] = (
+        {"action": result} if isinstance(result, int) else dict(result)
+    )
     if notice is not None and reply.get("notice") is None:
         reply["notice"] = notice
     return reply
@@ -159,14 +135,15 @@ class Server(http.server.ThreadingHTTPServer):
 class _Handler(http.server.BaseHTTPRequestHandler):
     """Answers the protocol's requests."""
 
-    server: Server
+    @property
+    def app(self) -> Server:
+        """The server this handler answers for."""
+        assert isinstance(self.server, Server)
+        return self.server
+
     protocol_version = "HTTP/1.1"
 
-    def log_message(self, format: str, *args: object) -> None:
-        """Logs a request through absl."""
-        logging.info("%s %s", self.address_string(), format % args)
-
-    def send(self, status: int, body: dict[str, Any]) -> None:
+    def send(self, status: int, body: dict[str, contract.JsonValue]) -> None:
         """Sends a JSON reply."""
         data = json.dumps(body).encode()
         self.send_response(status)
@@ -177,7 +154,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def authorized(self) -> bool:
         """Whether the request carries the server's token; answers 401 if not."""
-        token = self.server.token
+        token = self.app.token
         if token is None:
             return True
         given = self.headers.get("Authorization", "")
@@ -194,7 +171,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not self.authorized():
             return
         if self.path == remote_bot.HEALTH_PATH:
-            self.send(http.HTTPStatus.OK, {"ok": True, "name": self.server.name})
+            self.send(http.HTTPStatus.OK, {"ok": True, "name": self.app.name})
         else:
             self.send(http.HTTPStatus.NOT_FOUND, {"error": f"no {self.path}"})
 
@@ -221,7 +198,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             )
             return
         try:
-            result = self.server.bot.move(request)
+            result = self.app.bot.move(request)
         except ValueError as e:
             self.send(
                 http.HTTPStatus.UNPROCESSABLE_ENTITY,
@@ -235,7 +212,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 {"error": "the bot failed; see the bot server's log"},
             )
             return
-        self.send(http.HTTPStatus.OK, reply_of(result, self.server.notice))
+        self.send(http.HTTPStatus.OK, reply_of(result, self.app.notice))
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -248,8 +225,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=9001)
     parser.add_argument(
         "--bot",
-        default="random",
-        help="random, or MODULE:FACTORY (a function returning a bot).",
+        required=True,
+        help="MODULE:FACTORY: a function returning a bot.",
     )
     parser.add_argument(
         "--token-env",

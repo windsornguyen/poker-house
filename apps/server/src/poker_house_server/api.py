@@ -26,9 +26,12 @@ import http
 import re
 import urllib.parse
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import pydantic
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 from poker_house_server import catalogue as catalogue_lib
 from poker_house_server import contract, controllers, errors, request, store
@@ -58,7 +61,7 @@ class Response:
     body: contract.JsonValue
 
 
-def ok(value: object) -> Response:
+def ok(value: DataclassInstance) -> Response:
     """Answers with a contract object."""
     return Response(http.HTTPStatus.OK, contract.to_json(value))
 
@@ -119,7 +122,7 @@ def spec(seat: request.SeatConfig) -> controllers.Spec:
     return controllers.Spec(seat.controller, seat.config)
 
 
-_Handler = Callable[[Any, _Request], Response]
+_Handler = Callable[["Api", _Request], Response]
 _Route = tuple[str, re.Pattern[str], _Handler]
 
 

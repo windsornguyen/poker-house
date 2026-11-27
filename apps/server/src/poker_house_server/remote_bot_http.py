@@ -152,12 +152,13 @@ def parse_reply(reply: contract.JsonValue, legal: Sequence[int]) -> tuple[int, s
         raise RemoteBotReplyError("The bot server's reply is not a JSON object.")
     if reply.get("error") is not None:
         raise RemoteBotRefusedError(f"The bot server refused: {refusal_text(reply)}.")
+    actions = reply.get("actions")
     if "action" in reply:
         action = reply["action"]
-    elif isinstance(reply.get("actions"), list) and reply["actions"]:
+    elif isinstance(actions, list) and actions:
         # A bot that answers with a line plays its first action, and is asked
         # again at the next position.
-        action = reply["actions"][0]
+        action = actions[0]
     else:
         raise RemoteBotReplyError(
             "The bot server's reply has no `action` (or non-empty `actions`)."
@@ -184,7 +185,7 @@ def parse_reply(reply: contract.JsonValue, legal: Sequence[int]) -> tuple[int, s
     return action, notice
 
 
-def as_number(value: object) -> float | None:
+def as_number(value: contract.JsonValue) -> float | None:
     """Returns `value` as a finite float, or None if it is not one."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None

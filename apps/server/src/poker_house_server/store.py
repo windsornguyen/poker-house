@@ -66,7 +66,7 @@ class Journal:
 
     def sync(self, session: session_lib.Session) -> None:
         """Writes the plies that differ from those stored, and the hand's result."""
-        current = session.plies
+        current = session.played
         before = self.saved.get(session.id, ())
         kept = 0
         for old, new in zip(before, current, strict=False):
@@ -82,7 +82,7 @@ class Journal:
         if stored is None:
             return None
         session = session_lib.Session.restore(stored)
-        self.resume(session, session.plies)
+        self.resume(session, session.played)
         return session
 
     def forget(self, session_id: str) -> None:

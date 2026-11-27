@@ -219,7 +219,7 @@ class Session:
         return self._loaded.parameters
 
     @property
-    def plies(self) -> tuple[plies.Ply, ...]:
+    def played(self) -> tuple[plies.Ply, ...]:
         """Every ply of the live game."""
         with self._lock:
             return tuple(self._plies)

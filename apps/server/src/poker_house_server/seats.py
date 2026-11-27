@@ -44,7 +44,7 @@ def random_seed() -> int:
     return random.SystemRandom().randrange(_SEED_BOUND)
 
 
-def derive_seed(seed: int, *path: object) -> int:
+def derive_seed(seed: int, *path: str | int) -> int:
     """Derives an independent, reproducible seed from a session's seed."""
     key = "/".join(str(part) for part in (seed, *path))
     return random.Random(key).randrange(_SEED_BOUND)

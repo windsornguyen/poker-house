@@ -151,26 +151,29 @@ def run[T](call: Callable[[], T], *, name: str) -> T:
       Exception: Whatever `call` raised, raised again here.
     """
     budget = _BUDGET.seconds
-    # (returned, value): the result if `call` returned, else what it raised.
-    outcome: queue.Queue[tuple[bool, object]] = queue.Queue(maxsize=1)
+    # What the waiting thread runs: return the result, or raise what `call` raised.
+    outcome: queue.Queue[Callable[[], T]] = queue.Queue(maxsize=1)
     stop = threading.Event()
 
     def target() -> None:
         _CURRENT.stop = stop
         try:
-            outcome.put((True, call()))
-        # Handed to the waiting thread, which raises it there.
+            result = call()
         except Exception as e:
-            outcome.put((False, e))
+            error = e
+
+            def reraise() -> T:
+                raise error
+
+            outcome.put(reraise)
+        else:
+            outcome.put(lambda: result)
 
     # A daemon, so a call that never returns cannot keep the process alive.
     threading.Thread(target=target, name=name, daemon=True).start()
     try:
-        returned, value = outcome.get(timeout=budget)
+        finish = outcome.get(timeout=budget)
     except queue.Empty:
         stop.set()
         raise OverBudgetError(budget) from None
-    if not returned:
-        assert isinstance(value, Exception)
-        raise value
-    return value  # type: ignore[return-value]
+    return finish()

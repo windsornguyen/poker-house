@@ -36,11 +36,13 @@ import types
 import urllib.parse
 import webbrowser
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, TextIO
+from typing import TextIO
 
+import pydantic
 import pyspiel
 
-from poker_house_server import child_servers, cli, play_config, remote_bot
+from poker_house_server import child_servers, cli, contract, play_config, remote_bot
+from poker_house_server import frame as frame_lib
 from poker_house_server import request as request_contract
 
 Options = play_config.Options
@@ -69,10 +71,10 @@ LaunchError = child_servers.LaunchError
 def request(
     method: str,
     url: str,
-    body: Mapping[str, Any] | None = None,
+    body: contract.JsonValue = None,
     *,
     timeout_seconds: float | None = None,
-) -> object:
+) -> contract.JsonValue:
     """Sends a JSON request to a server on this machine; returns its JSON reply.
 
     Raises:
@@ -104,8 +106,8 @@ def request(
             f"{method} {url} answered HTTP {status}: " + raw[:500].decode(errors="replace")
         )
     try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        return contract.adapter(contract.JsonValue).validate_json(raw)
+    except pydantic.ValidationError as e:
         raise LaunchError(f"{method} {url} answered with no JSON.") from e
 
 
@@ -124,45 +126,31 @@ def bot_unready(bot_url: str) -> str | None:
     return None
 
 
-def seat_config(options: Options, bot_url: str) -> dict[str, Any]:
-    """Returns the Remote bot seat's settings.
-
-    The seat waits for each move as long as the move budget allows
-    (`timeout_seconds` 0).
-    """
-    del options
-    return {"url": bot_url, "timeout_seconds": 0.0}
-
-
 def session_body(
     options: Options,
     bot_url: str | Mapping[int, str],
     num_players: int,
-) -> dict[str, Any]:
-    """Returns the body that opens the session, its bot seats Remote bots.
+) -> request_contract.CreateSession:
+    """Returns the request that opens the session, its bot seats Remote bots.
 
-    Args:
-      options: What is launched.
-      bot_url: The bot server's URL, or each bot seat's.
-      num_players: The game's number of seats.
+    A bot seat waits for each move as long as the move budget allows
+    (`timeout_seconds` 0).
     """
     name, parameters = parse_game(options.game)
     who = seating(options, num_players)
-    seats = [{"controller": "human", "config": {}, "autoplay": False} for _ in range(num_players)]
+    seats = [request_contract.SeatConfig("human", {}, autoplay=False)] * num_players
     for seat in who.bots:
         url = bot_url if isinstance(bot_url, str) else bot_url[seat]
-        seats[seat] = {
-            "controller": remote_bot.NAME,
-            "config": seat_config(options, url),
-            "autoplay": True,
-        }
-    return {
-        "game": name,
-        "parameters": parameters,
-        "seats": seats,
-        "chance_policy": "auto",
-        "seed": None,
-    }
+        seats[seat] = request_contract.SeatConfig(
+            remote_bot.NAME, {"url": url, "timeout_seconds": 0.0}, autoplay=True
+        )
+    return request_contract.CreateSession(
+        game=name,
+        parameters=parameters,
+        seats=tuple(seats),
+        chance_policy=contract.ChancePolicy.AUTO,
+        seed=None,
+    )
 
 
 @dataclasses.dataclass
@@ -255,7 +243,7 @@ def start_bots(
 def launch(
     options: Options,
     out: TextIO = sys.stderr,
-    started: Callable[[Running], object] | None = None,
+    started: Callable[[Running], None] | None = None,
 ) -> Running:
     """Starts the bot servers and the GUI server, and opens the session.
 
@@ -322,16 +310,17 @@ def launch(
         frame = request(
             "POST",
             f"{local_api}/sessions?viewer=oracle",
-            session_body(options, bot_urls, num_players),
+            contract.to_json(session_body(options, bot_urls, num_players)),
             timeout_seconds=settlement_seconds,
         )
-        session = str(frame["session"]["id"])
+        opened = contract.adapter(frame_lib.Frame).validate_python(frame)
+        session = opened.session.id
         for seat_number in who.bots:
-            seat = frame["seats"][seat_number]
-            if seat.get("controller") != remote_bot.NAME:
+            seat = opened.seats[seat_number]
+            if seat.controller != remote_bot.NAME:
                 raise LaunchError(f"The bot seat {seat_number} is {seat!r}, not a Remote bot.")
-            if seat.get("failure"):
-                raise LaunchError(f"The bot seat {seat_number} failed: {seat['failure']}.")
+            if seat.failure is not None:
+                raise LaunchError(f"The bot seat {seat_number} failed: {seat.failure}.")
         viewer = "spectator" if who.human is None else str(who.human)
         query = urllib.parse.urlencode({"session": session, "viewer": viewer})
         running = Running(
@@ -354,7 +343,7 @@ def launch(
 def serve(
     running: Running,
     stopping: threading.Event,
-    opener: Callable[[str], object] | None = None,
+    opener: Callable[[str], bool] | None = None,
 ) -> int:
     """Prints the address, then waits for a stop or a server exiting.
 

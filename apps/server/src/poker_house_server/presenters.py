@@ -102,13 +102,13 @@ def public_action_label(state: pyspiel.State, action: int) -> str | None:
     return label
 
 
-def checked_json(value: object, what: str) -> contract.JsonValue:
+def checked_json(value: contract.JsonValue, what: str) -> contract.JsonValue:
     """Returns `value` after checking that it encodes as strict JSON."""
     try:
         json.dumps(value, allow_nan=False)
     except (TypeError, ValueError) as e:
         raise TypeError(f"{what} is not JSON: {e}") from e
-    return value  # type: ignore[return-value]
+    return value
 
 
 def present(

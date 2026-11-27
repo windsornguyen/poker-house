@@ -20,11 +20,10 @@ import argparse
 import dataclasses
 import sys
 from collections.abc import Mapping, Sequence
-from typing import Any
 
 import pyspiel
 
-from poker_house_server import child_servers, loader, static
+from poker_house_server import child_servers, contract, loader, static
 
 LaunchError = child_servers.LaunchError
 
@@ -92,7 +91,7 @@ class Options:
     python: str = sys.executable
 
 
-def parse_game(text: str) -> tuple[str, dict[str, Any]]:
+def parse_game(text: str) -> tuple[str, dict[str, contract.ParameterValue]]:
     """Returns the short name and parameters of the game string `text`.
 
     Raises:

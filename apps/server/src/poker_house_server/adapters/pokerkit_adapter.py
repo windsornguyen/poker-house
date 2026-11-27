@@ -176,16 +176,16 @@ class PokerkitAdapter(adapter.Adapter):
         )
         struct: dict[str, contract.JsonValue] = {
             "board_cards": "".join(observation["board_cards"]),
-            "player_hands": format_hands(state, viewpoint),
-            "player_contributions": contributions,
-            "starting_stacks": list(starting),
+            "player_hands": list[contract.JsonValue](format_hands(state, viewpoint)),
+            "player_contributions": list[contract.JsonValue](contributions),
+            "starting_stacks": list[contract.JsonValue](starting),
             "pot_size": observation["total_pot"],
             "current_player": observation["current_player"],
             "betting_history": betting,
-            "blinds": list(initial["bets"]),
+            "blinds": list[contract.JsonValue](initial["bets"]),
             "ante": ante,
-            "best_hand_rank_types": [""] * count,
-            "best_five_card_hands": [""] * count,
+            "best_hand_rank_types": list[contract.JsonValue]([""] * count),
+            "best_five_card_hands": list[contract.JsonValue]([""] * count),
         }
         game: dict[str, contract.JsonValue] = {
             "title": title,
