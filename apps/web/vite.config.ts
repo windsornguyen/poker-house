@@ -21,6 +21,7 @@ import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
 import react, {reactCompilerPreset} from '@vitejs/plugin-react';
 import {defineConfig} from 'vite-plus';
+import {playwright} from 'vite-plus/test/browser-playwright';
 
 import {thirdPartyNotices} from './scripts/third_party_notices.ts';
 
@@ -46,13 +47,28 @@ export default defineConfig({
     },
   },
   test: {
-    environment: 'jsdom',
-    // Browser tests use jsdom's origin-scoped storage, not Node's file store.
-    execArgv: ['--no-experimental-webstorage'],
-    include: ['{scripts,src}/**/*_test.{ts,tsx}'],
-    setupFiles: ['src/testing/setup.ts'],
-    // Twice app_test's 5 s `until`, so a slow wait reports its failing
-    // check rather than the test timeout, and two waits fit in one test.
-    testTimeout: 10000,
+    projects: [
+      {
+        extends: true,
+        test: {name: 'node', include: ['src/contract/*_test.ts']},
+      },
+      {
+        extends: true,
+        test: {
+          name: 'browser',
+          include: ['src/*_test.tsx'],
+          setupFiles: ['src/testing/setup.ts'],
+          // Twice app_test's 5 s `until`, so a slow wait reports its failing
+          // check rather than the test timeout, and two waits fit in one test.
+          testTimeout: 10000,
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright({launchOptions: {channel: 'chrome'}}),
+            instances: [{browser: 'chromium'}],
+          },
+        },
+      },
+    ],
   },
 });
