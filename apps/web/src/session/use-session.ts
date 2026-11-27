@@ -37,7 +37,11 @@ export interface Session extends SessionSnapshot {
  * @throws Error when `client` differs from the first render's: the session
  *     belongs to that client, so a new client needs a new component.
  */
-export function useSession(client: SessionClient, viewer: Viewer): Session {
+export function useSession(
+  client: SessionClient,
+  viewer: Viewer,
+  onRefused: (code: string) => void,
+): Session {
   const [store] = useState(() => new SessionStore(client, viewer));
   if (store.client !== client) {
     throw new Error('useSession keeps the client of its first render.');
@@ -52,10 +56,13 @@ export function useSession(client: SessionClient, viewer: Viewer): Session {
   const {busy} = snapshot;
   useEffect(() => {
     if (id === null || busy) return undefined;
-    return client.events(id, viewer, store.receive, store.streamFailed);
+    return client.events(id, viewer, store.receive, store.streamFailed, () => {
+      const code = store.getSnapshot().frame?.session.code;
+      if (code !== undefined) onRefused(code);
+    });
     // `shown` names the viewer, whose object may change without it changing.
     // oxlint-disable-next-line react/exhaustive-deps
-  }, [client, store, id, shown, busy]);
+  }, [client, store, id, shown, busy, onRefused]);
   // Until the effect passes a new viewer on, the store holds the old one's
   // frame.
   const frame =

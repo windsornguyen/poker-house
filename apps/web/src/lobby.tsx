@@ -14,6 +14,9 @@
 
 import {type JSX, type SyntheticEvent, useState} from 'react';
 
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
+
 import type {
   CatalogueEntry,
   CreateSession,
@@ -22,6 +25,8 @@ import type {
 import type {SessionClient} from './session/client.ts';
 
 import './lobby.css';
+
+const ROOM_CODE_LENGTH = 6;
 
 /** The two bot endpoints and the hand's integer-chip stakes. */
 export interface MatchSettings {
@@ -131,7 +136,62 @@ export function PokerLobby({
           void start(event);
         }}
       />
+      <JoinRoom client={client} onOpen={onOpen} />
     </section>
+  );
+}
+
+function JoinRoom({
+  client,
+  onOpen,
+}: {
+  readonly client: SessionClient;
+  readonly onOpen: (frame: Frame) => void;
+}): JSX.Element {
+  const [code, setCode] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function join(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+
+    try {
+      onOpen(await client.join(code));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={event => {
+        void join(event);
+      }}
+    >
+      <div className="flex gap-2">
+        <Input
+          aria-label="Room code"
+          placeholder="Room code"
+          maxLength={ROOM_CODE_LENGTH}
+          value={code}
+          onChange={event => {
+            setCode(event.target.value.toUpperCase());
+          }}
+        />
+        <Button
+          type="submit"
+          disabled={pending || code.length !== ROOM_CODE_LENGTH}
+        >
+          Join
+        </Button>
+      </div>
+      {error !== null && <p role="alert">{error}</p>}
+    </form>
   );
 }
 

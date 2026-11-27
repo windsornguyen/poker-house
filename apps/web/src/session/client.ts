@@ -100,6 +100,15 @@ export class SessionClient {
     );
   }
 
+  /** Sits in the room `code` names, and answers with the seat's view. */
+  join(code: string): Promise<Frame> {
+    return this.request(
+      'POST',
+      `/api/rooms/${encodeURIComponent(code)}/join`,
+      'frame',
+    );
+  }
+
   /** The live position. */
   frame(id: string, viewer: Viewer): Promise<Frame> {
     return this.sessionRequest('GET', id, '', viewer);
@@ -110,13 +119,15 @@ export class SessionClient {
    * the session, until the returned function is called. The browser
    * reconnects a dropped stream itself, and each connection starts with the
    * current position. An event that is not a frame ends the stream and
-   * goes to `onError`.
+   * goes to `onError`. When another player sits down and the viewer is no
+   * longer the player's to take, the stream ends and `onRefused` runs.
    */
   events(
     id: string,
     viewer: Viewer,
     onFrame: (frame: Frame) => void,
     onError: (error: TransportError) => void,
+    onRefused: () => void,
   ): () => void {
     const source = new EventSource(
       `${this.origin}/api/sessions/${encodeURIComponent(id)}/events?${query(viewer)}`,
@@ -136,6 +147,10 @@ export class SessionClient {
     // The server ends a quiet stream so an idle tab lets the machine sleep.
     source.addEventListener('idle', () => {
       source.close();
+    });
+    source.addEventListener('refused', () => {
+      source.close();
+      onRefused();
     });
     return () => {
       source.close();

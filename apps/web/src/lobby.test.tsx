@@ -103,3 +103,40 @@ describe('the poker lobby', () => {
     ).toContain('stack at least as large as the big blind');
   });
 });
+
+describe('joining a room', () => {
+  it('joins a room by its code and opens the seat it answers with', async () => {
+    const seated = frame();
+    seated.viewer = {kind: 'seat', seat: 1};
+    const fetch = vi.fn<Fetch>(() => Promise.resolve(Response.json(seated)));
+    const open = vi.fn();
+    rendered = render(
+      <PokerLobby
+        entry={ENTRY}
+        client={new SessionClient({fetch})}
+        onOpen={open}
+      />,
+    );
+    const {container} = rendered;
+
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Room code"]',
+    );
+    if (input === null) throw new Error('No room code input.');
+    enter(input, 'room42');
+    const forms = container.querySelectorAll('form');
+    const join = forms[forms.length - 1];
+    if (join === undefined) throw new Error('No join form.');
+    await act(async () => {
+      join.dispatchEvent(
+        new Event('submit', {bubbles: true, cancelable: true}),
+      );
+      await Promise.resolve();
+    });
+
+    const [url, init] = fetch.mock.calls[0] ?? [];
+    expect(String(url)).toMatch(/\/api\/rooms\/ROOM42\/join$/);
+    expect(init?.method).toBe('POST');
+    expect(open).toHaveBeenCalledWith(seated);
+  });
+});

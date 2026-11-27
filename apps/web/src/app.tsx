@@ -69,10 +69,11 @@ export function App(props: AppProps): JSX.Element {
           )}
           client={client}
           onOpen={frame => {
-            const path = sessionPath(frame.session.game, frame.session.id, {
-              kind: 'oracle',
-              seat: null,
-            });
+            const path = sessionPath(
+              frame.session.game,
+              frame.session.id,
+              frame.viewer,
+            );
             window.history.pushState(null, '', path);
             setUrl(new URL(path, url.origin));
           }}

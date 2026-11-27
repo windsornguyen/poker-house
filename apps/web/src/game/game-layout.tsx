@@ -17,6 +17,7 @@ import type {JSX} from 'react';
 import {createPortal} from 'react-dom';
 
 import {Alert, AlertDescription} from '@/components/ui/alert';
+import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {
   Sheet,
@@ -29,6 +30,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 
 import {useHeaderActions} from '../app/header-actions.ts';
 import {BotOutputView} from '../bot-output/bot-output.tsx';
+import {CopyButton} from '../controls/copy-button.tsx';
 import {SETUP_GROUP, SetupPanel} from '../setup/setup-panel.tsx';
 import {STATE_GROUP} from '../state/state-panel.tsx';
 import {VIEW_GROUP} from '../view/view-panel.tsx';
@@ -71,8 +73,9 @@ const TOOLS: readonly Tool[] = [
 
 /** The game's page: the table, and the tool panels in a sheet. */
 export function GameLayout(): JSX.Element {
-  const {error} = useGame().session;
+  const {error, frame} = useGame().session;
   const header = useHeaderActions();
+  const code = frame?.session.code;
   return (
     <div className="flex flex-col gap-3 p-3">
       {error !== null && (
@@ -81,7 +84,14 @@ export function GameLayout(): JSX.Element {
         </Alert>
       )}
       <GameplayPanel />
-      {header !== null && createPortal(<ToolSheet />, header)}
+      {header !== null &&
+        createPortal(
+          <>
+            {code !== undefined && <RoomCode code={code} />}
+            <ToolSheet />
+          </>,
+          header,
+        )}
     </div>
   );
 }
@@ -122,6 +132,17 @@ function ToolSheet(): JSX.Element {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function RoomCode({code}: {code: string}): JSX.Element {
+  return (
+    <div className="flex items-center gap-1">
+      <Badge variant="outline" aria-label="Room code">
+        {code}
+      </Badge>
+      <CopyButton text={code} />
+    </div>
   );
 }
 

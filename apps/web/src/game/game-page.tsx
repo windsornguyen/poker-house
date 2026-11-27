@@ -54,7 +54,9 @@ export interface GamePageProps {
 export function GamePage(props: GamePageProps): JSX.Element {
   const {entry, client} = props;
   const [viewer] = useState<Viewer>(() => initialViewer(entry, props.viewer));
-  const session = useSession(client, viewer);
+  const session = useSession(client, viewer, code => {
+    void reopenAtOwnSeat(client, entry.name, code);
+  });
   useStartSession(session.commands, entry, props.session);
   const viewSeat = useOpeningViewSeat(entry, viewer, props.viewSeat ?? null);
   const id = session.frame?.session.id ?? null;
@@ -83,6 +85,17 @@ export function GamePage(props: GamePageProps): JSX.Element {
  * `viewSeat`) when the game has it. Every page starts afresh: a seat chosen
  * on another page never carries over, and none is kept outside analysis.
  */
+// Another player sat down, so every card is no longer this player's view.
+// Joining again answers with the seat they hold, which the page reopens at.
+async function reopenAtOwnSeat(
+  client: SessionClient,
+  game: string,
+  code: string,
+): Promise<void> {
+  const frame = await client.join(code);
+  window.location.assign(sessionPath(game, frame.session.id, frame.viewer));
+}
+
 function useOpeningViewSeat(
   entry: CatalogueEntry,
   viewer: Viewer,
