@@ -1,5 +1,6 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
+import type {Port} from 'dedalus/resources/machines/index';
 import {ensureMachine, ensurePort, run, waitRunning} from './machine.ts';
 
 const SERVER_PORT = 8787;
@@ -12,6 +13,15 @@ function required(name: string): string {
     throw new Error(`${name} must be set.`);
   }
   return value;
+}
+
+function announceKey(name: string, port: Port): void {
+  const key = port.initial_access_key;
+  if (key) {
+    console.log(
+      `${name}: ${key.access_key} (shown once, expires ${key.expires_at})`,
+    );
+  }
 }
 
 function git(...args: string[]): string {
@@ -42,16 +52,8 @@ await waitRunning(machineId);
 
 const port = await ensurePort(machineId, SERVER_PORT);
 const authPort = await ensurePort(machineId, AUTH_PORT);
-for (const [name, created] of [
-  ['Port key', port],
-  ['Auth port key', authPort],
-] as const) {
-  if (created.initial_access_key) {
-    console.log(
-      `${name}: ${created.initial_access_key.access_key} (shown once, expires ${created.initial_access_key.expires_at})`,
-    );
-  }
-}
+announceKey('Port key', port);
+announceKey('Auth port key', authPort);
 const hosts = [
   ...new Set(
     [port.application_url, port.url]

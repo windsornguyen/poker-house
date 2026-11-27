@@ -17,7 +17,7 @@
     "test:server": "uv run --all-packages python -m unittest discover -s apps/server/tests -p '*_test.py'",
     "test:web": "pnpm --filter @poker-house/web test",
     "test": "pnpm test:engine && pnpm test:server && pnpm test:web",
-    "check": "pnpm --filter @poker-house/web check && pnpm check:server && pnpm test && pnpm build",
+    "check": "pnpm --filter @poker-house/web exec react-router typegen && vp check && pnpm --filter @poker-house/web check && pnpm check:server && pnpm test && pnpm build",
     "check:server": "uv run --all-packages --group check ruff format --check && uv run --all-packages --group check ruff check && uv run --all-packages --group check ty check",
     "typecheck": "uv run --all-packages --group check ty check"
   },

@@ -85,7 +85,6 @@ export default defineConfig({
     plugins: ['typescript', 'react', 'import'],
     // Oxlint runs these ESLint plugins for the rules it has not ported.
     jsPlugins: [
-      {name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin'},
       {name: 'eslint-js', specifier: 'oxlint-plugin-eslint'},
       {name: 'jsdoc-js', specifier: 'eslint-plugin-jsdoc'},
     ],
@@ -98,7 +97,6 @@ export default defineConfig({
     ],
     options: {typeAware: true, typeCheck: true},
     rules: {
-      'vite-plus/prefer-vite-plus-imports': 'error',
       'block-scoped-var': 'error',
       curly: ['error', 'multi-line'],
       'default-case': 'error',

@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "check": "react-router typegen && vp check && node scripts/style_lint.ts && node scripts/contrast_check.ts",
+    "check": "node scripts/style_lint.ts && node scripts/contrast_check.ts",
     "deploy": "react-router build && wrangler deploy",
     "dev": "react-router dev",
     "fmt": "vp fmt",

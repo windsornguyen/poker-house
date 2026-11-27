@@ -37,11 +37,6 @@ export default defineConfig({
   ],
   server: {proxy: {'/api': {target: API_SERVER, changeOrigin: false}}},
   test: {
-    // Vitest v4 compatibility: preserve mock call history.
-    // Remove after tests no longer rely on calls from setup or earlier tests.
-    // https://viteplus.dev/guide/vitest-v5#remove-unneeded-compatibility-settings
-    // https://vitest.dev/guide/migration/#clearmocks-is-enabled-by-default
-    clearMocks: false,
     environment: 'jsdom',
     // Browser tests use jsdom's origin-scoped storage, not Node's file store.
     execArgv: ['--no-experimental-webstorage'],

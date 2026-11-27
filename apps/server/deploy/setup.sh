@@ -117,10 +117,6 @@ systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service poke
 systemctl restart poker-house.service poker-house-auth.service
 
 for url in http://127.0.0.1:8787/ http://127.0.0.1:8788/api/auth/ok; do
-  for _ in $(seq 1 30); do
-    curl -fsS -o /dev/null "$url" && break
-    sleep 1
-  done
-  curl -fsS -o /dev/null "$url"
+  curl -fsS -o /dev/null --retry 30 --retry-delay 1 --retry-connrefused "$url"
 done
 echo "Poker House $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."
