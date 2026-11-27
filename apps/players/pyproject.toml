@@ -1,0 +1,14 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "poker-house-players"
+version = "0.1.0"
+description = "Accounts that play Poker House through its site, for testing strategies."
+license = "Apache-2.0"
+requires-python = ">=3.14,<3.15"
+dependencies = ["httpx==0.29.0", "poker-house-server==0.1.0", "pokerkit==0.6.3"]
+
+[project.scripts]
+poker-house-match = "poker_house_players.match:main"

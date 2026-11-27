@@ -2,9 +2,10 @@ create schema if not exists poker;
 
 create schema if not exists auth;
 
--- The emails that may make an account.
+-- The emails that may make an account, and whose account each is.
 create table if not exists poker.player (
     email text primary key constraint player_email_lowercase check (email = lower(email)),
+    kind text not null default 'person' check (kind in ('person', 'internal', 'test')),
     added_at timestamptz not null default now()
 );
 
