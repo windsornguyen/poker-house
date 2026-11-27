@@ -1,19 +1,22 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import type {Port} from 'dedalus/resources/machines/index';
+import * as z from 'zod';
 import {ensureMachine, ensurePort, run, waitRunning} from './machine.ts';
 
 const SERVER_PORT = 8787;
 const AUTH_PORT = 8788;
 const SETUP_TIMEOUT_MS = 1_800_000;
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value === '') {
-    throw new Error(`${name} must be set.`);
-  }
-  return value;
-}
+const Env = z.object({
+  POKER_HOUSE_SITE_URL: z.url(),
+  // The emails that may make an account, comma-separated.
+  POKER_HOUSE_PLAYERS: z
+    .string()
+    .transform(list => list.split(','))
+    .pipe(z.array(z.email()).min(1)),
+  POKER_HOUSE_MACHINE_ID: z.string().optional(),
+});
 
 function announceKey(name: string, port: Port): void {
   const key = port.initial_access_key;
@@ -43,10 +46,9 @@ function publishedCommit(): string {
 }
 
 const commit = publishedCommit();
-const siteUrl = required('POKER_HOUSE_SITE_URL');
-const players = required('POKER_HOUSE_PLAYERS');
+const env = Env.parse(process.env);
 
-const machineId = await ensureMachine(process.env['POKER_HOUSE_MACHINE_ID']);
+const machineId = await ensureMachine(env.POKER_HOUSE_MACHINE_ID);
 console.log(`Machine ${machineId}`);
 await waitRunning(machineId);
 
@@ -67,8 +69,8 @@ const {execution, output} = await run(
   machineId,
   [
     'env',
-    `SITE_URL=${siteUrl}`,
-    `PLAYERS=${players}`,
+    `SITE_URL=${env.POKER_HOUSE_SITE_URL}`,
+    `PLAYERS=${env.POKER_HOUSE_PLAYERS.join(',')}`,
     'bash',
     '-s',
     '--',
