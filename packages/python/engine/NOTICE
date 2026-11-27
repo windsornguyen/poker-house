@@ -1,0 +1,22 @@
+Poker House
+Copyright 2026 Poker House contributors
+
+This product includes software developed by Google DeepMind and the
+OpenSpiel authors, licensed under the Apache License, Version 2.0.
+
+Source: https://github.com/google-deepmind/open_spiel
+Revision: 4956843d7375e29a4c986425c66f897d7ac15340
+
+The browser client in apps/web is derived from open_spiel/gui. The Python
+server in apps/server is derived from open_spiel/python/gui. The engine
+adapter in packages/python/engine is derived from
+open_spiel/python/games/pokerkit_wrapper.py and its tests.
+
+Modifications include the standalone package layout, poker-only application,
+structured private observations, remote-bot observation transport, PokerKit
+table presentation, and bot-only launcher. Original copyright and license
+notices are retained in the copied files. Modified files carry a notice.
+
+PokerKit and OpenSpiel are installed as dependencies. Their distribution
+licenses and notices remain with those packages. Browser dependency notices
+are retained under apps/web/licenses and included in the client build.

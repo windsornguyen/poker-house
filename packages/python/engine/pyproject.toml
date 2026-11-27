@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "poker-house-engine"
+version = "0.1.0"
+description = "PokerKit games and private bot observations for Poker House."
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "absl-py>=2,<3",
+  "numpy>=2,<3",
+  "open-spiel==2.0.2",
+  "pokerkit==0.6.3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/poker_house_engine"]

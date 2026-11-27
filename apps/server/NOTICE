@@ -1,0 +1,13 @@
+Poker House server
+Copyright 2026 Poker House contributors
+
+This package contains modified code from OpenSpiel, developed by Google
+DeepMind and the OpenSpiel authors under the Apache License, Version 2.0.
+
+Source: https://github.com/google-deepmind/open_spiel
+Revision: 4956843d7375e29a4c986425c66f897d7ac15340
+Original path: open_spiel/python/gui
+
+Modifications include the standalone package layout, poker-only catalogue,
+structured remote-bot observations, PokerKit table adapter, reference poker
+bots, and bot-only launcher. Original notices are retained in source files.

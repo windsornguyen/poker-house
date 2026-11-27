@@ -1,0 +1,112 @@
+/* Copyright 2026 Poker House contributors
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+.lobby {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+  align-items: center;
+  gap: 64px;
+  max-width: 1040px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 48px 32px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.lobby__intro h2 {
+  margin: 16px 0 24px;
+  max-width: 12ch;
+  font-size: clamp(36px, 4vw, 56px);
+  line-height: 1.08;
+}
+
+.lobby__intro p {
+  max-width: 45ch;
+  color: var(--color-text-secondary);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.lobby__suits {
+  color: var(--color-text);
+  font-size: 32px;
+}
+
+.lobby__intro a {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--color-accent);
+}
+
+.lobby__form {
+  display: grid;
+  gap: 20px;
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.lobby__form h3 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.lobby__field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.lobby__field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+}
+
+.lobby__stakes {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 12px;
+}
+
+.lobby__hint,
+.lobby__error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lobby__hint {
+  color: var(--color-text-secondary);
+}
+
+.lobby__error {
+  color: var(--color-danger);
+}
+
+.lobby__form > button {
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .lobby {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 28px 20px;
+    align-content: start;
+  }
+
+  .lobby__intro h2 {
+    max-width: 17ch;
+  }
+
+  .lobby__form {
+    padding: 20px;
+  }
+}
