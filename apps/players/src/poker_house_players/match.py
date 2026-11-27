@@ -108,6 +108,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--site", required=True)
     parser.add_argument("--deals", type=int, default=150)
     parser.add_argument("--log", type=pathlib.Path, default=pathlib.Path("match.jsonl"))
+    parser.add_argument("--seed", type=int, default=0, help="Seeds the deals, so a run repeats.")
     return parser.parse_args(argv)
 
 
@@ -120,9 +121,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         for name in ("tight", "pot_odds")
     )
 
+    deals = random.Random(args.seed)
     per_deal: list[float] = []
     for deal in range(args.deals):
-        seed = random.randrange(2**31)
+        seed = deals.randrange(2**31)
         first = play_hand(tight, odds, seed, args.log)
         second = play_hand(odds, tight, seed, args.log)
 
@@ -132,6 +134,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         spread = statistics.stdev(per_deal) / math.sqrt(len(per_deal)) if len(per_deal) > 1 else 0.0
         running = f"{mean:+.2f} ± {spread:.2f} bb/hand"
         print(f"deal {deal + 1}: tight {tight_won:+.1f} bb, running {running}")
+
+    mean = statistics.fmean(per_deal)
+    spread = statistics.stdev(per_deal) / math.sqrt(len(per_deal))
+    print(
+        f"final over {len(per_deal)} deals: tight {mean:+.2f} ± {spread:.2f} bb/hand,"
+        f" pot_odds {-mean:+.2f} ± {spread:.2f} bb/hand"
+    )
 
 
 if __name__ == "__main__":
