@@ -13,6 +13,7 @@ function required(name: string): string {
 
 const allowed = new Set(required('POKER_HOUSE_PLAYERS').split(','));
 
+/** Better Auth's configuration, shared by the server and the migration. */
 export const options = {
   baseURL: required('BETTER_AUTH_URL'),
   secret: required('BETTER_AUTH_SECRET'),
@@ -35,4 +36,5 @@ export const options = {
   },
 } satisfies BetterAuthOptions;
 
+/** The Better Auth instance the server mounts. */
 export const auth = betterAuth(options);

@@ -14,12 +14,14 @@ const TERMINAL_STATUSES: ReadonlySet<Execution['status']> = new Set([
 const POLL_MS = 1000;
 const RUNNING_TIMEOUT_MS = 180_000;
 
+/** The Dedalus API, authenticated by DEDALUS_API_KEY. */
 export const client = new Dedalus();
 
 function pause(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Returns the given Machine's ID, or creates a Machine when none is given. */
 export async function ensureMachine(
   machineId: string | undefined,
 ): Promise<string> {
@@ -36,6 +38,7 @@ export async function ensureMachine(
   return machine.machine_id;
 }
 
+/** Wakes the Machine if needed and resolves once it is running. */
 export async function waitRunning(machineId: string): Promise<void> {
   const deadline = Date.now() + RUNNING_TIMEOUT_MS;
   while (Date.now() < deadline) {
@@ -58,6 +61,7 @@ export async function waitRunning(machineId: string): Promise<void> {
   );
 }
 
+/** Runs `command` on the Machine with `stdin` and returns its result once it ends. */
 export async function run(
   machineId: string,
   command: string[],
@@ -86,6 +90,7 @@ export async function run(
   return {execution, output};
 }
 
+/** Returns the Machine's port for `port`, creating it with a required access key. */
 export async function ensurePort(
   machineId: string,
   port: number,

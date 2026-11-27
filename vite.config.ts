@@ -4,18 +4,44 @@ type LintOverride = NonNullable<
   NonNullable<UserConfig['lint']>['overrides']
 >[number];
 
+const WEB = 'apps/web/';
 const WEB_SOURCES = '*.{ts,tsx}';
 const MAX_DEPTH = 8;
 const NUMBER_PARSING =
   'Use Number() to parse numbers; parseInt only with a radix other than 10.';
+const ARRAY_CONSTRUCTOR = 'Use an array literal or Array.from({length}).';
+const NUMBER_PARSING_PROPERTIES = [
+  {object: 'Number', property: 'parseFloat', message: NUMBER_PARSING},
+  {object: 'Number', property: 'parseInt', message: NUMBER_PARSING},
+];
 
-// The web client is self-contained: no import leaves apps/web or names an absolute path. A glob
-// cannot resolve a path, so each directory depth gets the number of parent steps that leave it.
+// Every restriction but the one on default exports, which the framework's
+// configuration and route modules need.
+const RESTRICTED_SYNTAX = [
+  {
+    selector:
+      "CallExpression[callee.name='parseInt'][arguments.length<2], CallExpression[callee.name='parseInt'][arguments.1.value=10]",
+    message: NUMBER_PARSING,
+  },
+  {
+    selector:
+      'Program > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression, Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator > ArrowFunctionExpression',
+    message: 'Use a function declaration for top-level functions.',
+  },
+  {selector: "CallExpression[callee.name='Array']", message: ARRAY_CONSTRUCTOR},
+  {selector: "NewExpression[callee.name='Array']", message: ARRAY_CONSTRUCTOR},
+];
+
+// The web client is self-contained: no import leaves apps/web or names an
+// absolute path, and a relative import names its file with the extension,
+// which both Vite and Node resolve. A glob cannot resolve a path, so each
+// directory depth gets the number of parent steps that would leave it. The
+// lookbehind needs JS regex, so this is ESLint's rule, not oxlint's.
 function staysInWeb(depth: number): LintOverride {
   return {
-    files: ['apps/web/' + '*/'.repeat(depth) + WEB_SOURCES],
+    files: [WEB + '*/'.repeat(depth) + WEB_SOURCES],
     rules: {
-      'no-restricted-imports': [
+      'eslint-js/no-restricted-imports': [
         'error',
         {
           patterns: [
@@ -24,6 +50,10 @@ function staysInWeb(depth: number): LintOverride {
               message: 'Imports stay inside apps/web.',
             },
             {regex: '^/', message: 'No absolute imports.'},
+            {
+              regex: '^\\.\\.?(/.*)?(?<!\\.(ts|tsx|css|json|svg\\?raw))$',
+              message: 'A relative import names the file with its extension.',
+            },
           ],
         },
       ],
@@ -53,7 +83,12 @@ export default defineConfig({
   },
   lint: {
     plugins: ['typescript', 'react', 'import'],
-    jsPlugins: [{name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin'}],
+    // Oxlint runs these ESLint plugins for the rules it has not ported.
+    jsPlugins: [
+      {name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin'},
+      {name: 'eslint-js', specifier: 'oxlint-plugin-eslint'},
+      {name: 'jsdoc-js', specifier: 'eslint-plugin-jsdoc'},
+    ],
     ignorePatterns: [
       '**/dist/**',
       '**/.react-router/**',
@@ -67,14 +102,37 @@ export default defineConfig({
       'block-scoped-var': 'error',
       curly: ['error', 'multi-line'],
       'default-case': 'error',
-      // A relative import names its file, which both Vite and Node resolve.
-      'import/extensions': ['error', 'always', {ignorePackages: true}],
       eqeqeq: 'error',
       'no-var': 'error',
       'prefer-const': 'error',
       'no-restricted-globals': [
         'error',
         {name: 'parseFloat', message: NUMBER_PARSING},
+      ],
+      'eslint-js/no-restricted-properties': [
+        'error',
+        ...NUMBER_PARSING_PROPERTIES,
+      ],
+      'eslint-js/no-restricted-syntax': [
+        'error',
+        ...RESTRICTED_SYNTAX,
+        {selector: 'ExportDefaultDeclaration', message: 'Use named exports.'},
+      ],
+      'jsdoc-js/require-jsdoc': [
+        'error',
+        {
+          publicOnly: true,
+          require: {
+            FunctionDeclaration: true,
+            ClassDeclaration: true,
+            ArrowFunctionExpression: true,
+          },
+          contexts: [
+            'ExportNamedDeclaration > VariableDeclaration',
+            'ExportNamedDeclaration > TSTypeAliasDeclaration',
+            'ExportNamedDeclaration > TSInterfaceDeclaration',
+          ],
+        },
       ],
       'max-lines': [
         'error',
@@ -98,8 +156,51 @@ export default defineConfig({
       'typescript/no-floating-promises': 'error',
       'typescript/no-non-null-assertion': 'error',
     },
-    overrides: Array.from({length: MAX_DEPTH + 1}, (_, depth) =>
-      staysInWeb(depth),
-    ),
+    overrides: [
+      ...Array.from({length: MAX_DEPTH + 1}, (_, depth) => staysInWeb(depth)),
+      {
+        // DOM code reads textContent.
+        files: [WEB + 'src/**/*.{ts,tsx}'],
+        rules: {
+          'eslint-js/no-restricted-properties': [
+            'error',
+            ...NUMBER_PARSING_PROPERTIES,
+            {property: 'innerText', message: 'Use textContent.'},
+          ],
+        },
+      },
+      {
+        // Production code types an object literal by its declaration,
+        // `const x: T = {...}`. Tests and their fakes may cast partial objects.
+        files: [WEB + 'src/**/*.{ts,tsx}'],
+        excludeFiles: [
+          WEB + 'src/**/testing/**',
+          WEB + 'src/**/*_test.{ts,tsx}',
+        ],
+        rules: {
+          'typescript/consistent-type-assertions': [
+            'error',
+            {
+              assertionStyle: 'as',
+              objectLiteralTypeAssertions: 'allow-as-parameter',
+            },
+          ],
+        },
+      },
+      {
+        // The framework requires a default export from these modules.
+        files: [
+          '**/vite.config.ts',
+          WEB + 'react-router.config.ts',
+          WEB + 'src/root.tsx',
+          WEB + 'src/routes.ts',
+          WEB + 'src/routes/*.tsx',
+          WEB + 'worker/*.ts',
+        ],
+        rules: {
+          'eslint-js/no-restricted-syntax': ['error', ...RESTRICTED_SYNTAX],
+        },
+      },
+    ],
   },
 });

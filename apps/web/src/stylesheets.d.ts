@@ -19,6 +19,7 @@ declare module '*.css';
 // An SVG file imported with ?raw is its markup, as a string (Vite).
 declare module '*.svg?raw' {
   const markup: string;
+  // oxlint-disable-next-line eslint-js/no-restricted-syntax -- Vite's ?raw import is a default export.
   export default markup;
 }
 
