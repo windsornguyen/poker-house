@@ -1,29 +1,36 @@
-/* The site's tokens (apps/web/src/styles/theme.css), so the docs look like the site. */
+/* A dachshund's coat and a tomato-red chip, in light and dark. */
 :root {
   --scalar-font:
     'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, sans-serif;
   --scalar-radius: 0.5rem;
-  --scalar-radius-lg: 0.625rem;
+  --scalar-radius-lg: 0.75rem;
 }
 
 .light-mode {
-  --scalar-background-1: oklch(1 0 0);
-  --scalar-background-2: oklch(0.97 0 0);
-  --scalar-background-3: oklch(0.922 0 0);
-  --scalar-color-1: oklch(0.145 0 0);
-  --scalar-color-2: oklch(0.556 0 0);
-  --scalar-color-3: oklch(0.556 0 0);
-  --scalar-color-accent: oklch(0.205 0 0);
-  --scalar-border-color: oklch(0.922 0 0);
+  --scalar-background-1: #fdf8f3;
+  --scalar-background-2: #f6ece1;
+  --scalar-background-3: #ecdcc9;
+  --scalar-color-1: #2b1a10;
+  --scalar-color-2: #6b4f3a;
+  --scalar-color-3: #8c705b;
+  --scalar-color-accent: #d9412b;
+  --scalar-background-accent: #fbe3dc;
+  --scalar-border-color: #e6d4c0;
 }
 
 .dark-mode {
-  --scalar-background-1: oklch(0.145 0 0);
-  --scalar-background-2: oklch(0.205 0 0);
-  --scalar-background-3: oklch(0.269 0 0);
-  --scalar-color-1: oklch(0.985 0 0);
-  --scalar-color-2: oklch(0.708 0 0);
-  --scalar-color-3: oklch(0.708 0 0);
-  --scalar-color-accent: oklch(0.922 0 0);
-  --scalar-border-color: oklch(1 0 0 / 10%);
+  --scalar-background-1: #1b120c;
+  --scalar-background-2: #261910;
+  --scalar-background-3: #342318;
+  --scalar-color-1: #f6ece1;
+  --scalar-color-2: #cdb39b;
+  --scalar-color-3: #a68b74;
+  --scalar-color-accent: #ff6347;
+  --scalar-background-accent: #3a1f17;
+  --scalar-border-color: #3b2a1e;
+}
+
+/* The renderer is MIT-licensed and served from our own domain, without its badge. */
+.t-doc__sidebar-footer a[href='https://www.scalar.com'] {
+  display: none;
 }

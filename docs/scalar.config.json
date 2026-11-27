@@ -63,7 +63,11 @@
           "/api": {
             "type": "openapi",
             "title": "API",
-            "filepath": "../apps/web/public/openapi.json"
+            "filepath": "../apps/web/public/openapi.json",
+            "config": {
+              "hideModels": true,
+              "documentDownloadType": "json"
+            }
           }
         }
       }

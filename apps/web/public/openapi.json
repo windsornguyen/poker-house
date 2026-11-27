@@ -14,7 +14,7 @@
     "/api/sessions": {
       "post": {
         "operationId": "createRoom",
-        "summary": "Open a room and sit at its first seat.",
+        "summary": "Open a table and take a seat",
         "parameters": [
           {
             "name": "viewer",
@@ -63,7 +63,7 @@
     "/api/rooms/{code}/join": {
       "post": {
         "operationId": "joinRoom",
-        "summary": "Sit at the room with this code, buying in with its stack. The answer is your seat's view of its hand, or a spectator's when you are dealt into the next.",
+        "summary": "Sit at a table by its code",
         "parameters": [
           {
             "name": "code",
@@ -101,7 +101,7 @@
     "/api/rooms/{code}": {
       "get": {
         "operationId": "getRoom",
-        "summary": "The room: its latest hand, your seat in it and every stack.",
+        "summary": "A table's latest hand and stacks",
         "parameters": [
           {
             "name": "code",
@@ -139,7 +139,7 @@
     "/api/rooms/{code}/deal": {
       "post": {
         "operationId": "dealNextHand",
-        "summary": "Deal the hand after the one you saw finish, or get it if it is already dealt.",
+        "summary": "Deal the next hand",
         "parameters": [
           {
             "name": "code",
@@ -187,7 +187,7 @@
     "/api/rooms/{code}/leave": {
       "post": {
         "operationId": "leaveRoom",
-        "summary": "Get up between hands, moving your stack back to your account.",
+        "summary": "Cash out between hands",
         "parameters": [
           {
             "name": "code",
@@ -225,7 +225,7 @@
     "/api/sessions/{id}/turn": {
       "get": {
         "operationId": "getTurn",
-        "summary": "Your turn: your cards, the board, the pot, the price and your legal moves.",
+        "summary": "Your cards, the pot and your moves",
         "parameters": [
           {
             "name": "id",
@@ -272,7 +272,7 @@
     "/api/me": {
       "get": {
         "operationId": "getMe",
-        "summary": "Your chips off the tables, and your stack at each table you sit at.",
+        "summary": "Your chips and open tables",
         "parameters": [],
         "responses": {
           "200": {
@@ -301,7 +301,7 @@
     "/api/sessions/{id}": {
       "get": {
         "operationId": "getTable",
-        "summary": "The table as your seat sees it.",
+        "summary": "The table as your seat sees it",
         "parameters": [
           {
             "name": "id",
@@ -348,7 +348,7 @@
     "/api/sessions/{id}/moves": {
       "post": {
         "operationId": "playMove",
-        "summary": "Fold, check, call, or bet or raise to an amount.",
+        "summary": "Fold, check, call, bet or raise",
         "parameters": [
           {
             "name": "id",
