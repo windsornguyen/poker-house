@@ -17,24 +17,19 @@
 import json
 from typing import cast
 
+import pokerkit
 import pyspiel
 from absl.testing import absltest, parameterized
 
-try:
-    import pokerkit
-
-    from poker_house_engine import game as pokerkit_wrapper
-except ImportError:
-    pokerkit_wrapper = None
-
+from poker_house_engine import game as pokerkit_wrapper
 
 _BASE = "poker_house"
 _ACPC = "poker_house_acpc"
 _FORBIDDEN = {"deck", "deck_cards", "burn_cards", "mucked_cards", "operations"}
 
 
-def _game(name: str = _BASE, stacks: str = "200 200") -> pyspiel.Game:
-    return pyspiel.load_game(
+def _game(name: str = _BASE, stacks: str = "200 200") -> pokerkit_wrapper.PokerkitWrapper:
+    game = pyspiel.load_game(
         name,
         {
             "variant": "NoLimitTexasHoldem",
@@ -43,6 +38,8 @@ def _game(name: str = _BASE, stacks: str = "200 200") -> pyspiel.Game:
             "stack_sizes": stacks,
         },
     )
+    assert isinstance(game, pokerkit_wrapper.PokerkitWrapper)
+    return game
 
 
 def _deal(state: pyspiel.State) -> None:
@@ -57,7 +54,6 @@ def _view(state: pyspiel.State, player: int) -> pokerkit_wrapper.PokerObservatio
     )
 
 
-@absltest.skipIf(pokerkit_wrapper is None, "PokerKit is not installed")
 class PokerkitObservationTest(parameterized.TestCase):
     @parameterized.parameters(_BASE, _ACPC)
     def test_dealing_reveals_only_the_observers_cards(self, name: str) -> None:

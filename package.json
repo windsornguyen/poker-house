@@ -22,7 +22,7 @@
     "test:web": "pnpm --filter @poker-house/web test",
     "test": "pnpm test:engine && pnpm test:server && pnpm test:web",
     "check": "pnpm --filter @poker-house/web check && pnpm check:server && pnpm test && pnpm build",
-    "check:server": "uv run --all-packages --group check ruff format --check && uv run --all-packages --group check ruff check",
+    "check:server": "uv run --all-packages --group check ruff format --check && uv run --all-packages --group check ruff check && uv run --all-packages --group check ty check",
     "typecheck": "uv run --all-packages --group check ty check"
   }
 }

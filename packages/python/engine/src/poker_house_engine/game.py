@@ -150,15 +150,14 @@ class Parameters:
     @classmethod
     def of(cls, given: Mapping[str, int | float | str | bool]) -> Parameters:
         """Returns the defaults with `given` laid over them, refusing mistyped values."""
-        merged = dataclasses.asdict(cls()) | dict(given)
         defaults = dataclasses.asdict(cls())
-        unknown = set(merged) - set(defaults)
+        unknown = set(given) - set(defaults)
         if unknown:
             raise ValueError(f"Unknown poker parameters: {sorted(unknown)}.")
-        for name, value in merged.items():
+        for name, value in given.items():
             if type(value) is not type(defaults[name]):
                 raise ValueError(f"Poker parameter {name} must be {type(defaults[name]).__name__}.")
-        return cls(**merged)
+        return dataclasses.replace(cls(), **given)
 
     def as_dict(self) -> dict[str, int | float | str | bool]:
         """The parameters as pyspiel takes them."""
@@ -310,14 +309,15 @@ def card_code(card: pokerkit.Card) -> str | None:
 # of size >= 2.)
 
 
-def parse_values(param_str: str) -> list[int | decimal.Decimal]:
+def parse_values(param_str: str) -> list[int]:
     """Convert " "-separated values in a ``str`` to numerical values via pokerkit.
 
     Args:
       param_str: A space-separated string of numerical values.
 
     Returns:
-      A list of numerical values, which can be either `int` or `decimal.Decimal`.
+      A list of numerical values. PokerKit types chip amounts as `int`, though a
+      fractional value parses to a `decimal.Decimal`.
     """
     if not param_str:
         return []
@@ -333,7 +333,7 @@ def parse_values(param_str: str) -> list[int | decimal.Decimal]:
 class PokerkitWrapper(pyspiel.Game):
     """An OpenSpiel game that wraps pokerkit."""
 
-    def __init__(self, params: dict[str, int | float | str | bool] | None = None) -> None:
+    def __init__(self, params: Mapping[str, int | float | str | bool] | None = None) -> None:
         game_type = self.build_game_type()
 
         if not params:
@@ -528,7 +528,12 @@ class PokerkitWrapper(pyspiel.Game):
             + self.deck_size
         )
 
-    def new_initial_state(self) -> PokerkitWrapperState:
+    def new_initial_state(
+        self, arg0: str | pyspiel.StateStruct | None = None
+    ) -> PokerkitWrapperState:
+        # pyspiel forwards every NewInitialState overload here.
+        if arg0 is not None:
+            raise NotImplementedError("Poker House games start only from the initial state.")
         return PokerkitWrapperState(self)
 
     def make_py_observer(
@@ -586,53 +591,39 @@ class PokerkitWrapper(pyspiel.Game):
         if not poker_variant_class:
             raise ValueError(f"Unknown / unsupported poker variant: {variant}")
 
-        def in_scope_for_variant(k: str) -> bool:
-            return k in inspect.signature(poker_variant_class).parameters
-
-        assert parse_values(params.stack_sizes) == self.stack_sizes
-        game_args = {
-            k: v
-            for k, v in {
-                "automations": _DEFAULT_AUTOMATIONS,
-                "ante_trimming_status": False,
-                "player_count": params.num_players,
-                # As per pokerkit docs:
-                # """
-                # In Pokerkit, the term ``raw`` is used to denote the fact that
-                # they can be supplied in many forms and will be "parsed" or
-                # "evaluated" further to convert them into a more ideal form.
-                # For instance, ``0`` will be interpreted as no ante for all
-                # players. Another value will be interpreted as that value as the
-                # antes for all. ``[0, 2]`` and ``{1: 2} will be considered as the
-                # big blind ante whereas ``{-1: 2}`` will be considered as the
-                # button ante.
-                # """
-                "raw_antes": parse_values(params.antes),
-                "raw_starting_stacks": parse_values(params.stack_sizes),
-                "raw_blinds_or_straddles": self.blinds,
-                # Unlike most other args, we don't support custom user inputs for
-                # this. Despite the name, it's only used in nolimit games (NOT any
-                # of the fixed limit variants, which compute their minimum bet size
-                # in other ways). And in practice, almost everyone just uses the big
-                # blind as the minimum bet size in nolimit games.
-                "min_bet": max(self.blinds),  # Always set to the big blind
-                # All remaining args we need line up exactly with the params
-                # key/values.
-            }.items()
-            if in_scope_for_variant(k)
-        } | {k: v for k, v in params.as_dict().items() if in_scope_for_variant(k)}
-
-        # Double check that we didn't somehow end up in a situation where we are
-        # allowing bet sizes that could conflict with the reserved values for our
-        # fold / check actions.
-        min_bet = game_args.get("min_bet")
-        if min_bet is not None:
+        # PokerKit reads ``raw`` antes and blinds in many forms; for instance ``0``
+        # means no ante for any player.
+        antes = parse_values(params.antes)
+        if issubclass(poker_variant_class, pokerkit.UnfixedLimitHoldem):
+            # Only nolimit and pot-limit games take a minimum bet, always the big
+            # blind. It must not collide with our reserved fold / check actions.
+            min_bet = max(self.blinds)
             assert min_bet > 0
             assert min_bet not in FOLD_AND_CHECK_OR_CALL_ACTIONS
-        # TODO: b/434776281 - consider moving additional validation checks out of
-        # the constructor and into this spot here right before we actually use them.
-
-        return poker_variant_class(**game_args)
+            return poker_variant_class(
+                automations=_DEFAULT_AUTOMATIONS,
+                ante_trimming_status=False,
+                raw_antes=antes,
+                raw_blinds_or_straddles=self.blinds,
+                min_bet=min_bet,
+            )
+        if issubclass(poker_variant_class, pokerkit.Holdem):
+            return poker_variant_class(
+                automations=_DEFAULT_AUTOMATIONS,
+                ante_trimming_status=False,
+                raw_antes=antes,
+                raw_blinds_or_straddles=self.blinds,
+                small_bet=params.small_bet,
+                big_bet=params.big_bet,
+            )
+        return poker_variant_class(
+            automations=_DEFAULT_AUTOMATIONS,
+            ante_trimming_status=False,
+            raw_antes=antes,
+            bring_in=params.bring_in,
+            small_bet=params.small_bet,
+            big_bet=params.big_bet,
+        )
 
     def wrapped_state_factory(self) -> pokerkit.State:
         """Creates the "wrapped" (not "PokerkitWrapper...") pokerkit.state object.
@@ -664,39 +655,31 @@ class PokerkitWrapper(pyspiel.Game):
         #  words, the user must only read from the state's attributes or call public
         #  methods (which may modify them).
         # """
-        streets_override = [
-            pokerkit.state.Street(
-                **dataclasses.asdict(street)
-                | {
-                    "card_burning_status": False,
-                }
-            )
+        streets_override = tuple(
+            dataclasses.replace(street, card_burning_status=False)
             for street in helper_state.streets
-        ]
-        args = copy.deepcopy(
-            {
-                # A select few args have "raw_" prefixes in the State constructor.
-                # Unfortunately, although the constructed State objects have both
-                # versions, in practice the non-"raw_" versions are the only ones
-                # that are actually (reliably) set to non-None values.
-                # As such we have to source these "raw_" args from the equivalent
-                # non-"raw_" versions.
-                #
-                # For example:
-                # - giving `raw_starting_stacks` arg `state.starting_stacks`'s value
-                # - giving `raw_antes` arg `state.antes`'s value
-                # - giving `raw_blinds_or_straddles` arg `state.blinds`'s value
-                arg: helper_state.__dict__.get(arg.replace("raw_", ""))
-                for arg in inspect.signature(pokerkit.State).parameters
-            }
-            | {"streets": streets_override}
         )
-        assert len(args) == len(inspect.signature(pokerkit.State).parameters.keys())
-        assert None not in args.values()
         # NOTE: CANNOT USE THE "template" APPROACH, NOR .create_state() HERE
         # (without allowing card burning - since neither of these options accept an
-        # input 'streets').
-        returned_state: pokerkit.State = pokerkit.State(**args)
+        # input 'streets'). The "raw_" arguments take the helper state's parsed
+        # values, which are the ones PokerKit reliably sets.
+        returned_state = pokerkit.State(
+            automations=helper_state.automations,
+            deck=helper_state.deck,
+            hand_types=helper_state.hand_types,
+            streets=streets_override,
+            betting_structure=helper_state.betting_structure,
+            ante_trimming_status=helper_state.ante_trimming_status,
+            raw_antes=helper_state.antes,
+            raw_blinds_or_straddles=helper_state.blinds_or_straddles,
+            bring_in=helper_state.bring_in,
+            raw_starting_stacks=helper_state.starting_stacks,
+            player_count=helper_state.player_count,
+            mode=helper_state.mode,
+            starting_board_count=helper_state.starting_board_count,
+            divmod=helper_state.divmod,
+            rake=helper_state.rake,
+        )
         # Double checks that we didn't make mistakes when disabing card burning just
         # now. (This is a bit overkill, but we REALLY don't want there to be any
         # chance of accidentally leaving card burning enabled anywhere).
@@ -725,7 +708,9 @@ class PokerkitWrapperState(pyspiel.State):
             return pyspiel.PlayerId.TERMINAL
         if self.is_chance_node():
             return pyspiel.PlayerId.CHANCE
-        return self._wrapped_state.actor_index
+        actor = self._wrapped_state.actor_index
+        assert actor is not None
+        return actor
 
     def _legal_actions(self, player: int) -> list[int]:
         return self.legal_actions_base(player)
@@ -772,17 +757,18 @@ class PokerkitWrapperState(pyspiel.State):
         if wrapped_state.can_complete_bet_or_raise_to():
             valid_bet_sizes = []
             betting_structure = wrapped_state.betting_structure
-            min_bet = int(wrapped_state.min_completion_betting_or_raising_to_amount)
-            max_bet = int(wrapped_state.max_completion_betting_or_raising_to_amount)
-            assert min_bet is not None and max_bet is not None
+            min_amount = wrapped_state.min_completion_betting_or_raising_to_amount
+            max_amount = wrapped_state.max_completion_betting_or_raising_to_amount
+            assert min_amount is not None and max_amount is not None
+            min_bet = int(min_amount)
+            max_bet = int(max_amount)
 
             if betting_structure == pokerkit.state.BettingStructure.FIXED_LIMIT:
                 # min and max completion, bet, and raise amounts are identical as per:
                 # https://pokerkit.readthedocs.io/en/stable/reference.html#pokerkit.state.BettingStructure.FIXED_LIMIT
                 assert min_bet == max_bet
-                fixed_size: int | None = min_bet
-                if fixed_size is not None and fixed_size not in FOLD_AND_CHECK_OR_CALL_ACTIONS:
-                    valid_bet_sizes.append(fixed_size)
+                if min_bet not in FOLD_AND_CHECK_OR_CALL_ACTIONS:
+                    valid_bet_sizes.append(min_bet)
             elif (
                 betting_structure == pokerkit.state.BettingStructure.NO_LIMIT
                 or betting_structure == pokerkit.state.BettingStructure.POT_LIMIT
@@ -904,7 +890,6 @@ class PokerkitWrapperState(pyspiel.State):
                         f"Action was {action}, but cannot check_or_call or post_bring_in."
                     )
             else:
-                current_player = wrapped_state.actor_index
                 if wrapped_state.can_complete_bet_or_raise_to(action):
                     wrapped_state.complete_bet_or_raise_to(action)
                 else:
@@ -914,7 +899,7 @@ class PokerkitWrapperState(pyspiel.State):
                     assert action == 2
                     assert not wrapped_state.can_complete_bet_or_raise_to(2)
                     assert wrapped_state.can_complete_bet_or_raise_to(1)
-                    action_string = self.action_to_string_base(current_player, action)
+                    action_string = self.action_to_string_base(self.current_player(), action)
                     if _ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING not in action_string:
                         raise ValueError(
                             f"Expected to find {_ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING} for"
@@ -960,7 +945,7 @@ class PokerkitWrapperState(pyspiel.State):
     # TODO: b/437724266 - update string structure (not bet sizings!) to match
     # universal_poker/universal_poker.cc ActionToString where practical. E.g.
     # 'Deal {card}' and 'player={player} move={move}'.
-    def _action_to_string(self, player: int, action: int) -> str | None:
+    def _action_to_string(self, player: int, action: int) -> str:
         """Returns the string representation of an action.
 
         Assumes that input player actions corresponding to completion-bets or raises
@@ -974,7 +959,7 @@ class PokerkitWrapperState(pyspiel.State):
         """
         return self.action_to_string_base(player, action)
 
-    def action_to_string_base(self, player: int, action: int) -> str | None:
+    def action_to_string_base(self, player: int, action: int) -> str:
         """Core "base" logic from above, separated to bypass method overrides."""
         wrapped_state: pokerkit.State = self._wrapped_state
         if self.is_chance_node():
@@ -1007,22 +992,18 @@ class PokerkitWrapperState(pyspiel.State):
                 f"Action was {_ACTION_CHECK_OR_CALL_OR_POST_BRING_IN}, but cannot"
                 " check_or_call or post_bring_in."
             )
-        if action >= 0 and action not in FOLD_AND_CHECK_OR_CALL_ACTIONS:
-            if wrapped_state.can_complete_bet_or_raise_to(action):
-                return f"Player {player}: Bet/Raise to {action}"
-            # Handle edge case where we've 'mapped' a bet of 1 chip to action 2 to
-            # avoid conflicting with reserved actions.
-            if (  # wrapped_state.can_complete_bet_or_raise_to(action) == False
-                action == 2 and wrapped_state.can_complete_bet_or_raise_to(1)
-            ):
-                assert wrapped_state.min_completion_betting_or_raising_to_amount == 1
-                assert wrapped_state.max_completion_betting_or_raising_to_amount == 1
-                return f"Player {player}: {_ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING}"
-            raise ValueError(
-                f"Invalid action {action} for player {player}. 'legal actions' was "
-                f" {self.legal_actions()}"
-            )
-        return None
+        if action >= 0 and wrapped_state.can_complete_bet_or_raise_to(action):
+            return f"Player {player}: Bet/Raise to {action}"
+        # Handle edge case where we've 'mapped' a bet of 1 chip to action 2 to
+        # avoid conflicting with reserved actions.
+        if action == 2 and wrapped_state.can_complete_bet_or_raise_to(1):
+            assert wrapped_state.min_completion_betting_or_raising_to_amount == 1
+            assert wrapped_state.max_completion_betting_or_raising_to_amount == 1
+            return f"Player {player}: {_ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING}"
+        raise ValueError(
+            f"Invalid action {action} for player {player}. 'legal actions' was "
+            f" {self.legal_actions()}"
+        )
 
     def is_terminal(self) -> bool:
         # .status is True if the state is not terminal, as per
@@ -1451,14 +1432,14 @@ class PokerkitWrapperObserver:
         if params:
             raise ValueError(f"Observation parameters not supported; passed {params}.")
         self.game = game
-        self.iig_obs_types = iig_obs_types
-        if self.iig_obs_types is None:
+        if iig_obs_types is None:
             # Effectively: default to returning observation_* instead of
             # information_state_* if not specified. Since `perfect_recall` in practice
             # chooses between information_state_* vs observation_* from the
             # perspective of OpenSpiel. See e.g.
             # open_spiel/python/algorithms/generate_playthrough.py
-            self.iig_obs_types = pyspiel.IIGObservationType(perfect_recall=False)
+            iig_obs_types = pyspiel.IIGObservationType(perfect_recall=False)
+        self.iig_obs_types = iig_obs_types
         self.params = params
 
         # Not actually used since `provides_observation_tensor=False`, but necessary
@@ -1523,7 +1504,7 @@ class PokerkitWrapperObserver:
         # time this method is called.
         wrapped_state_do_not_mutate: pokerkit.State = state._wrapped_state
 
-        starting_stacks: list[int] = wrapped_state_do_not_mutate.starting_stacks
+        starting_stacks: tuple[int, ...] = wrapped_state_do_not_mutate.starting_stacks
         stacks: list[int] = wrapped_state_do_not_mutate.stacks
 
         current_street_index: int | None = wrapped_state_do_not_mutate.street_index
@@ -1534,16 +1515,18 @@ class PokerkitWrapperObserver:
         draw_status: bool | None = (
             None if current_street_index is None else draw_statuses[current_street_index]
         )
-        pots: pokerkit.Pot = [p for p in wrapped_state_do_not_mutate.pots]
+        pots: list[pokerkit.Pot] = [p for p in wrapped_state_do_not_mutate.pots]
         bets: list[int] = wrapped_state_do_not_mutate.bets
-        player_next_to_act: int = wrapped_state_do_not_mutate.actor_index
+        player_next_to_act: int | None = wrapped_state_do_not_mutate.actor_index
 
         # --- NOTE: the following '_cards' on the state here are all generators, so
         # we need to wrap them all in list() to actually grab any values. ---
 
         # Unlike below, board cards are always public to everyone, so this is
         # striaghtforward.
-        public_board_cards: list[pokerkit.Card] = list(wrapped_state_do_not_mutate.board_cards)
+        public_board_cards: list[list[pokerkit.Card]] = list(
+            wrapped_state_do_not_mutate.board_cards
+        )
 
         # Hole cards for this current player that only this current player can see.
         private_down_cards: list[pokerkit.Card] = list(
@@ -1554,7 +1537,7 @@ class PokerkitWrapperObserver:
         # plus '??'s for any of their facedown cards (**even if player p is the
         # current player or the 'observing' player**).
         # As such, this will look identical in all players' observations.
-        per_player_censored_cards: list[pokerkit.Card] = [
+        per_player_censored_cards: list[list[pokerkit.Card]] = [
             list(wrapped_state_do_not_mutate.get_censored_hole_cards(p))
             for p in range(wrapped_state_do_not_mutate.player_count)
         ]
@@ -1653,7 +1636,7 @@ class PokerkitWrapperAcpcStyle(PokerkitWrapper):
     straightforward.)
     """
 
-    def __init__(self, params: dict[str, int | float | str | bool] | None = None) -> None:
+    def __init__(self, params: Mapping[str, int | float | str | bool] | None = None) -> None:
         if (
             params
             and "variant" in params
@@ -1697,7 +1680,11 @@ class PokerkitWrapperAcpcStyle(PokerkitWrapper):
     def game_type(self) -> pyspiel.GameType:
         return _GAME_TYPE_ACPC_STYLE
 
-    def new_initial_state(self) -> PokerkitWrapperAcpcStyleState:
+    def new_initial_state(
+        self, arg0: str | pyspiel.StateStruct | None = None
+    ) -> PokerkitWrapperAcpcStyleState:
+        if arg0 is not None:
+            raise NotImplementedError("Poker House games start only from the initial state.")
         return PokerkitWrapperAcpcStyleState(self)
 
 
@@ -1783,7 +1770,7 @@ class PokerkitWrapperAcpcStyleState(PokerkitWrapperState):
         description["id"] = action
         return description
 
-    def _action_to_string(self, player: int, action: int) -> str | None:
+    def _action_to_string(self, player: int, action: int) -> str:
         """Returns the string representation of an ACPC style action.
 
         NOTE: Maps ACPC Style actions to a Pokerkit Style actions, then returns the
@@ -2102,7 +2089,7 @@ class ToAcpcActionConverter:
             # Completion bet or raise-to. (Note how unlike calls, this is effectively
             # "replacing" the contribution for the current street, not just adding to
             # it.)
-            self._per_street_contributions[-1][player] = size
+            self._per_street_contributions[-1][player] = decimal.Decimal(size)
         else:
             raise ValueError(
                 "pokerkit_style_action must be a fold, check, or call. Got action"
@@ -2198,7 +2185,7 @@ class ToAcpcActionConverter:
             pokerkit_style_action if not is_special_edge_case_betting_one_chip else 1
         )
         assert f"Bet/Raise to {pokerkit_action_size}" in pokerkit_style_action_string
-        return pokerkit_action_size + total_prior_street_contribution
+        return int(pokerkit_action_size + total_prior_street_contribution)
 
 
 # ------------------------------------------------------------------------------
