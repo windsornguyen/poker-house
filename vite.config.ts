@@ -87,6 +87,7 @@ export default defineConfig({
     jsPlugins: [
       {name: 'eslint-js', specifier: 'oxlint-plugin-eslint'},
       {name: 'jsdoc-js', specifier: 'eslint-plugin-jsdoc'},
+      {name: 'shadcn', specifier: '@shadcn/lint'},
     ],
     ignorePatterns: [
       '**/dist/**',
@@ -180,6 +181,16 @@ export default defineConfig({
         // Each generated type alias restates the documented schema above it.
         files: [WEB + 'src/contract/contract.ts'],
         rules: {'jsdoc-js/require-jsdoc': 'off'},
+      },
+      {
+        files: [WEB + 'src/**/*.tsx'],
+        excludeFiles: [WEB + 'src/components/**'],
+        rules: {
+          'shadcn/no-raw-colors': 'error',
+          'shadcn/no-arbitrary-values': 'error',
+          'shadcn/require-static-classes': 'error',
+          'shadcn/no-restyle': 'error',
+        },
       },
       {
         // DOM code reads textContent.

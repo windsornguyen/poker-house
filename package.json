@@ -22,6 +22,7 @@
     "typecheck": "uv run --all-packages --group check ty check"
   },
   "devDependencies": {
+    "@shadcn/lint": "0.2.5",
     "eslint-plugin-jsdoc": "65.5.7",
     "oxlint-plugin-eslint": "1.95.0",
     "vite-plus": "catalog:"
