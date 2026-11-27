@@ -29,7 +29,7 @@ class Cluster:
         if missing:
             raise RuntimeError(f"These tests need {', '.join(missing)} on PATH.")
 
-        self.directory = tempfile.mkdtemp(prefix="poker-house-pg-")
+        self.directory = tempfile.mkdtemp(prefix="doggybank-pg-")
         port = free_port()
         self.url = f"postgresql://postgres@127.0.0.1:{port}/postgres"
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Generated from apps/server/src/poker_house_server/contract.schema.json by
+// Generated from apps/server/src/doggybank_server/contract.schema.json by
 // scripts/generate-contract.ts. Do not edit; run pnpm generate:contract.
 
 import * as z from 'zod';
@@ -792,7 +792,7 @@ export type Grant = z.infer<typeof Grant>;
  * The server's identity and capabilities.
  *
  * Attributes:
- *   version: The installed Poker House server package's version.
+ *   version: The installed Doggybank server package's version.
  *   revision: The source revision the server runs from, or null when unknown.
  *   capabilities: What the server can do.
  */

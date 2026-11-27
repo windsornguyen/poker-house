@@ -7,8 +7,8 @@ export default {
   ssr: false,
   prerender: [
     '/',
-    '/game/poker_house',
-    '/game/poker_house_acpc',
+    '/game/doggybank',
+    '/game/doggybank_acpc',
     ...Object.values(viewPaths.auth).map(path => `/auth/${path}`),
   ],
 } satisfies Config;

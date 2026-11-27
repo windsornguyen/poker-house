@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // The viewer's Animation speed: one setting, for every game, that scales
 // every move animation (a bot's draw and discard, a dealt card, a piece's
@@ -23,7 +23,7 @@
 // flight, and stylesheets multiply their durations by the CSS variable
 // `--anim-scale`, which installAnimationScaleRoot() keeps on <html>.
 //
-// Stored on this browser under `poker_house.gui.anim.speed` (the key scheme
+// Stored on this browser under `doggybank.gui.anim.speed` (the key scheme
 // of the View panel's persisted settings), for every game: the field says
 // so. A write in another tab arrives as a 'storage' event.
 //
@@ -59,7 +59,7 @@ export const ANIMATION_SPEED_SCALE: Readonly<Record<AnimationSpeed, number>> = {
 };
 
 /** localStorage key of the speed (the View panel's persisted-setting scheme). */
-export const ANIMATION_SPEED_STORAGE_KEY = 'poker_house.gui.anim.speed';
+export const ANIMATION_SPEED_STORAGE_KEY = 'doggybank.gui.anim.speed';
 /** The CSS variable on <html>: the scale in effect (reduced motion applied). */
 export const ANIMATION_SCALE_VAR = '--anim-scale';
 

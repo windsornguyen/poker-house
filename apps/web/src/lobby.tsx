@@ -1,4 +1,4 @@
-// Copyright 2026 Poker House contributors
+// Copyright 2026 Doggybank contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ export function pokerMatchRequest(settings: MatchSettings): CreateSession {
     return url.href.replace(/\/$/, '');
   });
   return {
-    game: 'poker_house',
+    game: 'doggybank',
     parameters: {
       variant: 'NoLimitTexasHoldem',
       num_players: 2,
@@ -125,7 +125,7 @@ export function PokerLobby({
           and legal actions, then returns a move.
         </p>
         <p>Watch the hand, inspect every decision, and replay the result.</p>
-        <a href="/game/poker_house">Open a manual table</a>
+        <a href="/game/doggybank">Open a manual table</a>
       </div>
       <MatchForm
         entry={entry}

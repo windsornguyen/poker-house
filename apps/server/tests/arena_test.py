@@ -1,4 +1,4 @@
-# Copyright 2026 Poker House contributors
+# Copyright 2026 Doggybank contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import cluster
 import harness
 from absl.testing import absltest
 
-from poker_house_server import (
+from doggybank_server import (
     builds,
     contract,
     db,
@@ -108,7 +108,7 @@ class ArenaTest(absltest.TestCase):
             "POST",
             f"/api/sessions?viewer={viewer}",
             {
-                "game": "poker_house",
+                "game": "doggybank",
                 "parameters": {"blinds": "1 2", "stack_sizes": "40 40"},
                 "chance_policy": "auto",
                 "seed": 17,
@@ -119,12 +119,12 @@ class ArenaTest(absltest.TestCase):
         assert isinstance(frame, dict)
         return frame
 
-    def test_catalogue_and_loader_offer_only_poker_house_games(self) -> None:
+    def test_catalogue_and_loader_offer_only_doggybank_games(self) -> None:
         status, catalogue = self.request("GET", "/api/games")
         self.assertEqual(status, 200)
         self.assertEqual(
             {game["name"] for game in catalogue["games"]},
-            {"poker_house", "poker_house_acpc"},
+            {"doggybank", "doggybank_acpc"},
         )
         self.assertTrue(all(game["renderer"] == "poker" for game in catalogue["games"]))
         with self.assertRaises(loader.UnknownGameError):
@@ -292,7 +292,7 @@ class ArenaTest(absltest.TestCase):
             "POST",
             "/api/sessions?viewer=oracle",
             {
-                "game": "poker_house",
+                "game": "doggybank",
                 "parameters": {"blinds": "1 2", "stack_sizes": "40 40"},
                 "chance_policy": "auto",
                 "seed": None,

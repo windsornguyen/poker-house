@@ -1,4 +1,4 @@
-// Copyright 2026 Poker House contributors
+// Copyright 2026 Doggybank contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import {enter, labeled} from './testing/input.ts';
 import {type Rendered, render} from './testing/render.tsx';
 
 const ENTRY = {
-  name: 'poker_house',
+  name: 'doggybank',
   loadable: true,
   unavailable_reason: null,
 } as CatalogueEntry;
@@ -55,7 +55,7 @@ afterEach(() => {
 describe('the poker lobby', () => {
   it('connects both bot endpoints', async () => {
     const shown = frame();
-    shown.session.game = 'poker_house';
+    shown.session.game = 'doggybank';
     const fetch = server(shown);
     const client = new SessionClient({fetch});
     const open = vi.fn();
@@ -79,7 +79,7 @@ describe('the poker lobby', () => {
     const init = create[1];
     if (typeof init.body !== 'string') throw new Error('No JSON request body.');
     expect(JSON.parse(init.body)).toMatchObject({
-      game: 'poker_house',
+      game: 'doggybank',
       parameters: {num_players: 2, blinds: '1 2', stack_sizes: '200 200'},
       chance_policy: 'auto',
       seed: null,

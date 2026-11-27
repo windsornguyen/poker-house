@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Poker House",
+    "title": "Doggybank",
     "version": "0.1.0",
     "description": "Every call carries your API key in the x-api-key header. Create one while signed in with POST /api/auth/api-key/create. Rooms whose every seat is a player's are played for chips: joining buys in, a hand's result moves chips between stacks, and leaving cashes your stack out."
   },
@@ -1074,7 +1074,7 @@
       },
       "Health": {
         "additionalProperties": false,
-        "description": "The server's identity and capabilities.\n\nAttributes:\n  version: The installed Poker House server package's version.\n  revision: The source revision the server runs from, or null when unknown.\n  capabilities: What the server can do.",
+        "description": "The server's identity and capabilities.\n\nAttributes:\n  version: The installed Doggybank server package's version.\n  revision: The source revision the server runs from, or null when unknown.\n  capabilities: What the server can do.",
         "properties": {
           "version": {
             "type": "string"

@@ -8,12 +8,12 @@ readonly PG_MAJOR=19
 readonly NODE_VERSION=v26.13.1
 readonly UV_VERSION=0.12.1
 readonly PNPM_VERSION=10.30.3
-readonly REPO=https://github.com/windsornguyen/poker-house.git
-readonly APP_USER=poker-house
-readonly APP_DIR=/opt/poker-house
-readonly ENV_FILE=/etc/poker-house/db.env
-readonly AUTH_ENV_FILE=/etc/poker-house/auth.env
-readonly GAME_ENV_FILE=/etc/poker-house/game.env
+readonly REPO=https://github.com/windsornguyen/doggybank.git
+readonly APP_USER=doggybank
+readonly APP_DIR=/opt/doggybank
+readonly ENV_FILE=/etc/doggybank/db.env
+readonly AUTH_ENV_FILE=/etc/doggybank/auth.env
+readonly GAME_ENV_FILE=/etc/doggybank/game.env
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/opt/node/bin:$PATH"
@@ -26,7 +26,7 @@ apt-get install -y -qq "postgresql-$PG_MAJOR" >/dev/null
 if [[ ! -f $ENV_FILE ]]; then
   install -d -m 700 "$(dirname "$ENV_FILE")"
   password=$(openssl rand -hex 24)
-  printf 'DATABASE_URL=postgresql://poker_house:%s@localhost/poker_house\n' "$password" >"$ENV_FILE"
+  printf 'DATABASE_URL=postgresql://doggybank:%s@localhost/doggybank\n' "$password" >"$ENV_FILE"
   chmod 600 "$ENV_FILE"
 fi
 if [[ ! -f $AUTH_ENV_FILE ]]; then
@@ -34,14 +34,14 @@ if [[ ! -f $AUTH_ENV_FILE ]]; then
   chmod 600 "$AUTH_ENV_FILE"
 fi
 if [[ ! -f $GAME_ENV_FILE ]]; then
-  printf 'POKER_HOUSE_PLAYER_KEY=%s\n' "$(openssl rand -hex 32)" >"$GAME_ENV_FILE"
+  printf 'DOGGYBANK_PLAYER_KEY=%s\n' "$(openssl rand -hex 32)" >"$GAME_ENV_FILE"
   chmod 600 "$GAME_ENV_FILE"
 fi
 grep -q '^MAIL_KEY=' "$AUTH_ENV_FILE" || printf 'MAIL_KEY=%s\n' "$(openssl rand -hex 32)" >>"$AUTH_ENV_FILE"
 sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
 printf 'BETTER_AUTH_URL=%s\n' "$SITE_URL" >>"$AUTH_ENV_FILE"
-password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
-cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/poker-house.conf" <<CONF
+password=$(sed -n 's|^DATABASE_URL=postgresql://doggybank:\([^@]*\)@.*|\1|p' "$ENV_FILE")
+cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/doggybank.conf" <<CONF
 shared_buffers = 512MB
 effective_cache_size = 1GB
 synchronous_commit = off
@@ -54,9 +54,9 @@ max_connections = 20
 CONF
 systemctl restart "postgresql@$PG_MAJOR-main"
 runuser -u postgres -- psql -v ON_ERROR_STOP=1 -q <<SQL
-SELECT 'CREATE ROLE poker_house LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'poker_house')\gexec
-ALTER ROLE poker_house PASSWORD '$password';
-SELECT 'CREATE DATABASE poker_house OWNER poker_house' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'poker_house')\gexec
+SELECT 'CREATE ROLE doggybank LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'doggybank')\gexec
+ALTER ROLE doggybank PASSWORD '$password';
+SELECT 'CREATE DATABASE doggybank OWNER doggybank' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'doggybank')\gexec
 SQL
 
 if [[ ! -x /usr/local/bin/uv ]]; then
@@ -77,7 +77,7 @@ as_app() {
 as_app git -C "$APP_DIR" fetch -q origin "$COMMIT"
 as_app git -C "$APP_DIR" checkout -q --detach "$COMMIT"
 cd "$APP_DIR"
-as_app uv sync -q --frozen --package poker-house-server
+as_app uv sync -q --frozen --package doggybank-server
 as_app pnpm install --frozen-lockfile --silent
 as_app pnpm build >/dev/null
 psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
@@ -88,9 +88,9 @@ allow_hosts=()
 for host in "${HOSTS[@]}"; do
   allow_hosts+=(--allow-host "$host")
 done
-cat >/etc/systemd/system/poker-house.service <<UNIT
+cat >/etc/systemd/system/doggybank.service <<UNIT
 [Unit]
-Description=Poker House
+Description=Doggybank
 Requires=postgresql@$PG_MAJOR-main.service
 After=network-online.target postgresql@$PG_MAJOR-main.service
 
@@ -101,15 +101,15 @@ User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$GAME_ENV_FILE
-ExecStart=$APP_DIR/.venv/bin/python -m poker_house_server --host 0.0.0.0 --port 8787 ${allow_hosts[*]}
+ExecStart=$APP_DIR/.venv/bin/python -m doggybank_server --host 0.0.0.0 --port 8787 ${allow_hosts[*]}
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 UNIT
-cat >/etc/systemd/system/poker-house-auth.service <<UNIT
+cat >/etc/systemd/system/doggybank-auth.service <<UNIT
 [Unit]
-Description=Poker House sign-in
+Description=Doggybank sign-in
 Requires=postgresql@$PG_MAJOR-main.service
 After=network-online.target postgresql@$PG_MAJOR-main.service
 
@@ -127,9 +127,9 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service poker-house-auth.service
-systemctl restart poker-house.service poker-house-auth.service
+systemctl enable -q "postgresql@$PG_MAJOR-main.service" doggybank.service doggybank-auth.service
+systemctl restart doggybank.service doggybank-auth.service
 
 curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
 curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
-echo "Poker House $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."
+echo "Doggybank $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."

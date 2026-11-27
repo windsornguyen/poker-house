@@ -1,8 +1,8 @@
 {
-  "name": "@poker-house/auth",
+  "name": "@doggybank/auth",
   "version": "0.1.0",
   "private": true,
-  "description": "Better Auth for Poker House, on the game's Postgres.",
+  "description": "Better Auth for Doggybank, on the game's Postgres.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

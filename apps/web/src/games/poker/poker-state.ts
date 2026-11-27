@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // The poker table as the board draws it, derived from the session: the
 // seats, the board, the pot, the street, the actions grouped into fold, call

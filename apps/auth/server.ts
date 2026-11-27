@@ -73,7 +73,7 @@ createServer((request, response) => {
       throw new Error(`The database is not ready: ${reason}`);
     }
 
-    console.log(`Poker House auth on port ${String(PORT)}`);
+    console.log(`Doggybank auth on port ${String(PORT)}`);
     if (process.env['NOTIFY_SOCKET'] !== undefined) {
       execFileSync('systemd-notify', ['--ready']);
     }

@@ -1,4 +1,4 @@
-# Copyright 2026 Poker House contributors
+# Copyright 2026 Doggybank contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,11 +24,11 @@ from unittest import mock
 
 from absl.testing import absltest
 
-from poker_house_server import child_servers, play
+from doggybank_server import child_servers, play
 
 _SLOW_BOT = """
 import time
-from poker_house_server.poker_bot import PokerBot
+from doggybank_server.poker_bot import PokerBot
 
 class SlowBot(PokerBot):
   def move(self, request):
@@ -65,7 +65,7 @@ class LauncherTest(absltest.TestCase):
                 "PYTHONPATH": os.pathsep.join([directory, os.environ.get("PYTHONPATH", "")])
             }
             options = play.Options(
-                game="poker_house(blinds=1 2,stack_sizes=20 20)",
+                game="doggybank(blinds=1 2,stack_sizes=20 20)",
                 bot="slow_poker_bot:make_bot",
                 spectate=True,
                 server_per_seat=True,

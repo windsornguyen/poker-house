@@ -1,7 +1,7 @@
-# Poker House engine
+# Doggybank engine
 
 This package adapts PokerKit through OpenSpiel. Import
-`poker_house_engine.game` before loading `poker_house` or `poker_house_acpc`
+`doggybank_engine.game` before loading `doggybank` or `doggybank_acpc`
 with `pyspiel.load_game`. The latter uses ACPC action IDs; both use the same
 poker rules. The adapter and its original tests are derived from OpenSpiel;
 see the repository's `NOTICE`.

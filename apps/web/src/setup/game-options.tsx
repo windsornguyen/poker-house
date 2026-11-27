@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-specific settings copy.
+// Modified for Doggybank: poker-specific settings copy.
 
 import type {JSX} from 'react';
 import {useState} from 'react';

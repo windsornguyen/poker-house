@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // Poker table motion: what changed between two states of the table
 // moves, so a player can see what the bot just did without reading the

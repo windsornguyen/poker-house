@@ -8,7 +8,7 @@ const PATHS = new Set<string>(Object.values(viewPaths.auth));
 
 /** The sign-in pages' title. */
 export function meta(): Array<{title: string}> {
-  return [{title: 'Sign in · Poker House'}];
+  return [{title: 'Sign in · Doggybank'}];
 }
 
 /** Refuses a path that names no sign-in view. */

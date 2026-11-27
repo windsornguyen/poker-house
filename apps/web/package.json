@@ -1,8 +1,8 @@
 {
-  "name": "@poker-house/web",
+  "name": "@doggybank/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Poker House browser client and poker table.",
+  "description": "Doggybank browser client and poker table.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

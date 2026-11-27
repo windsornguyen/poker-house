@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // Generates src/contract/contract.ts, the TypeScript types of the wire format,
 // from the JSON Schema the Python server publishes. Run it with
@@ -35,7 +35,7 @@ import {isEntryPoint} from './entry-point.ts';
 /** The JSON Schema of the wire format, as the Python server publishes it. */
 export const SCHEMA_PATH = resolve(
   import.meta.dirname,
-  '../../server/src/poker_house_server/contract.schema.json',
+  '../../server/src/doggybank_server/contract.schema.json',
 );
 /** The generated Zod schemas of the wire format, src/contract/contract.ts. */
 export const CONTRACT_PATH = resolve(
@@ -48,7 +48,7 @@ export const ROOT_NAME = 'ResponseBody';
 const ROOT_DESCRIPTION = 'Every response body the server sends.';
 
 // The generated file opens with this file's license header, then this notice.
-const NOTICE = `// Generated from apps/server/src/poker_house_server/contract.schema.json by
+const NOTICE = `// Generated from apps/server/src/doggybank_server/contract.schema.json by
 // scripts/generate-contract.ts. Do not edit; run pnpm generate:contract.`;
 
 /** A schema whose keywords have been checked to have these shapes. */

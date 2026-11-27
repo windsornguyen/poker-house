@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // Every renderer the client has, by the name a server adapter gives it. A
 // game's renderer is added here, one line each, in name order; a game whose

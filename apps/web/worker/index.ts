@@ -11,6 +11,7 @@ interface Env {
   readonly MAIL_KEY: string;
   readonly MAIL_FROM: string;
   readonly PLAYER_KEY: string;
+  readonly SITE_URL: string;
 }
 
 /** An email the Machine may ask for: the site page its link must open. */
@@ -85,7 +86,7 @@ async function sendMail(
   );
   try {
     await env.EMAIL.send({
-      from: {email: env.MAIL_FROM, name: 'Poker House'},
+      from: {email: env.MAIL_FROM, name: 'Doggybank'},
       to: link.to,
       subject: kind.action,
       text: `${kind.action}: ${link.url}`,
@@ -166,6 +167,10 @@ function forward(
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    // Links shared before the site had its own domain still land on it.
+    if (url.hostname.endsWith('.workers.dev')) {
+      return Response.redirect(env.SITE_URL + url.pathname + url.search, 301);
+    }
     const mail = MAILS.get(url.pathname);
     if (mail !== undefined) return sendMail(request, env, mail);
     if (!url.pathname.startsWith('/api/')) return notFound();

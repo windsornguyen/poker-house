@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 import {type JSX, type ReactNode, useEffect, useState} from 'react';
 
@@ -35,7 +35,7 @@ export interface AppProps {
 }
 
 /**
- * Poker House: the bot lobby at `/`, and each game's page at
+ * Doggybank: the bot lobby at `/`, and each game's page at
  * `/game/<name>`. Every link loads its page afresh.
  */
 export function App(props: AppProps): JSX.Element {
@@ -65,7 +65,7 @@ export function App(props: AppProps): JSX.Element {
       <Page title="Heads-up Hold’em">
         <PokerLobby
           entry={catalogue.catalogue.games.find(
-            game => game.name === 'poker_house',
+            game => game.name === 'doggybank',
           )}
           client={client}
           onOpen={frame => {
@@ -134,7 +134,7 @@ function Page({
       <header className="app__header">
         <div className="app__brand">
           <a className="app__home" href="/">
-            Poker House
+            Doggybank
           </a>
           <span className="app__separator" aria-hidden="true">
             •

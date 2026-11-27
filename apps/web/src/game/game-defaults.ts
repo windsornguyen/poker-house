@@ -26,7 +26,7 @@ import {HUMAN_SEAT} from '../setup/parameters.ts';
 const OPENING_PARAMETERS: Readonly<
   Record<string, CreateSession['parameters']>
 > = {
-  poker_house: {blinds: '1 2', stack_sizes: '200 200'},
+  doggybank: {blinds: '1 2', stack_sizes: '200 200'},
 };
 
 /**

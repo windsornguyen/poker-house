@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // The color theme. The user picks a preference; the page shows the theme it
 // resolves to, written to <html data-theme> where src/styles/tokens.css reads
@@ -33,7 +33,7 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = [
 ];
 
 /** The localStorage key holding an explicit preference. */
-export const THEME_STORAGE_KEY = 'poker_house.theme';
+export const THEME_STORAGE_KEY = 'doggybank.theme';
 
 /** The media query that reports a system preference for dark colors. */
 export const DARK_QUERY = '(prefers-color-scheme: dark)';

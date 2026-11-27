@@ -6,7 +6,7 @@ import threading
 import urllib.parse
 from typing import Any
 
-from poker_house_server import api, contract, health_report, loader, server, static, store
+from doggybank_server import api, contract, health_report, loader, server, static, store
 
 PLAYER_KEY = "test-player-key"
 

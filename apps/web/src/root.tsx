@@ -32,7 +32,7 @@ import './styles/base.css';
 export const FIRST_PAINT_THEME = `      (() => {
         let preference = null;
         try {
-          preference = localStorage.getItem('poker_house.theme');
+          preference = localStorage.getItem('doggybank.theme');
         } catch {
         }
         const dark =

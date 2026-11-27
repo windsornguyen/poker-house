@@ -11,26 +11,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Modified for Poker House.
+# Modified for Doggybank.
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "poker-house-server"
+name = "doggybank-server"
 version = "0.1.0"
 description = "Local poker matches and structured remote bot protocol."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.14,<3.15"
-dependencies = ["poker-house-engine==0.1.0", "psycopg[binary]==3.3.9", "pydantic==2.13.5"]
+dependencies = ["doggybank-engine==0.1.0", "psycopg[binary]==3.3.9", "pydantic==2.13.5"]
 
 [project.scripts]
-poker-house = "poker_house_server.cli:main"
-poker-house-play = "poker_house_server.play:main"
-poker-house-bot = "poker_house_server.remote_bot_server:main"
+doggybank = "doggybank_server.cli:main"
+doggybank-play = "doggybank_server.play:main"
+doggybank-bot = "doggybank_server.remote_bot_server:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/poker_house_server"]
+packages = ["src/doggybank_server"]

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // The poker board: the hand bar (the game, the street, blinds or ante,
 // stacks, seats and New hand), the table (the board's cards, the pot and a

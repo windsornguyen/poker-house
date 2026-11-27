@@ -34,7 +34,7 @@ from absl.testing import absltest
 from hypothesis import stateful
 from hypothesis import strategies as st
 
-from poker_house_server import (
+from doggybank_server import (
     api,
     contract,
     db,
@@ -52,7 +52,7 @@ STACK = 40
 TOP_UP = 100_000
 HUMAN: dict[str, contract.JsonValue] = {"controller": "human", "config": {}, "autoplay": False}
 TABLE: dict[str, contract.JsonValue] = {
-    "game": "poker_house",
+    "game": "doggybank",
     "parameters": {"blinds": "1 2", "stack_sizes": f"{STACK} {STACK}"},
     "chance_policy": "auto",
     "seed": None,
@@ -69,7 +69,7 @@ hypothesis.settings.register_profile(
 hypothesis.settings.register_profile(
     "soak", max_examples=2_000, stateful_step_count=80, deadline=None
 )
-hypothesis.settings.load_profile(os.environ.get("POKER_HOUSE_HYPOTHESIS", "check"))
+hypothesis.settings.load_profile(os.environ.get("DOGGYBANK_HYPOTHESIS", "check"))
 
 POSTGRES: cluster.Cluster
 API: api.Api

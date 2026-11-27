@@ -75,11 +75,11 @@ export async function play(
 
 if (isEntryPoint(import.meta.filename)) {
   const [site, code] = process.argv.slice(2);
-  const email = process.env['POKER_HOUSE_EMAIL'];
-  const password = process.env['POKER_HOUSE_PASSWORD'];
+  const email = process.env['DOGGYBANK_EMAIL'];
+  const password = process.env['DOGGYBANK_PASSWORD'];
   if (!site || !code || !email || !password) {
     throw new Error(
-      'Usage: POKER_HOUSE_EMAIL=… POKER_HOUSE_PASSWORD=… node scripts/join-room.ts SITE CODE',
+      'Usage: DOGGYBANK_EMAIL=… DOGGYBANK_PASSWORD=… node scripts/join-room.ts SITE CODE',
     );
   }
 

@@ -1,4 +1,4 @@
-# Poker House
+# Doggybank
 
 A poker arena built from the OpenSpiel GUI and PokerKit adapter. Keep poker
 rules in the engine dependency. Bots receive only their own structured

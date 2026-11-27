@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 import {act} from 'react';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vite-plus/test';
@@ -195,7 +195,7 @@ describe('App, its header', () => {
     expect(controls).toEqual(['Panels', 'Settings']);
   });
 
-  it('names Poker House, then a bullet hidden from readers, then the title', () => {
+  it('names Doggybank, then a bullet hidden from readers, then the title', () => {
     const brand = open('/game/count').querySelector('header .app__brand');
     const parts = [...(brand?.children ?? [])].map(part => [
       part.tagName,
@@ -203,7 +203,7 @@ describe('App, its header', () => {
       part.getAttribute('aria-hidden'),
     ]);
     expect(parts).toEqual([
-      ['A', 'Poker House', null],
+      ['A', 'Doggybank', null],
       ['SPAN', '•', 'true'],
       ['H1', 'Heads-up Hold’em', null],
     ]);

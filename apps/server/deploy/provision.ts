@@ -9,8 +9,8 @@ const AUTH_PORT = 8788;
 const SETUP_TIMEOUT_MS = 1_800_000;
 
 const Env = z.object({
-  POKER_HOUSE_SITE_URL: z.url(),
-  POKER_HOUSE_MACHINE_ID: z.string().optional(),
+  DOGGYBANK_SITE_URL: z.url(),
+  DOGGYBANK_MACHINE_ID: z.string().optional(),
 });
 
 function announceKey(name: string, port: Port): void {
@@ -43,7 +43,7 @@ function publishedCommit(): string {
 const commit = publishedCommit();
 const env = Env.parse(process.env);
 
-const machineId = await ensureMachine(env.POKER_HOUSE_MACHINE_ID);
+const machineId = await ensureMachine(env.DOGGYBANK_MACHINE_ID);
 console.log(`Machine ${machineId}`);
 await waitRunning(machineId);
 
@@ -64,7 +64,7 @@ const {execution, output} = await run(
   machineId,
   [
     'env',
-    `SITE_URL=${env.POKER_HOUSE_SITE_URL}`,
+    `SITE_URL=${env.DOGGYBANK_SITE_URL}`,
     'bash',
     '-s',
     '--',

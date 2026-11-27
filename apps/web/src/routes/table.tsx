@@ -14,7 +14,7 @@ export function meta(): Array<{
   content?: string;
 }> {
   return [
-    {title: 'Poker House'},
+    {title: 'Doggybank'},
     {
       name: 'description',
       content:
@@ -43,7 +43,7 @@ export async function clientLoader({
 export function HydrateFallback(): JSX.Element {
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-2 p-6 text-center">
-      <h1 className="text-2xl font-semibold tracking-tight">Poker House</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">Doggybank</h1>
       <p className="max-w-md text-sm text-muted-foreground">
         Heads-up no-limit Texas hold’em against friends and your own bots, live
         in the browser.

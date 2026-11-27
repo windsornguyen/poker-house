@@ -21,7 +21,7 @@ import {ThemeProvider} from '../theme/theme-provider.tsx';
 
 /** The admin page's title. */
 export function meta(): Array<{title: string}> {
-  return [{title: 'Chips · Poker House'}];
+  return [{title: 'Chips · Doggybank'}];
 }
 
 /** Sends a visitor without a session to sign in, and back here after. */

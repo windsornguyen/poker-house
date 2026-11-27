@@ -1,8 +1,8 @@
 {
-  "name": "@poker-house/deploy",
+  "name": "@doggybank/deploy",
   "version": "0.1.0",
   "private": true,
-  "description": "Provisions Poker House on a Dedalus Machine.",
+  "description": "Provisions Doggybank on a Dedalus Machine.",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {

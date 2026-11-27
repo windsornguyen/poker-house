@@ -12,11 +12,11 @@ import cluster
 import harness
 from absl.testing import absltest
 
-from poker_house_server import contract, db, ledger, store
+from doggybank_server import contract, db, ledger, store
 
 BUY_IN = 40
 TABLE: dict[str, contract.JsonValue] = {
-    "game": "poker_house",
+    "game": "doggybank",
     "parameters": {"blinds": "1 2", "stack_sizes": f"{BUY_IN} {BUY_IN}"},
     "chance_policy": "auto",
     "seed": 3,

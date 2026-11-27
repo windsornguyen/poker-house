@@ -2,9 +2,9 @@
 members = ["apps/server", "apps/players", "packages/python/engine"]
 
 [tool.uv.sources]
-poker-house-engine = { workspace = true }
-poker-house-server = { workspace = true }
-poker-house-players = { workspace = true }
+doggybank-engine = { workspace = true }
+doggybank-server = { workspace = true }
+doggybank-players = { workspace = true }
 
 [dependency-groups]
 check = ["ruff==0.17.6", "ty==0.0.112"]
@@ -24,7 +24,7 @@ docstring-code-format = true
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ANN", "RET"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["poker_house_engine", "poker_house_players", "poker_house_server"]
+known-first-party = ["doggybank_engine", "doggybank_players", "doggybank_server"]
 
 [tool.ty.environment]
 python = "./.venv"

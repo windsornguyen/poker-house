@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // A board's view settings: one store the Gameplay panel's board and the View
 // panel's sections both read, so a change in one shows in the other at once.
@@ -42,7 +42,7 @@ function setValue(key: string, value: unknown): void {
 
 /** Where a persisted view setting lives in localStorage. */
 export function storedSettingKey(key: string): string {
-  return `poker_house.gui.${key}`;
+  return `doggybank.gui.${key}`;
 }
 
 /**

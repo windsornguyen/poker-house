@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 // The poker board's session: the frame and the poker adapter's view, joined
 // into the one record the board reads (the state, the seats and the moves).

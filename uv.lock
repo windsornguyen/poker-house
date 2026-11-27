@@ -4,9 +4,9 @@ requires-python = "==3.14.*"
 
 [manifest]
 members = [
-    "poker-house-engine",
-    "poker-house-players",
-    "poker-house-server",
+    "doggybank-engine",
+    "doggybank-players",
+    "doggybank-server",
 ]
 
 [manifest.dependency-groups]
@@ -63,6 +63,59 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/51/33/4cd27639502f010084bcef7a2036391dd637439901341ce1a530f36f6e51/certifi-2026.11.20.tar.gz", hash = "sha256:af1cb240a8133f105aa52684a3a3258339d7f2fd0bd4e2812698ff5cf5588c4e", size = 128901, upload-time = "2026-11-20T23:37:49.522Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6d/39/5eec3296860b94ac20bb8ed807725b88f6adfab3f343df592afd975f5f86/certifi-2026.11.20-py3-none-any.whl", hash = "sha256:7422df25243767b9877031a2248cb14d09ddac9beee846f4cef3d5c9191d488f", size = 127913, upload-time = "2026-11-20T23:37:48.117Z" },
+]
+
+[[package]]
+name = "doggybank-engine"
+version = "0.1.0"
+source = { editable = "packages/python/engine" }
+dependencies = [
+    { name = "absl-py" },
+    { name = "numpy" },
+    { name = "open-spiel" },
+    { name = "pokerkit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "absl-py", specifier = ">=2,<3" },
+    { name = "numpy", specifier = ">=2,<3" },
+    { name = "open-spiel", specifier = "==2.0.2" },
+    { name = "pokerkit", specifier = "==0.6.3" },
+]
+
+[[package]]
+name = "doggybank-players"
+version = "0.1.0"
+source = { editable = "apps/players" }
+dependencies = [
+    { name = "doggybank-server" },
+    { name = "httpx" },
+    { name = "pokerkit" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "doggybank-server", editable = "apps/server" },
+    { name = "httpx", specifier = "==0.29.0" },
+    { name = "pokerkit", specifier = "==0.6.3" },
+]
+
+[[package]]
+name = "doggybank-server"
+version = "0.1.0"
+source = { editable = "apps/server" }
+dependencies = [
+    { name = "doggybank-engine" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "doggybank-engine", editable = "packages/python/engine" },
+    { name = "psycopg", extras = ["binary"], specifier = "==3.3.9" },
+    { name = "pydantic", specifier = "==2.13.5" },
 ]
 
 [[package]]
@@ -232,59 +285,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/43/11/2235fb7b26ac3d0dfe14437af97531c134a3b3e7e2947b88862fc181ba9d/open_spiel-2.0.2-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b66f2ecfec2eda81c17659b544ec2a6a729a34d54474edd09af386bad37e019b", size = 15260888, upload-time = "2026-08-12T18:57:40.556Z" },
     { url = "https://files.pythonhosted.org/packages/08/bf/f803566a00124a3d82eb056cd83442d2f8ef4ff61163f56d548481da87be/open_spiel-2.0.2-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:661cc7615d3a09294fbc37cb9d15b123d03b970dbfc0b110ccbbc91c2835d4d2", size = 16050762, upload-time = "2026-08-12T18:57:42.698Z" },
     { url = "https://files.pythonhosted.org/packages/63/ca/c10349d4fc3644c35c43f43a68a0ef538510bbab4a3eaf1055abaa8f9fa2/open_spiel-2.0.2-cp314-cp314-win_amd64.whl", hash = "sha256:38ee96134315e2bd93bcf3bec7ea7f16079d4a5635523b9500e9fb853eff8eaa", size = 10512259, upload-time = "2026-08-12T18:57:45.055Z" },
-]
-
-[[package]]
-name = "poker-house-engine"
-version = "0.1.0"
-source = { editable = "packages/python/engine" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "numpy" },
-    { name = "open-spiel" },
-    { name = "pokerkit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "absl-py", specifier = ">=2,<3" },
-    { name = "numpy", specifier = ">=2,<3" },
-    { name = "open-spiel", specifier = "==2.0.2" },
-    { name = "pokerkit", specifier = "==0.6.3" },
-]
-
-[[package]]
-name = "poker-house-players"
-version = "0.1.0"
-source = { editable = "apps/players" }
-dependencies = [
-    { name = "httpx" },
-    { name = "poker-house-server" },
-    { name = "pokerkit" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = "==0.29.0" },
-    { name = "poker-house-server", editable = "apps/server" },
-    { name = "pokerkit", specifier = "==0.6.3" },
-]
-
-[[package]]
-name = "poker-house-server"
-version = "0.1.0"
-source = { editable = "apps/server" }
-dependencies = [
-    { name = "poker-house-engine" },
-    { name = "psycopg", extra = ["binary"] },
-    { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "poker-house-engine", editable = "packages/python/engine" },
-    { name = "psycopg", extras = ["binary"], specifier = "==3.3.9" },
-    { name = "pydantic", specifier = "==2.13.5" },
 ]
 
 [[package]]

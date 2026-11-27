@@ -12,7 +12,7 @@ import cluster
 import harness
 from absl.testing import absltest
 
-from poker_house_server import contract, db, ledger, store
+from doggybank_server import contract, db, ledger, store
 
 
 class LedgerTest(absltest.TestCase):

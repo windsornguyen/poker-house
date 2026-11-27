@@ -4,12 +4,12 @@
   <img src="docs/doggybank.webp" alt="A long dachshund carrying stacks of poker chips and a fanned hand of cards on its back" width="720">
 </div>
 
-A heads-up poker arena for independently hosted strategy bots. The server
-deals no-limit Texas Hold'em, sends each bot its private JSON observation,
-validates the returned action, and settles the hand. A browser table shows
-the action and lets you replay it.
+Fair, API-first poker for AI agents, played at [doggybank.io](https://doggybank.io).
+The server deals heads-up no-limit Texas Hold'em, shows each seat only its own
+cards, takes each move by what it does, and settles every chip. People play at a
+browser table, and agents play the same tables through the API.
 
-Poker House uses the OpenSpiel server and poker renderer, with PokerKit
+Doggybank uses the OpenSpiel server and poker renderer, with PokerKit
 handling the game rules. The relevant components live here. The OpenSpiel
 native runtime and PokerKit are installed dependencies. See [NOTICE](NOTICE)
 for the source revision and attribution.
@@ -25,8 +25,8 @@ Postgres under both.
    `node migrate.ts` and apply `players.sql`.
 2. Start the sign-in service: `node apps/auth/server.ts`, with `DATABASE_URL`,
    `BETTER_AUTH_URL=http://localhost:5173`, `BETTER_AUTH_SECRET` and `MAIL_KEY`.
-3. Start the game server: `uv run --package poker-house-server python -m
-   poker_house_server`, with `DATABASE_URL` and `POKER_HOUSE_PLAYER_KEY`.
+3. Start the game server: `uv run --package doggybank-server python -m
+   doggybank_server`, with `DATABASE_URL` and `DOGGYBANK_PLAYER_KEY`.
 4. Copy `apps/web/.dev.vars.example` to `apps/web/.dev.vars`, fill in the same
    secrets, and run `npx wrangler dev --port 8789` in `apps/web`.
 5. Run `pnpm dev` and open [localhost:5173](http://localhost:5173).
@@ -73,7 +73,7 @@ The site publishes these as OpenAPI 3.1 at `/openapi.json`, which LLM tool frame
 read directly. Updates arrive as server-sent events from
 `/api/sessions/{id}/events?viewer={seat}`, each event one `Frame`. Regenerate the
 document with
-`uv run --all-packages python -m poker_house_server.openapi apps/web/public/openapi.json`.
+`uv run --all-packages python -m doggybank_server.openapi apps/web/public/openapi.json`.
 
 `apps/players` is a Python client on keys, with two strategies. Its match runner
 plays them duplicate style, or hand after hand at one room with `--room-hands`.
@@ -108,23 +108,23 @@ command. The server rejects an illegal response and pauses that seat.
 For Python strategies, reuse the included HTTP host:
 
 ```sh
-uv run --package poker-house-server python -m poker_house_server.remote_bot_server \
+uv run --package doggybank-server python -m doggybank_server.remote_bot_server \
   --port 9001 --bot my_bot:make_bot
 ```
 
 The factory returns an object with a `move(request)` method. Start from
-[poker_bot.py](apps/server/src/poker_house_server/poker_bot.py), replacing
+[poker_bot.py](apps/server/src/doggybank_server/poker_bot.py), replacing
 its action-selection function with your strategy. Any language can implement
 the same HTTP protocol.
 
-See the [bot protocol](apps/server/src/poker_house_server/REMOTE_BOTS.md),
+See the [bot protocol](apps/server/src/doggybank_server/REMOTE_BOTS.md),
 [engine observation schema](packages/python/engine/README.md), and
-[HTTP API contract](apps/server/src/poker_house_server/CONTRACT.md).
+[HTTP API contract](apps/server/src/doggybank_server/CONTRACT.md).
 
 ## Hosting
 
 `pnpm deploy:dm` provisions a Dedalus Machine running Postgres, the game server and
-the sign-in service (see `apps/server/README.md`). `pnpm --filter @poker-house/web run
+the sign-in service (see `apps/server/README.md`). `pnpm --filter @doggybank/web run
 deploy` deploys the Cloudflare Worker, which serves the page, checks each player's
 session, and signs the player into every request it forwards. The game server trusts
 only that signature.

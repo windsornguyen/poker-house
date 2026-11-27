@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified for Poker House: poker-only application integration.
+// Modified for Doggybank: poker-only application integration.
 
 import process from 'node:process';
 
@@ -26,9 +26,9 @@ import {playwright} from 'vite-plus/test/browser-playwright';
 import {thirdPartyNotices} from './scripts/third-party-notices.ts';
 
 // `pnpm dev` sends /api to the Worker running under `wrangler dev`
-// (POKER_HOUSE_WORKER), which signs the player in and forwards to the local
+// (DOGGYBANK_WORKER), which signs the player in and forwards to the local
 // game server and sign-in service, as it does in production.
-const WORKER = process.env['POKER_HOUSE_WORKER'] ?? 'http://127.0.0.1:8789';
+const WORKER = process.env['DOGGYBANK_WORKER'] ?? 'http://127.0.0.1:8789';
 
 export default defineConfig({
   plugins: [
