@@ -12,7 +12,6 @@ readonly REPO=https://github.com/windsornguyen/poker-house.git
 readonly APP_USER=poker-house
 readonly APP_DIR=/opt/poker-house
 readonly ENV_FILE=/etc/poker-house/db.env
-readonly BOOT_TARGET=dm-bake.target
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/opt/node/bin:$PATH"
@@ -75,11 +74,10 @@ ExecStart=$APP_DIR/.venv/bin/python -m poker_house_server --host 0.0.0.0 --port 
 Restart=on-failure
 
 [Install]
-WantedBy=$BOOT_TARGET
+WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl add-wants "$BOOT_TARGET" postgresql.service
-systemctl enable -q poker-house.service
+systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service
 systemctl restart poker-house.service
 
 for _ in $(seq 1 30); do
