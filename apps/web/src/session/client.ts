@@ -122,6 +122,10 @@ export class SessionClient {
     source.onmessage = event => {
       onFrame(JSON.parse(String(event.data)) as Frame);
     };
+    // The server ends a quiet stream so an idle tab lets the machine sleep.
+    source.addEventListener('idle', () => {
+      source.close();
+    });
     return () => {
       source.close();
     };

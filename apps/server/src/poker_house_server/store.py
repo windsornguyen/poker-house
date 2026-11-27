@@ -28,7 +28,7 @@ import collections
 import threading
 from collections.abc import Mapping, Sequence
 
-from poker_house_server import contract, db, errors, plies
+from poker_house_server import contract, db, errors, plies, timeouts
 from poker_house_server import controllers as controllers_lib
 from poker_house_server import session as session_lib
 
@@ -61,7 +61,7 @@ class Journal:
     def resume(self, session: session_lib.Session, saved: tuple[plies.Ply, ...]) -> None:
         """Records every change to a session whose first `saved` plies are stored."""
         self.saved[session.id] = saved
-        session.on_change = self.sync
+        session.listeners.append(self.sync)
         self.sync(session)
 
     def sync(self, session: session_lib.Session) -> None:
@@ -108,6 +108,8 @@ class SessionStore:
         )
         self._lock = threading.Lock()
         self.journal = journal
+        self.turns = timeouts.TurnClock()
+        self.hands = timeouts.HandClock(self.expire)
 
     def create(
         self,
@@ -156,11 +158,13 @@ class SessionStore:
                     )
                 ],
             )
+        self.turns.follow(session)
+        self.hands.follow(session)
         with self._lock:
             self._sessions[session.id] = session
             while len(self._sessions) > self._capacity:
                 evicted = self._sessions.popitem(last=False)[1]
-                evicted.on_change = None
+                evicted.listeners.clear()
                 evicted.close()
         return session
 
@@ -181,6 +185,8 @@ class SessionStore:
         if session is None and self.journal is not None:
             session = self.journal.load(session_id)
             if session is not None:
+                self.turns.follow(session)
+                self.hands.follow(session)
                 with self._lock:
                     session = self._sessions.setdefault(session_id, session)
         if session is None:
@@ -203,6 +209,14 @@ class SessionStore:
         session.close()
         if self.journal is not None:
             self.journal.forget(session_id)
+
+    def expire(self, session_id: str) -> None:
+        """Drops a session from memory and ends its streams; its record stays."""
+        with self._lock:
+            session = self._sessions.pop(session_id, None)
+        if session is not None:
+            session.listeners.clear()
+            session.close()
 
     def __len__(self) -> int:
         with self._lock:

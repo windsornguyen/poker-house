@@ -1,5 +1,8 @@
 class SilentEventSource {
   onmessage = null;
+  addEventListener(): void {
+    this.onmessage = null;
+  }
   close(): void {
     this.onmessage = null;
   }

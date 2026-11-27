@@ -96,7 +96,7 @@ class Session:
         # How many chance outcomes the session has sampled; never rewound.
         self._draws = 0
         self._lock = threading.RLock()
-        self.on_change: Callable[[Session], None] | None = None
+        self.listeners: list[Callable[[Session], None]] = []
         self._changed = threading.Condition(self._lock)
         self._version = 0
         self._closed = False
@@ -197,11 +197,17 @@ class Session:
             return self._version, self.build_frame(self._state, len(self._plies), viewer)
 
     def touch(self) -> None:
-        """Records a change, wakes every `wait`, and tells `on_change`."""
+        """Records a change, wakes every `wait`, and tells every listener."""
         self._version += 1
         self._changed.notify_all()
-        if self.on_change is not None:
-            self.on_change(self)
+        for listener in self.listeners:
+            listener(self)
+
+    @property
+    def version(self) -> int:
+        """How many changes the session has had; a change makes it larger."""
+        with self._lock:
+            return self._version
 
     @property
     def seed(self) -> int:

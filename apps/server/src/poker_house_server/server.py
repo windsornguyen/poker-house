@@ -35,7 +35,7 @@ import urllib.parse
 from absl import logging
 
 from poker_house_server import api as api_lib
-from poker_house_server import contract, errors, static
+from poker_house_server import contract, errors, static, timeouts
 
 # The host names that reach the loopback interface.
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
@@ -224,12 +224,19 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         version = -1
+        quiet = 0.0
         try:
             while not session.closed:
                 version, frame = session.wait(viewer, version, _KEEPALIVE_SECONDS)
                 if frame is None:
+                    quiet += _KEEPALIVE_SECONDS
+                    if quiet >= timeouts.STREAM_IDLE_SECONDS:
+                        self.wfile.write(b"event: idle\ndata:\n\n")
+                        self.wfile.flush()
+                        return
                     self.wfile.write(b": keepalive\n\n")
                 else:
+                    quiet = 0.0
                     data = json.dumps(
                         contract.to_json(frame), allow_nan=False, separators=(",", ":")
                     )

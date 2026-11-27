@@ -48,12 +48,14 @@ export function useSession(client: SessionClient, viewer: Viewer): Session {
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const id = snapshot.frame?.session.id ?? null;
   const shown = viewerParameter(viewer);
+  // Reopened after each command, which also revives a stream ended as idle.
+  const {busy} = snapshot;
   useEffect(() => {
-    if (id === null) return undefined;
+    if (id === null || busy) return undefined;
     return client.events(id, viewer, store.receive);
     // `shown` names the viewer, whose object may change without it changing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client, store, id, shown]);
+  }, [client, store, id, shown, busy]);
   // Until the effect passes a new viewer on, the store holds the old one's
   // frame.
   const frame =
