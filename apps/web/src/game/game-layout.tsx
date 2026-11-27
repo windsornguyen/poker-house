@@ -28,7 +28,7 @@ import {
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 
 import {useHeaderActions} from '../app/header-actions.ts';
-import {BotOutputView} from '../bot_output/bot-output.tsx';
+import {BotOutputView} from '../bot-output/bot-output.tsx';
 import {SETUP_GROUP, SetupPanel} from '../setup/setup-panel.tsx';
 import {STATE_GROUP} from '../state/state-panel.tsx';
 import {VIEW_GROUP} from '../view/view-panel.tsx';

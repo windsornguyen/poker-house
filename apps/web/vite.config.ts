@@ -58,7 +58,7 @@ export default defineConfig({
           name: 'browser',
           include: ['src/*.test.tsx'],
           setupFiles: ['src/testing/setup.ts'],
-          // Twice app_test's 5 s `until`, so a slow wait reports its failing
+          // Twice `app.test.tsx`'s 5 s `until`, so a slow wait reports its failing
           // check rather than the test timeout, and two waits fit in one test.
           testTimeout: 10000,
           browser: {
