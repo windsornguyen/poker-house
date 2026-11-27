@@ -91,9 +91,12 @@ done
 cat >/etc/systemd/system/poker-house.service <<UNIT
 [Unit]
 Description=Poker House
-After=network-online.target postgresql.service
+Requires=postgresql@$PG_MAJOR-main.service
+After=network-online.target postgresql@$PG_MAJOR-main.service
 
 [Service]
+Type=notify
+NotifyAccess=all
 User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
@@ -107,9 +110,12 @@ UNIT
 cat >/etc/systemd/system/poker-house-auth.service <<UNIT
 [Unit]
 Description=Poker House sign-in
-After=network-online.target postgresql.service
+Requires=postgresql@$PG_MAJOR-main.service
+After=network-online.target postgresql@$PG_MAJOR-main.service
 
 [Service]
+Type=notify
+NotifyAccess=all
 User=$APP_USER
 WorkingDirectory=$APP_DIR/apps/auth
 EnvironmentFile=$ENV_FILE
@@ -124,7 +130,6 @@ systemctl daemon-reload
 systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service poker-house-auth.service
 systemctl restart poker-house.service poker-house-auth.service
 
-for url in http://127.0.0.1:8787/ http://127.0.0.1:8788/api/auth/ok; do
-  curl -fsS -o /dev/null --retry 30 --retry-delay 1 --retry-connrefused "$url"
-done
+curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
+curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
 echo "Poker House $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."

@@ -206,6 +206,10 @@ class SessionStore:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         return session
 
+    def problem(self) -> str | None:
+        """Returns why the store cannot keep sessions, or None when it can."""
+        return None if self.journal is None else self.journal.database.problem()
+
     def join(self, code: str, player: str) -> tuple[session_lib.Session, int]:
         """Seats `player` in the room `code`, or finds the seat they hold there.
 

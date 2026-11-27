@@ -14,7 +14,8 @@ const Env = z.object({
   MAIL_KEY: z.string().min(32),
 });
 const env = Env.parse(process.env);
-const pool = new Pool({
+/** The connection pool Better Auth and the readiness probe share. */
+export const pool = new Pool({
   connectionString: env.DATABASE_URL,
   options: '-c search_path=auth',
 });

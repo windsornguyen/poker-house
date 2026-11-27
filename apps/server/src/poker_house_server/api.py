@@ -186,6 +186,10 @@ class Api:
         self._catalogue_of = catalogue
         self._health_of = health
 
+    def problem(self) -> str | None:
+        """Returns why the API cannot serve sessions, or None when it can."""
+        return self._sessions.problem()
+
     def identify(self, header: str | None) -> str | None:
         """Returns the account a signed player header names, or None for any other."""
         if header is None:

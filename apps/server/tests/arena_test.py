@@ -253,6 +253,16 @@ class ArenaTest(absltest.TestCase):
             self.assertEqual(error["code"], code, target)
             self.assertGreaterEqual(status, 400)
 
+    def test_the_probes_answer_without_a_player(self) -> None:
+        for path, body in ((server.LIVE_PATH, b"live"), (server.READY_PATH, b"ready")):
+            address = urllib.parse.urlsplit(self.arena.url)
+            assert address.hostname is not None
+            connection = http.client.HTTPConnection(address.hostname, address.port, timeout=15)
+            connection.request("GET", path)
+            response = connection.getresponse()
+            self.assertEqual((response.status, response.read()), (200, body), path)
+            connection.close()
+
     def test_an_unknown_code_finds_no_room(self) -> None:
         status, error = self.request("POST", "/api/rooms/ZZZZZZ/join", player=GUEST)
         self.assertEqual((status, error["code"]), (404, "not_found"))

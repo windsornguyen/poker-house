@@ -165,6 +165,15 @@ class Database:
             ),
         )
 
+    def problem(self) -> str | None:
+        """Returns why the database cannot answer a query, or None when it can."""
+        try:
+            with self.lock:
+                self.connection.execute("select 1")
+        except psycopg.Error as error:
+            return str(error)
+        return None
+
     def claim(self, session_id: str, seat: int, player: str) -> None:
         """Records `player` holding `seat`."""
         with self.lock:

@@ -48,6 +48,8 @@ _BODY_METHODS = frozenset({"POST", "PUT"})
 
 # Seconds between keepalive comments on an idle event stream, under the
 # idle timeouts of the proxies in front of a deployed server.
+LIVE_PATH = "/livez"
+READY_PATH = "/readyz"
 _KEEPALIVE_SECONDS = 15.0
 
 _DIGITS = re.compile(r"[0-9]+")
@@ -166,6 +168,18 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self.send_text(http.HTTPStatus.FORBIDDEN, f"Host {host!r} is refused.")
             return
         path = urllib.parse.urlsplit(self.path).path
+        if path == LIVE_PATH:
+            self.send_text(http.HTTPStatus.OK, "live")
+            return
+
+        if path == READY_PATH:
+            problem = self.app.api.problem()
+            if problem is None:
+                self.send_text(http.HTTPStatus.OK, "ready")
+            else:
+                self.send_text(http.HTTPStatus.SERVICE_UNAVAILABLE, problem)
+            return
+
         is_api = path.startswith(api_lib.PREFIX)
         if self.command not in _BODY_METHODS and has_body(self.headers):
             # The body is never read, so the connection cannot carry another

@@ -23,6 +23,7 @@ import math
 import os
 import pathlib
 import signal
+import subprocess
 import threading
 import types
 from collections.abc import Sequence
@@ -304,7 +305,15 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"Serving Poker House at {display_url(server, args.host)}",
             flush=True,
         )
+
+        notify_ready()
         server.serve_forever()
+
+
+def notify_ready() -> None:
+    """Tells systemd the server is bound and its database is open, when systemd runs it."""
+    if "NOTIFY_SOCKET" in os.environ:
+        subprocess.run(["systemd-notify", "--ready"], check=True)
 
 
 def display_url(server: server_lib.Server, host: str) -> str:
