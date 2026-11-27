@@ -74,15 +74,11 @@ export async function run(
 	return { execution, output };
 }
 
-// SDK 0.8.0 lacks the control plane's key_required password field.
-export async function ensurePort(machineId: string, port: number, password: string): Promise<Port> {
+export async function ensurePort(machineId: string, port: number): Promise<Port> {
 	for await (const existing of client.machines.ports.list({ machine_id: machineId })) {
 		if (existing.port === port) {
 			return existing;
 		}
 	}
-	return client.machines.ports.create(
-		{ machine_id: machineId, port },
-		{ body: { port, protocol: "http", visibility: "key_required", password } },
-	);
+	return client.machines.ports.create({ machine_id: machineId, port, visibility: "key_required" });
 }
