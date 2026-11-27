@@ -11,14 +11,26 @@ interface Env {
   readonly MAIL_FROM: string;
 }
 
-interface Verification {
-  readonly to: string;
-  readonly url: string;
+/** An email the Machine may ask for: the site page its link must open. */
+interface MailKind {
+  readonly page: string;
+  readonly action: string;
 }
 
+// Each mail route sends one kind of link, to one of this site's own pages, so
+// the routes cannot relay any other mail.
+const MAILS = new Map<string, MailKind>([
+  [
+    '/mail/verify',
+    {page: '/api/auth/verify-email?', action: 'Confirm your email'},
+  ],
+  [
+    '/mail/reset',
+    {page: '/api/auth/reset-password/', action: 'Reset your password'},
+  ],
+]);
+
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
-const MAIL_PATH = '/mail/verify';
-const ADDRESS = /^[^\s@,<>]+@[^\s@,<>]+$/;
 const ENTITIES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -42,39 +54,39 @@ async function hasMailKey(request: Request, env: Env): Promise<boolean> {
   return crypto.subtle.timingSafeEqual(given, expected);
 }
 
-/**
- * The address and link a verification email carries, or null. The link must
- * be this site's own verification page, so the route cannot relay other mail.
- */
-function verificationOf(body: unknown, site: string): Verification | null {
+/** The recipient and link in `body`, or null unless the link opens `page`. */
+function linkOf(body: unknown, page: string): {to: string; url: string} | null {
   if (typeof body !== 'object' || body === null) return null;
   const {to, url} = body as Record<string, unknown>;
-  if (typeof to !== 'string' || !ADDRESS.test(to)) return null;
-  if (typeof url !== 'string') return null;
-  if (!url.startsWith(`${site}/api/auth/verify-email?`)) return null;
+  if (typeof to !== 'string' || typeof url !== 'string') return null;
+  if (!url.startsWith(page)) return null;
   return {to, url};
 }
 
-/** Sends the email that confirms a player owns their address. */
-async function sendVerification(request: Request, env: Env): Promise<Response> {
+/** Sends the email `kind` names: one link, to this site. */
+async function sendMail(
+  request: Request,
+  env: Env,
+  kind: MailKind,
+): Promise<Response> {
   if (request.method !== 'POST' || !(await hasMailKey(request, env))) {
     return notFound();
   }
   const body: unknown = await request.json().catch(() => null);
-  const verification = verificationOf(body, new URL(request.url).origin);
-  if (verification === null) return notFound();
-  const {to, url} = verification;
-  const link = url.replaceAll(
-    /[&<>"]/g,
-    character => ENTITIES[character] ?? character,
+  const link = linkOf(body, new URL(request.url).origin + kind.page);
+  if (link === null) return notFound();
+  // `&` comes first in ENTITIES, so no entity is escaped twice.
+  const href = Object.entries(ENTITIES).reduce(
+    (text, [char, entity]) => text.replaceAll(char, entity),
+    link.url,
   );
   try {
     await env.EMAIL.send({
       from: {email: env.MAIL_FROM, name: 'Poker House'},
-      to,
-      subject: 'Confirm your email',
-      text: `Confirm your email: ${url}`,
-      html: `<p><a href="${link}">Confirm your email</a></p>`,
+      to: link.to,
+      subject: kind.action,
+      text: `${kind.action}: ${link.url}`,
+      html: `<p><a href="${href}">${kind.action}</a></p>`,
     });
   } catch (e) {
     return new Response(e instanceof Error ? e.message : String(e), {
@@ -99,7 +111,8 @@ function forward(
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === MAIL_PATH) return sendVerification(request, env);
+    const mail = MAILS.get(url.pathname);
+    if (mail !== undefined) return sendMail(request, env, mail);
     if (!url.pathname.startsWith('/api/')) return notFound();
     const origin = request.headers.get('Origin');
     if (

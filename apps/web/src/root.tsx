@@ -1,5 +1,28 @@
-import type {JSX, ReactNode} from 'react';
-import {Links, Meta, Outlet, Scripts, ScrollRestoration} from 'react-router';
+import {QueryClientProvider} from '@tanstack/react-query';
+import {
+  type ComponentPropsWithoutRef,
+  type JSX,
+  type ReactNode,
+  useEffect,
+} from 'react';
+import {
+  Link,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useNavigate,
+} from 'react-router';
+
+import {AuthProvider} from '@/components/auth/auth-provider';
+import {Toaster} from '@/components/ui/sonner';
+
+import {
+  SESSION_REFRESH_MS,
+  authClient,
+  queryClient,
+} from './session/auth_client.ts';
 
 import './styles/theme.css';
 import './styles/tokens.css';
@@ -49,5 +72,43 @@ export function Layout({
 
 /** The root route. */
 export default function Root(): JSX.Element {
-  return <Outlet />;
+  const navigate = useNavigate();
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void authClient.getSession({query: {disableCookieCache: true}});
+    }, SESSION_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider
+        authClient={authClient}
+        queryClient={queryClient}
+        navigate={({to, replace}) => {
+          void navigate(to, {replace: replace ?? false});
+        }}
+        Link={RouterLink}
+        emailAndPassword={{requireEmailVerification: true}}
+      >
+        <Outlet />
+        <Toaster />
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}
+
+type RouterLinkProps = {
+  readonly href: string;
+  readonly className?: string;
+  readonly children?: ReactNode;
+} & Pick<
+  ComponentPropsWithoutRef<'a'>,
+  'aria-disabled' | 'tabIndex' | 'onClick'
+>;
+
+// Better Auth UI names a link's target `href`; React Router's Link takes `to`.
+function RouterLink({href, ...props}: RouterLinkProps): JSX.Element {
+  return <Link to={href} {...props} />;
 }

@@ -19,9 +19,12 @@ const pool = new Pool({
   options: '-c search_path=auth',
 });
 
-/** Asks the Worker to send `to` the link that confirms they own the address. */
-async function sendVerification(to: string, url: string): Promise<void> {
-  const sent = await fetch(new URL('/mail/verify', env.BETTER_AUTH_URL), {
+/** The emails the Worker sends: to confirm an address, and to reset a password. */
+type Mail = 'verify' | 'reset';
+
+/** Asks the Worker to email `to` the link `url`, for `mail`. */
+async function sendMail(mail: Mail, to: string, url: string): Promise<void> {
+  const sent = await fetch(new URL(`/mail/${mail}`, env.BETTER_AUTH_URL), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${env.MAIL_KEY}`,
@@ -31,7 +34,7 @@ async function sendVerification(to: string, url: string): Promise<void> {
   });
   if (!sent.ok) {
     throw new Error(
-      `The verification email to ${to} failed: ${String(sent.status)} ${await sent.text()}`,
+      `The ${mail} email to ${to} failed: ${String(sent.status)} ${await sent.text()}`,
     );
   }
 }
@@ -41,12 +44,17 @@ export const options = {
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   database: pool,
-  emailAndPassword: {enabled: true, requireEmailVerification: true},
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    sendResetPassword: async ({user, url}) =>
+      sendMail('reset', user.email, url),
+  },
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({user, url}) =>
-      sendVerification(user.email, url),
+      sendMail('verify', user.email, url),
   },
   session: {
     expiresIn: WEEK_SECONDS,

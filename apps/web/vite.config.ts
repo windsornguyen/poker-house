@@ -37,6 +37,8 @@ export default defineConfig({
     babel({presets: [reactCompilerPreset()]}),
     thirdPartyNotices(),
   ],
+  // The shadcn code imports `@/`, mapped in tsconfig.json.
+  resolve: {tsconfigPaths: true},
   server: {proxy: {'/api': {target: API_SERVER, changeOrigin: false}}},
   test: {
     environment: 'jsdom',

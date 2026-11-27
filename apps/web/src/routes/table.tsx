@@ -1,6 +1,10 @@
+import {ensureSession} from '@better-auth-ui/core';
+import {useAuthenticate} from '@better-auth-ui/react';
 import type {JSX} from 'react';
+import {redirect} from 'react-router';
 
 import {App} from '../app.tsx';
+import {authClient, queryClient} from '../session/auth_client.ts';
 import {ThemeProvider} from '../theme/theme_provider.tsx';
 
 /** The page's title and description, which search engines index. */
@@ -19,8 +23,19 @@ export function meta(): Array<{
   ];
 }
 
-/** Renders the table in the browser, where the session lives. */
-export function clientLoader(): null {
+/** Sends a visitor without a session to sign in, and back here after. */
+export async function clientLoader({
+  request,
+}: {
+  request: Request;
+}): Promise<null> {
+  const session = await ensureSession(queryClient, authClient);
+  if (session === null) {
+    const {pathname, search} = new URL(request.url);
+    throw redirect(
+      `/auth/sign-in?redirectTo=${encodeURIComponent(pathname + search)}`,
+    );
+  }
   return null;
 }
 
@@ -39,6 +54,9 @@ export function HydrateFallback(): JSX.Element {
 
 /** The lobby or a game's table. */
 export default function Table(): JSX.Element {
+  // Sends the player to sign in if the session ends while the page is open.
+  const {data: session} = useAuthenticate(authClient);
+  if (!session) return <HydrateFallback />;
   return (
     <ThemeProvider>
       <App />
