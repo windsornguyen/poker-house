@@ -25,8 +25,9 @@ export interface ColorScheme {
 }
 
 /**
- * Stands in for window.matchMedia, which jsdom lacks, answering the dark
- * colour scheme query only. Undo it with vi.unstubAllGlobals().
+ * Stands in for window.matchMedia so a test sets the colour scheme the page
+ * sees, answering the dark colour scheme query only. Undo it with
+ * vi.unstubAllGlobals().
  */
 export function fakeColorScheme(dark: boolean): ColorScheme {
   let matches = dark;
@@ -53,7 +54,7 @@ export function fakeColorScheme(dark: boolean): ColorScheme {
   return {
     setDark: next => {
       matches = next;
-      // jsdom has no MediaQueryListEvent; the theme reads only `matches`.
+      // The theme reads only `matches`.
       const partial: Pick<MediaQueryListEvent, 'matches'> = {matches: next};
       const event = partial as MediaQueryListEvent;
       for (const listener of listeners) {

@@ -26,19 +26,6 @@ import {render, type Rendered} from './testing/render.tsx';
 import {chooseTab} from './testing/tabs.ts';
 import {ThemeProvider} from './theme/theme-provider.tsx';
 
-/** A ResizeObserver that never reports: the dock keeps its first layout. */
-class SilentResizeObserver {
-  observe(): void {
-    // Nothing is laid out under jsdom, so nothing ever resizes.
-  }
-  unobserve(): void {
-    // As observe.
-  }
-  disconnect(): void {
-    // As observe.
-  }
-}
-
 let rendered: Rendered | undefined;
 let server: FakeServer;
 
@@ -143,7 +130,6 @@ function lockedPerspective(container: HTMLElement): Array<string | null> {
 beforeEach(() => {
   window.localStorage.clear();
   fakeColorScheme(false);
-  vi.stubGlobal('ResizeObserver', SilentResizeObserver);
   server = new FakeServer();
 });
 

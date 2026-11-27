@@ -114,13 +114,13 @@
   /* An empty place's dashed outline: 45% of the text colour around it. */
   --card-empty-dash: color-mix(in srgb, currentColor 45%, var(--color-none));
   /*
-    Card text sizes a card sets inline from its width (playing_card.tsx);
+    Card text sizes a card sets inline from its width;
     these are the sizes until it does, at the text floor.
   */
   --pcard-empty-font: 12px;
   --pcard-symbol-font: 12px;
   /*
-    A felt table's info box (felt_table.css): its fill, edges and shadow
+    A felt table's info box: its fill, edges and shadow
     from the felt, and its danger button; the custom felt swatch's rainbow.
   */
   --felt-info-border: color-mix(
