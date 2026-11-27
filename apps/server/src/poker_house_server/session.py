@@ -72,10 +72,12 @@ class Session:
         session_id: str,
         code: str,
         holders: Sequence[str | None],
+        staked: bool,
     ) -> None:
         """Starts a session with every seat human; use `create` or `restore`."""
         self.id = session_id
         self.code = code
+        self.staked = staked
         self._holders = list(holders)
         self.game_name = loaded.name
         self._loaded = loaded
@@ -98,6 +100,8 @@ class Session:
                 for descriptor in controllers_lib.descriptors(loaded.game)
             ),
             code=code,
+            staked=staked,
+            next=None,
         )
         self._seats = seats.Seats(loaded.num_seats, loaded.game, seed=seed, on_built=self.built)
         self._state = loaded.game.new_initial_state()
@@ -121,9 +125,11 @@ class Session:
         chance_policy: contract.ChancePolicy,
         controllers: Sequence[controllers_lib.Spec],
         autoplay: Sequence[bool] = (),
-        player: str,
+        players: Sequence[str],
+        code: str,
+        staked: bool,
     ) -> Session:
-        """Starts a session of a game, with `player` at its first human seat.
+        """Starts a hand of room `code`, with `players` at its human seats in order.
 
         Args:
           game_name: A registered short name.
@@ -133,7 +139,9 @@ class Session:
           controllers: Who plays each seat, in seat order.
           autoplay: Whether each seat's controller plays as soon as it is to
             move, in seat order; empty for none.
-          player: The account that starts the session.
+          players: The accounts seated, in seat order.
+          code: The code of the room the hand is dealt at.
+          staked: Whether the hand is played for chips.
 
         Returns:
           The session, at its first position that needs a choice.
@@ -154,14 +162,16 @@ class Session:
             seed=seats.random_seed() if seed is None else seed,
             chance_policy=chance_policy,
             session_id=secrets.token_hex(8),
-            code="".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH)),
+            code=code,
             holders=[None] * num_seats,
+            staked=staked,
         )
         with session._lock:  # A build may finish on its own thread meanwhile.
             session._seats.assign(
                 dict(enumerate(zip(controllers, autoplay or [False] * num_seats, strict=False)))
             )
-            session.claim(player)
+            for player in players:
+                session.claim(player)
             session.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
         return session
 
@@ -212,6 +222,11 @@ class Session:
             return self._version, self.build_frame(self._state, len(self._plies), viewer)
 
     @property
+    def num_seats(self) -> int:
+        """The number of seats."""
+        return self._info.num_seats
+
+    @property
     def holders(self) -> tuple[str | None, ...]:
         """The account holding each seat, or None for an open seat."""
         with self._lock:
@@ -239,7 +254,8 @@ class Session:
         """Refuses a view `player` may not take.
 
         A seat's view belongs to the player holding it. Every card, the oracle's
-        view, is open only while no other player holds a seat.
+        view, is open only to a player holding every human seat, so no one sees
+        the cards of a seat another player holds or will take.
 
         Raises:
           ViewerUnavailableError: If `player` may not take `viewer`.
@@ -250,11 +266,19 @@ class Session:
                 raise errors.ViewerUnavailableError(
                     f"Seat {viewer.seat} is not yours.", seat=viewer.seat
                 )
-            others = any(holder not in (None, player) for holder in self._holders)
-            if viewer.kind == contract.ViewerKind.ORACLE and others:
+            humans = [
+                holder for index, holder in enumerate(self._holders) if self._seats[index].is_human
+            ]
+            if viewer.kind == contract.ViewerKind.ORACLE and any(h != player for h in humans):
                 raise errors.ViewerUnavailableError(
-                    "Another player sits at this table, so only your seat's view is open."
+                    "This table has a seat for another player, so only your seat's view is open."
                 )
+
+    def succeed(self, session_id: str) -> None:
+        """Records the room's next hand, so every viewer of this one learns of it."""
+        with self._lock:
+            self._info = dataclasses.replace(self._info, next=session_id)
+            self.touch()
 
     def touch(self) -> None:
         """Records a change, wakes every `wait`, and tells every listener."""
@@ -309,6 +333,7 @@ class Session:
             session_id=stored.id,
             code=stored.code,
             holders=[seat.player for seat in stored.seats],
+            staked=stored.staked,
         )
         with session._lock:
             session._seats.assign(
@@ -458,6 +483,7 @@ class Session:
         """
         with self._lock:
             self.check_viewer(viewer)
+            self.check_unstaked("taken back")
             step = self.last_action(viewer)
             if step is None:
                 raise errors.NothingToUndoError("There is no action to undo.")
@@ -490,6 +516,7 @@ class Session:
         with self._lock:
             self.check_viewer(viewer)
             self.check_participant(viewer, "resets the game")
+            self.check_unstaked("reset")
             self._state, rebuilt = plies.rebuild(self._loaded.game, history)
             self._plies = list(rebuilt)
             self._seats.clear_failures()
@@ -529,6 +556,7 @@ class Session:
         with self._lock:
             self.check_viewer(viewer)
             self.check_participant(viewer, "changes who plays a seat")
+            self.check_unstaked("given to another player")
             if not 0 <= seat < len(self._seats):
                 raise errors.NotFoundError(f"There is no seat {seat}.", seat=seat)
             self._seats.assign({seat: (spec, autoplay)})
@@ -550,6 +578,7 @@ class Session:
         with self._lock:
             self.check_viewer(viewer)
             self.check_participant(viewer, "closes the session")
+            self.check_unstaked("closed")
 
     def built(self, index: int, build: builds.Build[controllers_lib.Controller]) -> None:
         """Finishes the seat `build` prepares, if it still does, and plays on."""
@@ -615,6 +644,11 @@ class Session:
         """Refuses a spectator, who watches the game and never changes it."""
         if viewer.kind == contract.ViewerKind.SPECTATOR:
             raise errors.NotYourTurnError(f"A spectator never {what}.")
+
+    def check_unstaked(self, what: str) -> None:
+        """Refuses to rewind or rearrange a hand played for chips."""
+        if self.staked:
+            raise errors.ForbiddenError(f"This hand is played for chips, so it cannot be {what}.")
 
     def check_not_paused(self) -> None:
         """Refuses to move a paused session."""

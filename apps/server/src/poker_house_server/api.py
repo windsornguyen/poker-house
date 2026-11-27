@@ -39,6 +39,7 @@ from poker_house_server import accounts, contract, controllers, errors, moves, r
 from poker_house_server import catalogue as catalogue_lib
 from poker_house_server import health as health_lib
 from poker_house_server import ledger as ledger_lib
+from poker_house_server import rooms as rooms_lib
 from poker_house_server import session as session_lib
 
 # The path prefix of every API route.
@@ -100,6 +101,10 @@ class _Request:
         """The session the request concerns."""
         return self.path["id"]
 
+    def room_code(self) -> str:
+        """The room code the path names, as players type it in either case."""
+        return self.path["code"].upper()
+
     def viewer(self) -> contract.Viewer:
         """Returns the viewer named by the `viewer` query parameter."""
         values = self.query.get("viewer", [])
@@ -141,6 +146,13 @@ class _Request:
             first = e.errors()[0]
             where = ".".join(str(part) for part in first["loc"]) or "body"
             raise errors.BadRequestError(f"{where}: {first['msg']}.") from e
+
+
+def seat_view(seat: int | None) -> contract.Viewer:
+    """The view of a player at `seat`, or the spectator's when they sit the hand out."""
+    if seat is None:
+        return contract.Viewer(contract.ViewerKind.SPECTATOR)
+    return contract.Viewer(contract.ViewerKind.SEAT, seat)
 
 
 def spec(seat: request.SeatConfig) -> controllers.Spec:
@@ -324,19 +336,42 @@ class Api:
             controllers=[spec(seat) for seat in body.seats],
             autoplay=[seat.autoplay for seat in body.seats],
             player=player,
+            viewer=viewer,
         )
-        try:
-            session.authorize(viewer, player)
-            frame = session.frame(viewer)
-        except errors.RequestError:
-            self._sessions.delete(session.id)
-            raise
-        return ok(frame)
+        return ok(session.frame(viewer))
 
     def join(self, req: _Request) -> Response:
-        """Seats the player in a room by its code, and answers with their seat's view."""
-        session, seat = self._sessions.join(req.path["code"].upper(), req.signed_in())
-        return ok(session.frame(contract.Viewer(contract.ViewerKind.SEAT, seat)))
+        """Sits the player at a room by its code, and answers with their view of its hand."""
+        session, seat = self._sessions.join(req.room_code(), req.signed_in())
+        return ok(session.frame(seat_view(seat)))
+
+    def room(self, req: _Request) -> Response:
+        """Answers with the room as the player sees it."""
+        player = req.signed_in()
+        return ok(self.room_view(self._sessions.rooms().find(req.room_code()), player))
+
+    def room_view(self, room: rooms_lib.Room, player: str) -> rooms_lib.RoomView:
+        """`room` as `player` sees it."""
+        holders = () if room.latest is None else self._sessions.get(room.latest).holders
+        return rooms_lib.RoomView(
+            code=room.code,
+            buy_in=room.buy_in,
+            session_id=room.latest,
+            seat=holders.index(player) if player in holders else None,
+            stack=room.stack(player),
+            stacks=tuple(seat.stack for seat in room.seated),
+        )
+
+    def deal(self, req: _Request) -> Response:
+        """Deals the room's next hand, and answers with the player's view of it."""
+        body = req.decode(request.Deal)
+        session, seat = self._sessions.deal(req.room_code(), body.after, req.signed_in())
+        return ok(session.frame(seat_view(seat)))
+
+    def leave(self, req: _Request) -> Response:
+        """Gets the player up from the room's table, and answers with the room."""
+        player = req.signed_in()
+        return ok(self.room_view(self._sessions.leave(req.room_code(), player), player))
 
     def get_frame(self, req: _Request) -> Response:
         """Answers with the live position."""
@@ -405,7 +440,10 @@ class Api:
         route("GET", "admin/accounts", list_accounts),
         route("POST", "admin/grants", grant),
         route("POST", "sessions", create),
+        route("GET", "rooms/{code}", room),
         route("POST", "rooms/{code}/join", join),
+        route("POST", "rooms/{code}/deal", deal),
+        route("POST", "rooms/{code}/leave", leave),
         route("GET", "sessions/{id}", get_frame),
         route("DELETE", "sessions/{id}", close),
         route("GET", "sessions/{id}/plies/{ply}", replay),

@@ -51,6 +51,8 @@ export function frame(fields: Partial<Frame> = {}): Frame {
     session: {
       id: 'session-1',
       code: 'ROOM42',
+      staked: false,
+      next: null,
       game: 'game',
       parameters: {},
       num_seats: 2,

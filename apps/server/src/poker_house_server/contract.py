@@ -521,6 +521,10 @@ class SessionInfo:
         since it determines every chance outcome to come.
       controllers: The controllers that can play a seat of this game.
       code: The room code another player joins the session with.
+      staked: Whether the hand is played for chips: every seat is a player's,
+        each stack is chips they bought in with, and no one takes back,
+        resets or changes the hand.
+      next: The id of the room's next hand once it is dealt, else null.
     """
 
     id: str
@@ -533,6 +537,8 @@ class SessionInfo:
     seed: int | None
     controllers: tuple[Controller, ...]
     code: str
+    staked: bool
+    next: str | None
 
     def __post_init__(self) -> None:
         require(self.num_seats >= 1, f"A session cannot have {self.num_seats} seats.")

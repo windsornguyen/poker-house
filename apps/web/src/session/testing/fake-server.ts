@@ -56,6 +56,28 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
   ledger_unavailable: 503,
 };
 
+/** The fixed properties of a fake session, with the seed only the oracle sees. */
+function sessionInfo(
+  id: string,
+  hidesInformation: boolean,
+  seed: number | null,
+): Frame['session'] {
+  return {
+    id,
+    game: 'count',
+    code: 'ROOM42',
+    staked: false,
+    next: null,
+    parameters: {},
+    num_seats: SEATS,
+    chance_policy: 'auto',
+    turn_based: false,
+    hides_information: hidesInformation,
+    seed,
+    controllers: HEALTH.capabilities.controllers,
+  };
+}
+
 /** A request the fake received. */
 export interface Received {
   readonly method: string;
@@ -252,18 +274,11 @@ export class FakeServer {
       taken: false,
     }));
     const body: Frame = {
-      session: {
+      session: sessionInfo(
         id,
-        game: 'count',
-        code: 'ROOM42',
-        parameters: {},
-        num_seats: SEATS,
-        chance_policy: 'auto',
-        turn_based: false,
-        hides_information: this.hidesInformation,
-        seed: viewer.kind === 'oracle' ? seed : null,
-        controllers: HEALTH.capabilities.controllers,
-      },
+        this.hidesInformation,
+        viewer.kind === 'oracle' ? seed : null,
+      ),
       viewer,
       omniscient,
       status: history.length === LENGTH ? 'terminal' : 'playing',

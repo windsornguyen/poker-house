@@ -15,23 +15,22 @@
 """The HTTP arena runs private bots and preserves poker's public boundaries."""
 
 import http.client
-import json
 import threading
 import urllib.parse
 from typing import Any
 
+import cluster
+import harness
 from absl.testing import absltest
 
 from poker_house_server import (
-    api,
     builds,
     contract,
-    health_report,
+    db,
     loader,
     poker_bot,
     remote_bot_server,
     server,
-    static,
     store,
 )
 
@@ -49,28 +48,31 @@ class RecordingBot:
         return self.strategy.move(request)
 
 
-PLAYER_KEY = "test-player-key"
-HOST = "host-account"
-GUEST = "guest-account"
+PLAYER_KEY = harness.PLAYER_KEY
 
 
 class ArenaTest(absltest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        cls.cluster = cluster.Cluster()
+        cls.host = cls.cluster.add_account("host@test.poker.invalid", "test")
+        cls.guest = cls.cluster.add_account("guest@test.poker.invalid", "test")
+        cls.third = cls.cluster.add_account("third@test.poker.invalid", "test")
+        cls.arena = harness.start(
+            store.SessionStore(journal=store.Journal(db.Database(cls.cluster.url)))
+        )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        harness.stop(cls.arena)
+        cls.cluster.stop()
+        super().tearDownClass()
+
     def setUp(self) -> None:
         super().setUp()
         self.addCleanup(builds.set_wait_seconds, builds.wait_seconds())
         builds.set_wait_seconds(10)
-        self.arena = server.Server(
-            ("127.0.0.1", 0),
-            api.Api(
-                store.SessionStore(),
-                catalogue=loader.build_catalogue,
-                health=health_report.build,
-                player_key=PLAYER_KEY,
-            ),
-            static.ClientFiles(static.DEFAULT_ROOT),
-            server.LOOPBACK_HOSTS,
-        )
-        self.serve(self.arena)
 
     def serve(self, listener: server.Server | remote_bot_server.Server) -> None:
         """Starts an isolated HTTP listener and closes it after the test."""
@@ -84,31 +86,17 @@ class ArenaTest(absltest.TestCase):
         method: str,
         target: str,
         body: dict[str, contract.JsonValue] | None = None,
-        player: str | None = HOST,
+        player: str | None = "host",
         key: str = PLAYER_KEY,
     ) -> tuple[int, Any]:
-        """Decodes an HTTP response, at the untyped JSON test boundary.
-
-        `player` is the account the Worker would name, signed with `key`. None
-        sends no account.
-        """
-        address = urllib.parse.urlsplit(self.arena.url)
-        assert address.hostname is not None
-        connection = http.client.HTTPConnection(address.hostname, address.port, timeout=15)
-
-        encoded = None if body is None else json.dumps(body)
-        headers = {"Content-Type": "application/json"}
-        if player is not None:
-            headers[api.PLAYER_HEADER] = api.signed_player(player, key)
-        connection.request(method, target, encoded, headers)
-        response = connection.getresponse()
-        decoded = json.loads(response.read())
-        connection.close()
-        return response.status, decoded
+        """Calls the arena as `player`: "host", "guest", "third", or None for no account."""
+        account = None if player is None else getattr(self, player)
+        return harness.call(self.arena.url, method, target, body, account, key)
 
     def create(
         self,
         seats: list[contract.JsonValue] | None = None,
+        viewer: str = "0",
     ) -> dict[str, Any]:
         """Creates a deterministic, 20-big-blind heads-up hand."""
         if seats is None:
@@ -118,7 +106,7 @@ class ArenaTest(absltest.TestCase):
             ]
         status, frame = self.request(
             "POST",
-            "/api/sessions?viewer=oracle",
+            f"/api/sessions?viewer={viewer}",
             {
                 "game": "poker_house",
                 "parameters": {"blinds": "1 2", "stack_sizes": "40 40"},
@@ -160,7 +148,7 @@ class ArenaTest(absltest.TestCase):
                     "config": {"url": listener.url},
                 }
             )
-        result = self.create(seats)
+        result = self.create(seats, viewer="oracle")
         self.assertEqual(result["status"], "terminal")
         self.assertEqual(sum(result["returns"]), 0)
         self.assertEqual([seat["failure"] for seat in result["seats"]], [None, None])
@@ -181,18 +169,23 @@ class ArenaTest(absltest.TestCase):
                 self.assertNotIn("deck", structured)
                 self.assertNotIn("burn_cards", structured)
 
-    def join(self, frame: dict[str, Any], player: str = GUEST) -> tuple[int, Any]:
+    def join(self, frame: dict[str, Any], player: str = "guest") -> tuple[int, Any]:
         """Joins the room `frame` shows as `player`."""
         return self.request("POST", f"/api/rooms/{frame['session']['code']}/join", player=player)
 
     def test_seat_and_spectator_views_hide_other_hole_cards(self) -> None:
         frame = self.create()
         session_id = frame["session"]["id"]
-        holes = frame["presentation"]["view"]["struct"]["player_hands"]
+        status, joined = self.join(frame)
+        self.assertEqual(status, 200)
+        holes = [
+            frame["presentation"]["view"]["struct"]["player_hands"][0],
+            joined["presentation"]["view"]["struct"]["player_hands"][1],
+        ]
         self.assertTrue(all(len(hand) == 4 for hand in holes))
-        self.assertEqual(self.join(frame)[0], 200)
+        self.assertEqual(frame["presentation"]["view"]["struct"]["player_hands"][1], "")
 
-        for seat, player in ((0, HOST), (1, GUEST)):
+        for seat, player in ((0, "host"), (1, "guest")):
             status, view = self.request(
                 "GET", f"/api/sessions/{session_id}?viewer={seat}", player=player
             )
@@ -215,8 +208,8 @@ class ArenaTest(absltest.TestCase):
         self.assertEqual(self.join(frame)[0], 200)
 
         for seat, player, action, code in (
-            (1, GUEST, 10_000, "illegal_action"),
-            (0, HOST, 1, "not_your_turn"),
+            (1, "guest", 10_000, "illegal_action"),
+            (0, "host", 1, "not_your_turn"),
         ):
             status, error = self.request(
                 "POST",
@@ -240,14 +233,14 @@ class ArenaTest(absltest.TestCase):
         self.assertEqual([seat["taken"] for seat in joined["seats"]], [True, True])
         self.assertEqual(self.join(frame)[1]["viewer"], joined["viewer"])
 
-        status, full = self.join(frame, player="third-account")
+        status, full = self.join(frame, player="third")
         self.assertEqual((status, full["code"]), (409, "room_full"))
 
         for target, player, key, code in (
-            (f"/api/sessions/{session_id}?viewer=oracle", HOST, PLAYER_KEY, "viewer_unavailable"),
-            (f"/api/sessions/{session_id}?viewer=0", GUEST, PLAYER_KEY, "viewer_unavailable"),
+            (f"/api/sessions/{session_id}?viewer=oracle", "host", PLAYER_KEY, "viewer_unavailable"),
+            (f"/api/sessions/{session_id}?viewer=0", "guest", PLAYER_KEY, "viewer_unavailable"),
             (f"/api/sessions/{session_id}?viewer=0", None, PLAYER_KEY, "unauthorized"),
-            (f"/api/sessions/{session_id}?viewer=0", HOST, "wrong-key", "unauthorized"),
+            (f"/api/sessions/{session_id}?viewer=0", "host", "wrong-key", "unauthorized"),
         ):
             status, error = self.request("GET", target, player=player, key=key)
             self.assertEqual(error["code"], code, target)
@@ -269,40 +262,40 @@ class ArenaTest(absltest.TestCase):
         self.assertEqual(self.join(frame)[0], 200)
         target = f"/api/sessions/{session_id}/moves?viewer=1"
 
-        status, refused = self.request("POST", target, {"kind": "raise"}, player=GUEST)
+        status, refused = self.request("POST", target, {"kind": "raise"}, player="guest")
         self.assertEqual((status, refused["code"]), (409, "illegal_action"))
         self.assertIn("Name the amount", refused["message"])
 
-        status, refused = self.request("POST", target, {"kind": "check"}, player=GUEST)
+        status, refused = self.request("POST", target, {"kind": "check"}, player="guest")
         self.assertEqual((status, refused["code"]), (409, "illegal_action"))
         self.assertIn("Legal moves: fold, call", refused["message"])
 
-        status, called = self.request("POST", target, {"kind": "call"}, player=GUEST)
+        status, called = self.request("POST", target, {"kind": "call"}, player="guest")
         self.assertEqual(status, 200, called)
         self.assertEqual(len(called["history"]), len(frame["history"]) + 1)
 
     def test_an_unknown_code_finds_no_room(self) -> None:
-        status, error = self.request("POST", "/api/rooms/ZZZZZZ/join", player=GUEST)
+        status, error = self.request("POST", "/api/rooms/ZZZZZZ/join", player="guest")
         self.assertEqual((status, error["code"]), (404, "not_found"))
 
-    def test_the_hosts_every_card_stream_ends_when_a_guest_sits(self) -> None:
-        frame = self.create()
-        address = urllib.parse.urlsplit(self.arena.url)
-        assert address.hostname is not None
-        connection = http.client.HTTPConnection(address.hostname, address.port, timeout=15)
-        connection.request(
-            "GET",
-            f"/api/sessions/{frame['session']['id']}/events?viewer=oracle",
-            headers={api.PLAYER_HEADER: api.signed_player(HOST, PLAYER_KEY)},
+    def test_no_one_sees_the_cards_of_a_seat_another_player_will_take(self) -> None:
+        status, refused = self.request(
+            "POST",
+            "/api/sessions?viewer=oracle",
+            {
+                "game": "poker_house",
+                "parameters": {"blinds": "1 2", "stack_sizes": "40 40"},
+                "chance_policy": "auto",
+                "seed": None,
+                "seats": [{"controller": "human", "config": {}, "autoplay": False}] * 2,
+            },
         )
-        stream = connection.getresponse()
-        self.assertTrue(stream.readline().startswith(b"data: "))
+        self.assertEqual((status, refused["code"]), (409, "viewer_unavailable"))
 
-        self.assertEqual(self.join(frame)[0], 200)
-
-        lines = [stream.readline() for _ in range(2)]
-        connection.close()
-        self.assertIn(b"event: refused\n", lines)
+        frame = self.create()
+        session_id = frame["session"]["id"]
+        status, refused = self.request("GET", f"/api/sessions/{session_id}?viewer=oracle")
+        self.assertEqual((status, refused["code"]), (409, "viewer_unavailable"))
 
 
 if __name__ == "__main__":

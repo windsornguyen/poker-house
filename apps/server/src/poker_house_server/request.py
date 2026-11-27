@@ -181,3 +181,16 @@ class Grant:
 
     def __post_init__(self) -> None:
         contract.require(self.amount >= 1, f"A grant gives at least 1 chip, not {self.amount}.")
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
+class Deal:
+    """Deals a room's next hand.
+
+    Attributes:
+      after: The id of the hand the player saw finish. When the room has dealt
+        a newer one, the answer is that hand, so players who ask together all
+        land on the same one.
+    """
+
+    after: str

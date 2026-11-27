@@ -23,6 +23,9 @@
     },
     {
       "$ref": "#/$defs/Accounts"
+    },
+    {
+      "$ref": "#/$defs/RoomView"
     }
   ],
   "$defs": {
@@ -501,6 +504,19 @@
         "seats",
         "chance_policy",
         "seed"
+      ],
+      "type": "object"
+    },
+    "Deal": {
+      "additionalProperties": false,
+      "description": "Deals a room's next hand.\n\nAttributes:\n  after: The id of the hand the player saw finish. When the room has dealt\n    a newer one, the answer is that hand, so players who ask together all\n    land on the same one.",
+      "properties": {
+        "after": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "after"
       ],
       "type": "object"
     },
@@ -1133,6 +1149,70 @@
       ],
       "type": "object"
     },
+    "RoomView": {
+      "additionalProperties": false,
+      "description": "A room, as the player asking sees it.\n\nAttributes:\n  code: The code players join it with.\n  buy_in: The chips a seat costs; null for a room played for nothing.\n  session_id: The id of its latest hand; null once it has closed.\n  seat: The seat the player holds in the latest hand; null when they sit it out.\n  stack: The player's chips at the table; null when they do not sit there.\n  stacks: Every stack at the table, in the order the players sat.",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "buy_in": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "seat": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stack": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stacks": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "buy_in",
+        "session_id",
+        "seat",
+        "stack",
+        "stacks"
+      ],
+      "type": "object"
+    },
     "SeatConfig": {
       "additionalProperties": false,
       "description": "Who plays a seat.\n\nAttributes:\n  controller: The `Controller.name` to play the seat.\n  config: The controller's settings, satisfying its `config_schema`.\n  autoplay: Whether the server plays the seat's moves as soon as it is to\n    move. Must be false for a human seat.",
@@ -1276,7 +1356,7 @@
     },
     "SessionInfo": {
       "additionalProperties": false,
-      "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.\n  code: The room code another player joins the session with.",
+      "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.\n  code: The room code another player joins the session with.\n  staked: Whether the hand is played for chips: every seat is a player's,\n    each stack is chips they bought in with, and no one takes back,\n    resets or changes the hand.\n  next: The id of the room's next hand once it is dealt, else null.",
       "properties": {
         "id": {
           "type": "string"
@@ -1333,6 +1413,19 @@
         },
         "code": {
           "type": "string"
+        },
+        "staked": {
+          "type": "boolean"
+        },
+        "next": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1345,7 +1438,9 @@
         "hides_information",
         "seed",
         "controllers",
-        "code"
+        "code",
+        "staked",
+        "next"
       ],
       "type": "object"
     },

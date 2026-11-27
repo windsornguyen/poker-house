@@ -62,3 +62,35 @@ create table if not exists poker.transfer (
     reason text not null check (reason in ('grant', 'buy_in', 'cash_out', 'purchase')),
     created_at timestamptz not null default now()
 );
+
+-- A room is a code players share. Each of its hands is a session. A room with a
+-- buy-in plays for chips: each seat's stack is chips moved from the player's
+-- account to the room's account (`room:<code>`), carried from hand to hand.
+create table if not exists poker.room (
+    code text primary key check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),
+    buy_in bigint check (buy_in > 0),
+    created_at timestamptz not null default now()
+);
+
+create table if not exists poker.room_seat (
+    code text not null references poker.room on delete cascade,
+    player text not null,
+    stack bigint not null check (stack >= 0),
+    joined_at timestamptz not null default now(),
+    primary key (code, player)
+);
+
+-- Sessions from before rooms become rooms of their own, played for nothing.
+insert into poker.room (code) select code from poker.session on conflict do nothing;
+
+alter table poker.session drop constraint if exists session_code_key;
+
+do $$
+begin
+  if not exists (select from pg_constraint where conname = 'session_code_room') then
+    alter table poker.session add constraint session_code_room
+      foreign key (code) references poker.room (code) on delete cascade;
+  end if;
+end $$;
+
+create index if not exists session_code on poker.session (code, created_at desc);

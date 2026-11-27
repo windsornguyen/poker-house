@@ -432,6 +432,19 @@ export const CreateSession = z.strictObject({
 export type CreateSession = z.infer<typeof CreateSession>;
 
 /**
+ * Deals a room's next hand.
+ *
+ * Attributes:
+ *   after: The id of the hand the player saw finish. When the room has dealt
+ *     a newer one, the answer is that hand, so players who ask together all
+ *     land on the same one.
+ */
+export const Deal = z.strictObject({
+  after: z.string(),
+});
+export type Deal = z.infer<typeof Deal>;
+
+/**
  * Why a request was refused.
  *
  * Attributes:
@@ -508,6 +521,10 @@ export type Error = z.infer<typeof Error>;
  *     since it determines every chance outcome to come.
  *   controllers: The controllers that can play a seat of this game.
  *   code: The room code another player joins the session with.
+ *   staked: Whether the hand is played for chips: every seat is a player's,
+ *     each stack is chips they bought in with, and no one takes back,
+ *     resets or changes the hand.
+ *   next: The id of the room's next hand once it is dealt, else null.
  */
 export const SessionInfo = z.strictObject({
   id: z.string(),
@@ -523,6 +540,8 @@ export const SessionInfo = z.strictObject({
   seed: z.int().nullable(),
   controllers: z.array(Controller),
   code: z.string(),
+  staked: z.boolean(),
+  next: z.string().nullable(),
 });
 export type SessionInfo = z.infer<typeof SessionInfo>;
 
@@ -827,6 +846,27 @@ export const Reset = z.strictObject({
 export type Reset = z.infer<typeof Reset>;
 
 /**
+ * A room, as the player asking sees it.
+ *
+ * Attributes:
+ *   code: The code players join it with.
+ *   buy_in: The chips a seat costs; null for a room played for nothing.
+ *   session_id: The id of its latest hand; null once it has closed.
+ *   seat: The seat the player holds in the latest hand; null when they sit it out.
+ *   stack: The player's chips at the table; null when they do not sit there.
+ *   stacks: Every stack at the table, in the order the players sat.
+ */
+export const RoomView = z.strictObject({
+  code: z.string(),
+  buy_in: z.int().nullable(),
+  session_id: z.string().nullable(),
+  seat: z.int().nullable(),
+  stack: z.int().nullable(),
+  stacks: z.array(z.int()),
+});
+export type RoomView = z.infer<typeof RoomView>;
+
+/**
  * The answer to closing a session: the server has forgotten it.
  *
  * Attributes:
@@ -848,5 +888,6 @@ export const ResponseBody = z.union([
   Error,
   Me,
   Accounts,
+  RoomView,
 ]);
 export type ResponseBody = z.infer<typeof ResponseBody>;

@@ -40,10 +40,16 @@ class TurnClock:
         timer.start()
 
     def human_to_act(self, session: session_lib.Session) -> int | None:
-        """The human seat whose turn it is, or None."""
+        """The held human seat whose turn it is, or None.
+
+        A seat no player holds yet is never played for: a hand waits for its
+        player rather than fold chips nobody bought in with.
+        """
         frame = session.frame(ORACLE)
         seat = frame.to_move.seat
         if frame.status != contract.SessionStatus.PLAYING or seat is None:
+            return None
+        if session.holders[seat] is None:
             return None
         return seat if frame.seats[seat].controller == contract.HUMAN else None
 

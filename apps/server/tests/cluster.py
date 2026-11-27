@@ -82,10 +82,10 @@ class Cluster:
         assert row is not None
         return row[0]
 
-    def query(self, sql: LiteralString) -> list[tuple[object, ...]]:
+    def query(self, sql: LiteralString, *params: object) -> list[tuple[object, ...]]:
         """The rows of one read."""
         with psycopg.connect(self.url) as connection:
-            return connection.execute(sql).fetchall()
+            return connection.execute(sql, params).fetchall()
 
     def stop(self) -> None:
         """Stops the cluster and deletes its files."""
