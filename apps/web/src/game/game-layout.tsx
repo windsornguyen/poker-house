@@ -100,9 +100,9 @@ function ToolSheet(): JSX.Element {
             <SheetTitle>Panels</SheetTitle>
           </SheetHeader>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col p-4">
+        <div className="flex min-h-0 flex-1 flex-col p-4 pr-12">
           <Tabs defaultValue={ACTIONS_GROUP.id} className="min-h-0 flex-1">
-            <TabsList className="flex-wrap">
+            <TabsList className="h-auto flex-wrap">
               {TOOLS.map(tool => (
                 <TabsTrigger key={tool.id} value={tool.id}>
                   {tool.title}
