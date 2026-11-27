@@ -9,6 +9,9 @@ create table if not exists poker.player (
     added_at timestamptz not null default now()
 );
 
+alter table poker.player add column if not exists kind text not null default 'person'
+    check (kind in ('person', 'internal', 'test'));
+
 create table if not exists poker.session (
     id text primary key check (id ~ '^[0-9a-f]{16}$'),
     code text not null unique check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),

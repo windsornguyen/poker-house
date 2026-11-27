@@ -15,10 +15,13 @@
 import * as z from 'zod';
 
 import {
+  Accounts,
   Catalogue,
   Error as ErrorBody,
   Frame,
   Health,
+  Me,
+  RoomView,
 } from '../contract/contract.ts';
 import {ContractError, TransportError} from './errors.ts';
 
@@ -27,6 +30,9 @@ export interface Bodies {
   frame: Frame;
   catalogue: Catalogue;
   health: Health;
+  me: Me;
+  room: RoomView;
+  accounts: Accounts;
 }
 
 // Compiled once: every response and every pushed frame takes the fast path.
@@ -34,11 +40,17 @@ const BODIES: {[K in keyof Bodies]: z.ZodType<Bodies[K]>} = {
   frame: z.compile(Frame),
   catalogue: z.compile(Catalogue),
   health: z.compile(Health),
+  me: z.compile(Me),
+  room: z.compile(RoomView),
+  accounts: z.compile(Accounts),
 };
 const NAMES: Record<keyof Bodies, string> = {
   frame: 'Frame',
   catalogue: 'Catalogue',
   health: 'Health',
+  me: 'Me',
+  room: 'RoomView',
+  accounts: 'Accounts',
 };
 const ERROR_BODY = z.compile(ErrorBody);
 

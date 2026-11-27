@@ -28,6 +28,8 @@ export interface Game {
    * analysis, a seat or a spectator in a game (see bottom-seat.ts).
    */
   readonly viewer: Viewer;
+  /** Deals the room's next hand at a table played for chips, and opens it. */
+  readonly deal: () => Promise<void>;
 }
 
 /** The game of the page; provided by `GamePage`. */

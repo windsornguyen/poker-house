@@ -211,7 +211,7 @@ describe('App, its header', () => {
 });
 
 describe('App, on a game page', () => {
-  it('starts a game, plays it, and keeps its session in the address', async () => {
+  it('starts a game at its first seat, plays it, and keeps its session in the address', async () => {
     open('/game/count');
     await until(() => {
       expect(legal('zero')).toBeDefined();
@@ -227,7 +227,7 @@ describe('App, on a game page', () => {
     });
     const url = new URL(window.location.href);
     expect(url.pathname).toBe('/game/count');
-    expect(url.searchParams.get('viewer')).toBe('oracle');
+    expect(url.searchParams.get('viewer')).toBe('0');
     const id = url.searchParams.get('session');
     expect(id).not.toBeNull();
     expect(server.history(id ?? '')).toEqual([1]);
@@ -235,9 +235,9 @@ describe('App, on a game page', () => {
 });
 
 describe('App, analysis and a game', () => {
-  it('opens in analysis, offering every seat and nothing else', async () => {
+  it('opens in analysis when its address names the oracle, offering every seat and nothing else', async () => {
     server = new FakeServer({hidesInformation: true});
-    open('/game/count');
+    open('/game/count?viewer=oracle');
     await until(() => {
       expect(legal('zero')).toBeDefined();
     });
@@ -256,7 +256,7 @@ describe('App, analysis and a game', () => {
 
   it('sits at another seat without a request, and keeps it in the address', async () => {
     server = new FakeServer({hidesInformation: true});
-    open('/game/count');
+    open('/game/count?viewer=oracle');
     await until(() => {
       expect(legal('zero')).toBeDefined();
     });
@@ -272,7 +272,7 @@ describe('App, analysis and a game', () => {
   });
 
   it('opens analysis at the seat its address names', async () => {
-    open('/game/count?viewSeat=1');
+    open('/game/count?viewer=oracle&viewSeat=1');
     await until(() => {
       expect(legal('zero')).toBeDefined();
     });
@@ -281,7 +281,7 @@ describe('App, analysis and a game', () => {
 
   it('plays every seat in analysis, with no hand-over', async () => {
     server = new FakeServer({hidesInformation: true});
-    const container = open('/game/count');
+    const container = open('/game/count?viewer=oracle');
     await until(() => {
       expect(legal('zero')).toBeDefined();
     });

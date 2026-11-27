@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {type JSX, type SyntheticEvent, useState} from 'react';
+import {type JSX, type SyntheticEvent, useEffect, useState} from 'react';
 
+import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 
@@ -137,8 +138,22 @@ export function PokerLobby({
         }}
       />
       <JoinRoom client={client} onOpen={onOpen} />
+      <Chips client={client} />
     </section>
   );
+}
+
+// The signed-in player's chips off the tables, which a seat's buy-in comes from.
+function Chips({client}: {readonly client: SessionClient}): JSX.Element | null {
+  const [balance, setBalance] = useState<number | null>(null);
+  useEffect(() => {
+    void client.me().then(me => {
+      setBalance(me.balance);
+    });
+  }, [client]);
+
+  if (balance === null) return null;
+  return <Badge variant="secondary">{balance.toLocaleString()} chips</Badge>;
 }
 
 function JoinRoom({

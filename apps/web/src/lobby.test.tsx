@@ -30,6 +30,23 @@ const ENTRY = {
 
 let rendered: Rendered | undefined;
 
+// The lobby asks for the player's chips as it opens; every other request
+// gets `body`.
+function server(body: unknown): ReturnType<typeof vi.fn<Fetch>> {
+  return vi.fn<Fetch>(url =>
+    Promise.resolve(
+      Response.json(url === '/api/me' ? {balance: 1000, kind: 'person'} : body),
+    ),
+  );
+}
+
+// The requests the lobby sent besides asking for the player's chips.
+function sent(
+  fetch: ReturnType<typeof vi.fn<Fetch>>,
+): Array<Parameters<Fetch>> {
+  return fetch.mock.calls.filter(([url]) => url !== '/api/me');
+}
+
 afterEach(() => {
   rendered?.unmount();
   rendered = undefined;
@@ -39,7 +56,7 @@ describe('the poker lobby', () => {
   it('connects both bot endpoints', async () => {
     const shown = frame();
     shown.session.game = 'poker_house';
-    const fetch = vi.fn<Fetch>(() => Promise.resolve(Response.json(shown)));
+    const fetch = server(shown);
     const client = new SessionClient({fetch});
     const open = vi.fn();
     rendered = render(
@@ -56,10 +73,10 @@ describe('the poker lobby', () => {
       );
       await Promise.resolve();
     });
-    const sent = fetch.mock.calls[0];
-    if (sent === undefined) throw new Error('No create request.');
-    expect(sent[0]).toBe('/api/sessions?viewer=oracle');
-    const init = sent[1];
+    const [create] = sent(fetch);
+    if (create === undefined) throw new Error('No create request.');
+    expect(create[0]).toBe('/api/sessions?viewer=oracle');
+    const init = create[1];
     if (typeof init.body !== 'string') throw new Error('No JSON request body.');
     expect(JSON.parse(init.body)).toMatchObject({
       game: 'poker_house',
@@ -83,7 +100,7 @@ describe('the poker lobby', () => {
   });
 
   it('shows invalid stakes without sending a hand to the server', async () => {
-    const fetch = vi.fn<Fetch>(() => Promise.resolve(Response.json(frame())));
+    const fetch = server(frame());
     const client = new SessionClient({fetch});
     rendered = render(
       <PokerLobby entry={ENTRY} client={client} onOpen={vi.fn()} />,
@@ -97,7 +114,7 @@ describe('the poker lobby', () => {
       );
       await Promise.resolve();
     });
-    expect(fetch).not.toHaveBeenCalled();
+    expect(sent(fetch)).toEqual([]);
     expect(
       rendered.container.querySelector('[role="alert"]')?.textContent,
     ).toContain('stack at least as large as the big blind');
@@ -108,7 +125,7 @@ describe('joining a room', () => {
   it('joins a room by its code and opens the seat it answers with', async () => {
     const seated = frame();
     seated.viewer = {kind: 'seat', seat: 1};
-    const fetch = vi.fn<Fetch>(() => Promise.resolve(Response.json(seated)));
+    const fetch = server(seated);
     const open = vi.fn();
     rendered = render(
       <PokerLobby
@@ -134,7 +151,7 @@ describe('joining a room', () => {
       await Promise.resolve();
     });
 
-    const [url, init] = fetch.mock.calls[0] ?? [];
+    const [url, init] = sent(fetch)[0] ?? [];
     expect(String(url)).toMatch(/\/api\/rooms\/ROOM42\/join$/);
     expect(init?.method).toBe('POST');
     expect(open).toHaveBeenCalledWith(seated);

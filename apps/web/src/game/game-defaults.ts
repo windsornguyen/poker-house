@@ -21,13 +21,12 @@ import {viewerParameter} from '../session/client.ts';
 import {HUMAN_SEAT} from '../setup/parameters.ts';
 
 // The parameters a game page opens a game with, where they are not the
-// game's own defaults: Go opens on the 9×9 board, and gin rummy on Oklahoma
-// rules, where the first upcard sets the knock card.
+// game's own defaults. A new poker table is played for chips, so its stack is
+// its buy-in: 200 chips at 1/2 blinds, within a new player's 1,000.
 const OPENING_PARAMETERS: Readonly<
   Record<string, CreateSession['parameters']>
 > = {
-  gin_rummy: {oklahoma: true},
-  go: {board_size: 9},
+  poker_house: {blinds: '1 2', stack_sizes: '200 200'},
 };
 
 /**

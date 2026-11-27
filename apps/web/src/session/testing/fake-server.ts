@@ -170,6 +170,7 @@ export class FakeServer {
   ): Response {
     if (path === '/api/health') return json(HEALTH);
     if (path === '/api/games') return json(this.catalogue());
+    if (path === '/api/me') return json({balance: 1000, kind: 'person'});
     const viewer = parseViewer(viewerName);
     const field = (name: string): unknown =>
       (body as Record<string, unknown>)[name];

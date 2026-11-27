@@ -13,10 +13,13 @@
 // limitations under the License.
 
 import type {
+  Accounts,
   Catalogue,
   CreateSession,
   Frame,
   Health,
+  Me,
+  RoomView,
   SeatConfig,
   Viewer,
 } from '../contract/contract.ts';
@@ -102,12 +105,39 @@ export class SessionClient {
 
   /** Sits in the room `code` names, and answers with the seat's view. */
   join(code: string): Promise<Frame> {
-    return this.request(
-      'POST',
-      `/api/rooms/${encodeURIComponent(code)}/join`,
-      'frame',
-      {},
-    );
+    return this.request('POST', `${roomPath(code)}/join`, 'frame', {});
+  }
+
+  /** The room `code` names, as this player sees it. */
+  room(code: string): Promise<RoomView> {
+    return this.request('GET', roomPath(code), 'room');
+  }
+
+  /**
+   * Deals the room's hand after `after`, the hand this player saw finish, and
+   * answers with this player's view of it. When the room has dealt it
+   * already, the answer is that hand.
+   */
+  deal(code: string, after: string): Promise<Frame> {
+    return this.request('POST', `${roomPath(code)}/deal`, 'frame', {after});
+  }
+
+  /** The signed-in player's chips and kind. */
+  me(): Promise<Me> {
+    return this.request('GET', '/api/me', 'me');
+  }
+
+  /** Every account and its chips, for an internal account. */
+  accounts(): Promise<Accounts> {
+    return this.request('GET', '/api/admin/accounts', 'accounts');
+  }
+
+  /** Gives `email`'s account `amount` chips from the treasury. */
+  grant(email: string, amount: number): Promise<Accounts> {
+    return this.request('POST', '/api/admin/grants', 'accounts', {
+      email,
+      amount,
+    });
   }
 
   /** The live position. */
@@ -264,6 +294,10 @@ export class SessionClient {
     }
     return decode(response, kind);
   }
+}
+
+function roomPath(code: string): string {
+  return `/api/rooms/${encodeURIComponent(code)}`;
 }
 
 function query(viewer: Viewer): string {

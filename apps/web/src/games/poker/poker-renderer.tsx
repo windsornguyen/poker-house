@@ -29,9 +29,8 @@ import type {
   SeatConfig,
 } from '../../contract/contract.ts';
 import type {SectionDefinition} from '../../game/sections.ts';
-import {GameContext} from '../../game/game-context.ts';
+import {type Game, GameContext} from '../../game/game-context.ts';
 import type {RendererEntry, RendererProps} from '../../renderers/renderer.ts';
-import type {SessionCommands} from '../../session/session-store.ts';
 import {AnimationSpeedField} from '../../view/animation-speed-field.tsx';
 import {PokerGameplay} from './poker-gameplay-panel.tsx';
 import {PokerHistoryRenderer} from './poker-history-renderer.tsx';
@@ -82,16 +81,18 @@ export function newHandSession(frame: Frame, hand: NewHand): CreateSession {
   };
 }
 
-/** Deals a new hand: the same table again, or a table of another size. */
-function dealer(
-  frame: Frame,
-  commands: SessionCommands | null,
-): (hand: NewHand) => void {
+/**
+ * Deals a new hand: at a table played for chips, the room's next hand from
+ * the stacks; otherwise the same table again, or a table of another size.
+ */
+function dealer(frame: Frame, game: Game | null): (hand: NewHand) => void {
   return hand => {
-    if (commands === null) {
+    if (game === null) {
       throw new Error('A new hand is dealt only on a game page.');
     }
-    if (hand.seats === frame.seats.length) commands.reset();
+    const {commands} = game.session;
+    if (frame.session.staked) void game.deal();
+    else if (hand.seats === frame.seats.length) commands.reset();
     else commands.create(newHandSession(frame, hand));
   };
 }
@@ -104,7 +105,6 @@ export function PokerRenderer({
   busy = false,
 }: RendererProps): JSX.Element {
   const game = useContext(GameContext);
-  const commands = game?.session.commands ?? null;
   const value = useMemo((): SessionContextValue => {
     const session = pokerSession(frame, presentation);
     const {to_move: toMove, viewer} = frame;
@@ -127,9 +127,9 @@ export function PokerRenderer({
               play(action);
               return Promise.resolve();
             },
-      createSession: dealer(frame, commands),
+      createSession: dealer(frame, game),
     };
-  }, [frame, presentation, play, busy, commands]);
+  }, [frame, presentation, play, busy, game]);
   return (
     <PokerSessionContext.Provider value={value}>
       <PokerGameplay />

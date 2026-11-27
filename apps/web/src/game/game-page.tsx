@@ -15,7 +15,11 @@
 import {type JSX, useEffect, useLayoutEffect, useRef, useState} from 'react';
 
 import {sessionPath} from '../app/route.ts';
-import type {CatalogueEntry, Viewer} from '../contract/contract.ts';
+import type {
+  CatalogueEntry,
+  SessionInfo,
+  Viewer,
+} from '../contract/contract.ts';
 import type {SessionClient} from '../session/client.ts';
 import type {SessionCommands} from '../session/session-store.ts';
 import {useSession} from '../session/use-session.ts';
@@ -53,11 +57,17 @@ export interface GamePageProps {
  */
 export function GamePage(props: GamePageProps): JSX.Element {
   const {entry, client} = props;
-  const [viewer] = useState<Viewer>(() => initialViewer(entry, props.viewer));
+  const [viewer] = useState<Viewer>(() =>
+    initialViewer(
+      entry,
+      props.viewer ?? (props.session === null ? FIRST_SEAT : null),
+    ),
+  );
   const session = useSession(client, viewer, code => {
-    void reopenAtOwnSeat(client, entry.name, code);
+    void openRoom(client, entry.name, code);
   });
   useStartSession(session.commands, entry, props.session);
+  useFollowRoom(client, entry.name, session.frame?.session ?? null);
   const viewSeat = useOpeningViewSeat(entry, viewer, props.viewSeat ?? null);
   const id = session.frame?.session.id ?? null;
   useEffect(() => {
@@ -70,7 +80,12 @@ export function GamePage(props: GamePageProps): JSX.Element {
     }
   }, [entry.name, id, viewer, viewSeat]);
 
-  const game: Game = {entry, session, viewer};
+  const game: Game = {
+    entry,
+    session,
+    viewer,
+    deal: () => dealNext(client, entry.name, session.frame?.session ?? null),
+  };
   return (
     <GameContext value={game}>
       <div className="game-page">
@@ -85,15 +100,46 @@ export function GamePage(props: GamePageProps): JSX.Element {
  * `viewSeat`) when the game has it. Every page starts afresh: a seat chosen
  * on another page never carries over, and none is kept outside analysis.
  */
-// Another player sat down, so every card is no longer this player's view.
-// Joining again answers with the seat they hold, which the page reopens at.
-async function reopenAtOwnSeat(
+// Every seat of a new table is a player's, so its creator sits at the first.
+const FIRST_SEAT: Viewer = {kind: 'seat', seat: 0};
+const SPECTATOR: Viewer = {kind: 'spectator', seat: null};
+
+// Opens room `code`'s latest hand at the seat this player holds there, or as
+// a spectator when they sit it out: a bust, or a seat taken after the deal.
+async function openRoom(
   client: SessionClient,
   game: string,
   code: string,
 ): Promise<void> {
-  const frame = await client.join(code);
+  const room = await client.room(code);
+  if (room.session_id === null) return;
+  const viewer =
+    room.seat === null ? SPECTATOR : {kind: 'seat' as const, seat: room.seat};
+  window.location.assign(sessionPath(game, room.session_id, viewer));
+}
+
+// Deals the room's next hand after the one shown, and opens it.
+async function dealNext(
+  client: SessionClient,
+  game: string,
+  shown: SessionInfo | null,
+): Promise<void> {
+  if (shown === null) return;
+  const frame = await client.deal(shown.code, shown.id);
   window.location.assign(sessionPath(game, frame.session.id, frame.viewer));
+}
+
+// Once the room deals the hand after the one shown, every viewer moves to it.
+function useFollowRoom(
+  client: SessionClient,
+  game: string,
+  shown: SessionInfo | null,
+): void {
+  const next = shown?.next ?? null;
+  const code = shown?.code ?? null;
+  useEffect(() => {
+    if (next !== null && code !== null) void openRoom(client, game, code);
+  }, [client, game, next, code]);
 }
 
 function useOpeningViewSeat(
