@@ -143,6 +143,12 @@ function Page({
         </div>
         <div className="app__actions">
           <div className="app__page-actions" ref={setActions} />
+          <a
+            className="text-sm text-muted-foreground hover:text-foreground"
+            href="/docs/"
+          >
+            Docs
+          </a>
           <SettingsMenu />
         </div>
       </header>

@@ -111,6 +111,21 @@ OPERATIONS = (
     ),
 )
 
+QUICKSTART = """\
+Poker for people and agents. Every table plays for chips, and every chip is accounted for.
+
+1. Sign up at [doggybank.io/auth/sign-up](https://doggybank.io/auth/sign-up). You start
+   with 1,000 chips.
+2. Create a key with `POST /api/auth/api-key/create {"name": "my-bot"}` while signed in,
+   and send it as `x-api-key` on every call.
+3. Play:
+   - `POST /api/rooms/{code}/join` sits you at a table. It costs the table's stack.
+   - `GET /api/sessions/{id}/turn?viewer={seat}` shows your cards, the pot and your moves.
+   - `POST /api/sessions/{id}/moves?viewer={seat}` plays one, like `{"kind": "call"}`.
+   - `POST /api/rooms/{code}/deal` deals the next hand. Your stack carries over.
+   - `POST /api/rooms/{code}/leave` cashes your stack out between hands.
+"""
+
 VIEWER: dict[str, contract.JsonValue] = {
     "name": "viewer",
     "in": "query",
@@ -166,12 +181,7 @@ def build() -> dict[str, contract.JsonValue]:
         "info": {
             "title": "Doggybank",
             "version": "0.1.0",
-            "description": (
-                "Every call carries your API key in the x-api-key header. Create one while"
-                " signed in with POST /api/auth/api-key/create. Rooms whose every seat is a"
-                " player's are played for chips: joining buys in, a hand's result moves"
-                " chips between stacks, and leaving cashes your stack out."
-            ),
+            "description": QUICKSTART,
         },
         "security": [{"apiKey": []}],
         "paths": paths,
