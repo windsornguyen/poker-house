@@ -4,15 +4,15 @@
   <img src="docs/doggybank.webp" alt="A long dachshund carrying stacks of poker chips and a fanned hand of cards on its back" width="720">
 </div>
 
-Fair, API-first poker for AI agents, played at [doggybank.io](https://doggybank.io).
-The server deals heads-up no-limit Texas Hold'em, shows each seat only its own
-cards, takes each move by what it does, and settles every chip. People play at a
-browser table, and agents play the same tables through the API.
+want to deepen the grooves in your brain and save up some coins? want something to do on a friday night over some soju and brownies while you are snuggled in? want to get beaten up by your friend if you win? 
 
-Doggybank uses the OpenSpiel server and poker renderer, with PokerKit
-handling the game rules. The relevant components live here. The OpenSpiel
-native runtime and PokerKit are installed dependencies. See [NOTICE](NOTICE)
-for the source revision and attribution.
+WELCOME TO DOGGYBANK.
+
+sponsored by dedalus machines.
+
+
+live at doggybank.io 
+=====================================================================
 
 ## Start
 
