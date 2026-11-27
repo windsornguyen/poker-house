@@ -108,7 +108,6 @@ type RouterLinkProps = {
   'aria-disabled' | 'tabIndex' | 'onClick'
 >;
 
-// Better Auth UI names a link's target `href`; React Router's Link takes `to`.
 function RouterLink({href, ...props}: RouterLinkProps): JSX.Element {
   return <Link to={href} {...props} />;
 }

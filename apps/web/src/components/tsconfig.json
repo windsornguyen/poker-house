@@ -1,7 +1,4 @@
 {
-  // Code copied from the shadcn and Better Auth UI registries, kept as they
-  // ship it so `shadcn add --overwrite` can update it. It is written without
-  // the two flags below, which the rest of the client sets.
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "exactOptionalPropertyTypes": false,

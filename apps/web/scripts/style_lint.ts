@@ -586,9 +586,6 @@ const LINTERS: Array<
   [/\.tsx?$/, lintScript],
 ];
 
-// Tailwind's theme source and the code copied from the shadcn and Better
-// Auth UI registries are styled through the shadcn theme, not this gate's
-// tokens, and the theme file is Tailwind syntax this reader does not parse.
 const UNGATED = [
   /^src\/styles\/theme\.css$/,
   /^src\/components\//,

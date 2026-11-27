@@ -17,8 +17,6 @@ interface MailKind {
   readonly action: string;
 }
 
-// Each mail route sends one kind of link, to one of this site's own pages, so
-// the routes cannot relay any other mail.
 const MAILS = new Map<string, MailKind>([
   [
     '/mail/verify',
@@ -75,7 +73,6 @@ async function sendMail(
   const body: unknown = await request.json().catch(() => null);
   const link = linkOf(body, new URL(request.url).origin + kind.page);
   if (link === null) return notFound();
-  // `&` comes first in ENTITIES, so no entity is escaped twice.
   const href = Object.entries(ENTITIES).reduce(
     (text, [char, entity]) => text.replaceAll(char, entity),
     link.url,

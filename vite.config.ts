@@ -157,8 +157,6 @@ export default defineConfig({
     overrides: [
       ...Array.from({length: MAX_DEPTH + 1}, (_, depth) => staysInWeb(depth)),
       {
-        // Copied from the shadcn and Better Auth UI registries, kept as shipped
-        // so `shadcn add --overwrite` can update it.
         files: [
           WEB + 'src/components/**',
           WEB + 'src/lib/auth/**',

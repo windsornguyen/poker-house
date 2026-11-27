@@ -54,7 +54,6 @@ export function HydrateFallback(): JSX.Element {
 
 /** The lobby or a game's table. */
 export default function Table(): JSX.Element {
-  // Sends the player to sign in if the session ends while the page is open.
   const {data: session} = useAuthenticate(authClient);
   if (!session) return <HydrateFallback />;
   return (
