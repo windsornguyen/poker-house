@@ -234,6 +234,31 @@ describe('App, on a game page', () => {
   });
 });
 
+describe('App, at a table played for chips', () => {
+  it('shows why the server refuses to let the player leave mid-hand', async () => {
+    server = new FakeServer({staked: true});
+    const container = open('/game/count');
+    let leave: HTMLElement | undefined;
+    await until(() => {
+      leave = [...document.querySelectorAll<HTMLElement>('button')].find(
+        button => button.textContent === 'Leave table',
+      );
+      expect(leave).toBeDefined();
+    });
+    server.refuseNext('table_not_ready', 'Finish the hand before you leave.');
+    if (leave !== undefined) click(leave);
+    await until(() => {
+      expect(container.textContent).toContain(
+        'Finish the hand before you leave.',
+      );
+    });
+    expect(server.received.at(-1)).toMatchObject({
+      method: 'POST',
+      path: '/api/rooms/ROOM42/leave',
+    });
+  });
+});
+
 describe('App, analysis and a game', () => {
   it('opens in analysis when its address names the oracle, offering every seat and nothing else', async () => {
     server = new FakeServer({hidesInformation: true});

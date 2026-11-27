@@ -289,10 +289,16 @@ class Api:
         return ok(self._catalogue_of())
 
     def me(self, req: _Request) -> Response:
-        """Answers with the signed-in player's balance and kind."""
+        """Answers with the signed-in player's balance, kind and seats."""
         player = req.signed_in()
         chips = self._sessions.ledger()
-        return ok(accounts.Me(balance=chips.balance(player), kind=chips.kind(player)))
+        return ok(
+            accounts.Me(
+                balance=chips.balance(player),
+                kind=chips.kind(player),
+                seats=self._sessions.rooms().seats(player),
+            )
+        )
 
     def admin(self, req: _Request) -> ledger_lib.Ledger:
         """The ledger, for a player whose listing is internal.

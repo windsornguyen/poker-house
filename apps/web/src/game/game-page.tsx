@@ -85,6 +85,7 @@ export function GamePage(props: GamePageProps): JSX.Element {
     session,
     viewer,
     deal: () => dealNext(client, entry.name, session.frame?.session ?? null),
+    leave: () => leaveTable(client, session.frame?.session ?? null),
   };
   return (
     <GameContext value={game}>
@@ -104,9 +105,11 @@ export function GamePage(props: GamePageProps): JSX.Element {
 const FIRST_SEAT: Viewer = {kind: 'seat', seat: 0};
 const SPECTATOR: Viewer = {kind: 'spectator', seat: null};
 
-// Opens room `code`'s latest hand at the seat this player holds there, or as
-// a spectator when they sit it out: a bust, or a seat taken after the deal.
-async function openRoom(
+/**
+ * Opens room `code`'s latest hand at the seat this player holds there, or as
+ * a spectator when they sit it out: a bust, or a seat taken after the deal.
+ */
+export async function openRoom(
   client: SessionClient,
   game: string,
   code: string,
@@ -127,6 +130,17 @@ async function dealNext(
   if (shown === null) return;
   const frame = await client.deal(shown.code, shown.id);
   window.location.assign(sessionPath(game, frame.session.id, frame.viewer));
+}
+
+// Moves this player's stack at the room shown back to their account, and
+// opens the lobby.
+async function leaveTable(
+  client: SessionClient,
+  shown: SessionInfo | null,
+): Promise<void> {
+  if (shown === null) return;
+  await client.leave(shown.code);
+  window.location.assign('/');
 }
 
 // Once the room deals the hand after the one shown, every viewer moves to it.

@@ -51,7 +51,8 @@ class LedgerTest(absltest.TestCase):
         for _ in range(2):
             status, me = self.call("GET", "/api/me", player=self.newcomer)
             self.assertEqual(
-                (status, me), (200, {"balance": ledger.WELCOME_GRANT, "kind": "person"})
+                (status, me),
+                (200, {"balance": ledger.WELCOME_GRANT, "kind": "person", "seats": []}),
             )
         self.assert_supply_kept()
 

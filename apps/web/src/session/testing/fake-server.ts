@@ -60,13 +60,14 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
 function sessionInfo(
   id: string,
   hidesInformation: boolean,
+  staked: boolean,
   seed: number | null,
 ): Frame['session'] {
   return {
     id,
     game: 'count',
     code: 'ROOM42',
-    staked: false,
+    staked,
     next: null,
     parameters: {},
     num_seats: SEATS,
@@ -103,6 +104,8 @@ export function unanswered(
 export interface FakeServerOptions {
   /** Whether each seat's actions are hidden from the other. */
   readonly hidesInformation?: boolean;
+  /** Whether every hand is played for chips. */
+  readonly staked?: boolean;
 }
 
 interface Session {
@@ -115,12 +118,14 @@ export class FakeServer {
   /** Every request, in order. */
   readonly received: Received[] = [];
   private readonly hidesInformation: boolean;
+  private readonly staked: boolean;
   private readonly sessions = new Map<string, Session>();
   private held: Array<() => void> | null = null;
   private refusal: [ErrorCode, string] | null = null;
 
   constructor(options: FakeServerOptions = {}) {
     this.hidesInformation = options.hidesInformation ?? false;
+    this.staked = options.staked ?? false;
   }
 
   readonly fetch: Fetch = async (url, init) => {
@@ -170,7 +175,9 @@ export class FakeServer {
   ): Response {
     if (path === '/api/health') return json(HEALTH);
     if (path === '/api/games') return json(this.catalogue());
-    if (path === '/api/me') return json({balance: 1000, kind: 'person'});
+    if (path === '/api/me') {
+      return json({balance: 1000, kind: 'person', seats: []});
+    }
     const viewer = parseViewer(viewerName);
     const field = (name: string): unknown =>
       (body as Record<string, unknown>)[name];
@@ -278,6 +285,7 @@ export class FakeServer {
       session: sessionInfo(
         id,
         this.hidesInformation,
+        this.staked,
         viewer.kind === 'oracle' ? seed : null,
       ),
       viewer,

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import {PanelRightIcon} from 'lucide-react';
-import type {JSX} from 'react';
+import {type JSX, useState} from 'react';
 import {createPortal} from 'react-dom';
 
 import {Alert, AlertDescription} from '@/components/ui/alert';
@@ -75,6 +75,7 @@ const TOOLS: readonly Tool[] = [
 export function GameLayout(): JSX.Element {
   const {error, frame} = useGame().session;
   const header = useHeaderActions();
+  const [refusal, setRefusal] = useState<string | null>(null);
   const code = frame?.session.code;
   return (
     <div className="flex flex-col gap-3 p-3">
@@ -83,16 +84,47 @@ export function GameLayout(): JSX.Element {
           <AlertDescription>{error.message}</AlertDescription>
         </Alert>
       )}
+      {refusal !== null && (
+        <Alert variant="destructive">
+          <AlertDescription>{refusal}</AlertDescription>
+        </Alert>
+      )}
       <GameplayPanel />
       {header !== null &&
         createPortal(
           <>
             {code !== undefined && <RoomCode code={code} />}
+            {frame?.session.staked === true && (
+              <LeaveTable onRefused={setRefusal} />
+            )}
             <ToolSheet />
           </>,
           header,
         )}
     </div>
+  );
+}
+
+// Cashes out between hands. While a hand is played the server refuses, and
+// says why.
+function LeaveTable({
+  onRefused,
+}: {
+  readonly onRefused: (message: string) => void;
+}): JSX.Element {
+  const {leave} = useGame();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        leave().catch((caught: unknown) => {
+          onRefused(caught instanceof Error ? caught.message : String(caught));
+        });
+      }}
+    >
+      Leave table
+    </Button>
   );
 }
 

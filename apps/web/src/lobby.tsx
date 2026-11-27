@@ -12,22 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {type JSX, type SyntheticEvent, useEffect, useState} from 'react';
+import {
+  type JSX,
+  type SyntheticEvent,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 
 import {Badge} from '@/components/ui/badge';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
+import {Table, TableBody, TableCell, TableRow} from '@/components/ui/table';
 
 import type {
   CatalogueEntry,
   CreateSession,
   Frame,
+  Me,
 } from './contract/contract.ts';
+import {openRoom} from './game/game-page.tsx';
 import type {SessionClient} from './session/client.ts';
 
 import './lobby.css';
 
 const ROOM_CODE_LENGTH = 6;
+const GAME = 'doggybank';
 
 /** The two bot endpoints and the hand's integer-chip stakes. */
 export interface MatchSettings {
@@ -67,7 +77,7 @@ export function pokerMatchRequest(settings: MatchSettings): CreateSession {
     return url.href.replace(/\/$/, '');
   });
   return {
-    game: 'doggybank',
+    game: GAME,
     parameters: {
       variant: 'NoLimitTexasHoldem',
       num_players: 2,
@@ -143,17 +153,68 @@ export function PokerLobby({
   );
 }
 
-// The signed-in player's chips off the tables, which a seat's buy-in comes from.
+// The signed-in player's chips off the tables, which a seat's buy-in comes
+// from, and each table they still sit at. A player who closed a table's tab
+// finds their stack here, to open the table again or cash out.
 function Chips({client}: {readonly client: SessionClient}): JSX.Element | null {
-  const [balance, setBalance] = useState<number | null>(null);
-  useEffect(() => {
-    void client.me().then(me => {
-      setBalance(me.balance);
-    });
+  const [me, setMe] = useState<Me | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = useCallback(() => {
+    void client.me().then(setMe);
   }, [client]);
+  useEffect(refresh, [refresh]);
 
-  if (balance === null) return null;
-  return <Badge variant="secondary">{balance.toLocaleString()} chips</Badge>;
+  async function cashOut(code: string): Promise<void> {
+    setError(null);
+    try {
+      await client.leave(code);
+      refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  if (me === null) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <Badge variant="secondary">{me.balance.toLocaleString()} chips</Badge>
+      {me.seats.length > 0 && (
+        <Table>
+          <TableBody>
+            {me.seats.map(seat => (
+              <TableRow key={seat.code}>
+                <TableCell>
+                  Table {seat.code} · {seat.stack.toLocaleString()} chips
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        void openRoom(client, GAME, seat.code);
+                      }}
+                    >
+                      Open
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        void cashOut(seat.code);
+                      }}
+                    >
+                      Cash out
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+      {error !== null && <p role="alert">{error}</p>}
+    </div>
+  );
 }
 
 function JoinRoom({

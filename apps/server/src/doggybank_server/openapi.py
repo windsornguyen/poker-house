@@ -86,7 +86,7 @@ OPERATIONS = (
         "get",
         "/api/me",
         "getMe",
-        "Your chips off the tables.",
+        "Your chips off the tables, and your stack at each table you sit at.",
         None,
         "Me",
         viewer=False,

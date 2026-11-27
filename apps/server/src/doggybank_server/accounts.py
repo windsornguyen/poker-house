@@ -6,16 +6,32 @@ from doggybank_server import contract
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
+class TableSeat:
+    """A table a player sits at, and the chips in front of them there.
+
+    Attributes:
+      code: The room's code.
+      stack: The player's chips at its table.
+    """
+
+    code: str
+    stack: int
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
 class Me:
     """The signed-in player's account.
 
     Attributes:
       balance: The chips they hold off the tables.
       kind: person, internal or test, from their listing; null for none.
+      seats: Every table they sit at, the earliest first, so a player who
+        closed the tab finds their chips.
     """
 
     balance: int
     kind: str | None
+    seats: tuple[TableSeat, ...]
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)

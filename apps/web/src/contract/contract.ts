@@ -804,15 +804,31 @@ export const Health = z.object({
 export type Health = z.infer<typeof Health>;
 
 /**
+ * A table a player sits at, and the chips in front of them there.
+ *
+ * Attributes:
+ *   code: The room's code.
+ *   stack: The player's chips at its table.
+ */
+export const TableSeat = z.object({
+  code: z.string(),
+  stack: z.int(),
+});
+export type TableSeat = z.infer<typeof TableSeat>;
+
+/**
  * The signed-in player's account.
  *
  * Attributes:
  *   balance: The chips they hold off the tables.
  *   kind: person, internal or test, from their listing; null for none.
+ *   seats: Every table they sit at, the earliest first, so a player who
+ *     closed the tab finds their chips.
  */
 export const Me = z.object({
   balance: z.int(),
   kind: z.string().nullable(),
+  seats: z.array(TableSeat),
 });
 export type Me = z.infer<typeof Me>;
 

@@ -10,7 +10,7 @@ import dataclasses
 
 import pydantic.dataclasses
 
-from doggybank_server import contract, db, errors, ledger
+from doggybank_server import accounts, contract, db, errors, ledger
 
 
 @dataclasses.dataclass(frozen=True)
@@ -116,6 +116,15 @@ class Rooms:
         return Room(
             code, row[0], tuple(Seated(*seat) for seat in seated), tuple(h for (h,) in hands)
         )
+
+    def seats(self, player: str) -> tuple[accounts.TableSeat, ...]:
+        """Every table `player` sits at, and their stack there, the earliest first."""
+        with self.database.lock:
+            rows = self.database.connection.execute(
+                "select code, stack from poker.room_seat where player = %s order by joined_at",
+                (player,),
+            ).fetchall()
+        return tuple(accounts.TableSeat(code, stack) for code, stack in rows)
 
     def sit(self, code: str, player: str, seats: int) -> None:
         """Buys `player` a seat at room `code`, unless they already have one.

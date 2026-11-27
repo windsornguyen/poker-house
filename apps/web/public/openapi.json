@@ -272,7 +272,7 @@
     "/api/me": {
       "get": {
         "operationId": "getMe",
-        "summary": "Your chips off the tables.",
+        "summary": "Your chips off the tables, and your stack at each table you sit at.",
         "parameters": [],
         "responses": {
           "200": {
@@ -1184,7 +1184,7 @@
       },
       "Me": {
         "additionalProperties": false,
-        "description": "The signed-in player's account.\n\nAttributes:\n  balance: The chips they hold off the tables.\n  kind: person, internal or test, from their listing; null for none.",
+        "description": "The signed-in player's account.\n\nAttributes:\n  balance: The chips they hold off the tables.\n  kind: person, internal or test, from their listing; null for none.\n  seats: Every table they sit at, the earliest first, so a player who\n    closed the tab finds their chips.",
         "properties": {
           "balance": {
             "type": "integer"
@@ -1198,9 +1198,15 @@
                 "type": "null"
               }
             ]
+          },
+          "seats": {
+            "items": {
+              "$ref": "#/components/schemas/TableSeat"
+            },
+            "type": "array"
           }
         },
-        "required": ["balance", "kind"],
+        "required": ["balance", "kind", "seats"],
         "type": "object"
       },
       "Move": {
@@ -1726,6 +1732,20 @@
         "description": "The state of a session's live game.\n\nAttributes:\n  PLAYING: The game is in progress.\n  PAUSED: A seat's controller failed; play resumes only after an undo, a\n    reset or a change of that seat's controller. A seat whose controller\n    could not be built (`SeatStatus.UNAVAILABLE`) resumes only after a\n    change of its controller.\n  TERMINAL: The game is over.",
         "enum": ["playing", "paused", "terminal"],
         "type": "string"
+      },
+      "TableSeat": {
+        "additionalProperties": false,
+        "description": "A table a player sits at, and the chips in front of them there.\n\nAttributes:\n  code: The room's code.\n  stack: The player's chips at its table.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "integer"
+          }
+        },
+        "required": ["code", "stack"],
+        "type": "object"
       },
       "ToMove": {
         "additionalProperties": false,

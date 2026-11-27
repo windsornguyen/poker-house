@@ -15,7 +15,7 @@
 import {act} from 'react';
 import {afterEach, describe, expect, it, vi} from 'vite-plus/test';
 
-import type {CatalogueEntry} from './contract/contract.ts';
+import type {CatalogueEntry, Me, RoomView} from './contract/contract.ts';
 import {PokerLobby} from './lobby.tsx';
 import {type Fetch, SessionClient} from './session/client.ts';
 import {frame} from './testing/frames.ts';
@@ -32,13 +32,13 @@ let rendered: Rendered | undefined;
 
 // The lobby asks for the player's chips as it opens; every other request
 // gets `body`.
-function server(body: unknown): ReturnType<typeof vi.fn<Fetch>> {
+function server(body: unknown, me: Me = ME): ReturnType<typeof vi.fn<Fetch>> {
   return vi.fn<Fetch>(url =>
-    Promise.resolve(
-      Response.json(url === '/api/me' ? {balance: 1000, kind: 'person'} : body),
-    ),
+    Promise.resolve(Response.json(url === '/api/me' ? me : body)),
   );
 }
+
+const ME: Me = {balance: 1000, kind: 'person', seats: []};
 
 // The requests the lobby sent besides asking for the player's chips.
 function sent(
@@ -155,5 +155,52 @@ describe('joining a room', () => {
     expect(String(url)).toMatch(/\/api\/rooms\/ROOM42\/join$/);
     expect(init?.method).toBe('POST');
     expect(open).toHaveBeenCalledWith(seated);
+  });
+});
+
+describe('the tables a player sits at', () => {
+  it('lists each seat, and cashes one out', async () => {
+    const left: RoomView = {
+      code: 'ABC234',
+      buy_in: 200,
+      session_id: null,
+      seat: null,
+      stack: null,
+      stacks: [],
+    };
+    const fetch = server(left, {
+      ...ME,
+      seats: [{code: 'ABC234', stack: 350}],
+    });
+    rendered = render(
+      <PokerLobby
+        entry={ENTRY}
+        client={new SessionClient({fetch})}
+        onOpen={vi.fn()}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const {container} = rendered;
+    expect(container.textContent).toContain('Table ABC234 · 350 chips');
+
+    const cashOut = [...container.querySelectorAll('button')].find(
+      button => button.textContent === 'Cash out',
+    );
+    if (cashOut === undefined) throw new Error('No Cash out button.');
+    await act(async () => {
+      cashOut.click();
+      await Promise.resolve();
+    });
+
+    const [url, init] = sent(fetch)[0] ?? [];
+    expect(url).toBe('/api/rooms/ABC234/leave');
+    expect(init?.method).toBe('POST');
+    await vi.waitFor(() => {
+      expect(
+        fetch.mock.calls.filter(([called]) => called === '/api/me'),
+      ).toHaveLength(2);
+    });
   });
 });

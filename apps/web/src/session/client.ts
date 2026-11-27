@@ -122,7 +122,15 @@ export class SessionClient {
     return this.request('POST', `${roomPath(code)}/deal`, 'frame', {after});
   }
 
-  /** The signed-in player's chips and kind. */
+  /**
+   * Gets up from the room `code` names between hands, moving this player's
+   * stack back to their account, and answers with the room.
+   */
+  leave(code: string): Promise<RoomView> {
+    return this.request('POST', `${roomPath(code)}/leave`, 'room', {});
+  }
+
+  /** The signed-in player's chips, kind, and stack at each table. */
   me(): Promise<Me> {
     return this.request('GET', '/api/me', 'me');
   }

@@ -30,6 +30,8 @@ export interface Game {
   readonly viewer: Viewer;
   /** Deals the room's next hand at a table played for chips, and opens it. */
   readonly deal: () => Promise<void>;
+  /** Cashes this player out of the room's table, and goes back to the lobby. */
+  readonly leave: () => Promise<void>;
 }
 
 /** The game of the page; provided by `GamePage`. */

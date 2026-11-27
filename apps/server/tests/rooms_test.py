@@ -177,6 +177,19 @@ class RoomsTest(absltest.TestCase):
         )
         self.assert_chips_kept(code)
 
+    def test_me_lists_each_seat_until_it_is_cashed_out(self) -> None:
+        code, hand = self.open_room()
+        self.assertEqual(
+            self.call(self.host, "GET", "/api/me")[1]["seats"], [{"code": code, "stack": BUY_IN}]
+        )
+
+        self.move(self.guest, hand, 1, "fold")
+        status, _ = self.call(self.host, "POST", f"/api/rooms/{code}/leave", {})
+        self.assertEqual(status, 200)
+        _, me = self.call(self.host, "GET", "/api/me")
+        self.assertEqual((me["seats"], me["balance"]), ([], ledger.WELCOME_GRANT + 1))
+        self.assert_chips_kept(code)
+
     def test_a_room_left_before_anyone_joins_closes(self) -> None:
         status, frame = self.call(self.host, "POST", "/api/sessions?viewer=0", TABLE)
         self.assertEqual(status, 200, frame)
