@@ -4,12 +4,9 @@
   <img src="docs/doggybank.webp" alt="A long dachshund carrying stacks of poker chips and a fanned hand of cards on its back" width="720">
 </div>
 
-want to deepen the grooves in your brain and save up some coins? want something to do on a friday night over some soju and brownies while you are snuggled in? want to get beaten up by your friend if you win? 
-
 WELCOME TO DOGGYBANK.
 
 sponsored by dedalus machines.
-
 
 live at doggybank.io  
 
