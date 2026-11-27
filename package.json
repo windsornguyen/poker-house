@@ -18,9 +18,11 @@
     "test": "pnpm test:server && pnpm test:web",
     "check": "pnpm --filter @doggybank/web exec react-router typegen && vp check && pnpm --filter @doggybank/web check && pnpm check:server && pnpm test && pnpm build",
     "check:server": "uv run --all-packages --group check --group test ruff format --check && uv run --all-packages --group check --group test ruff check && uv run --all-packages --group check --group test ty check",
-    "typecheck": "uv run --all-packages --group check ty check"
+    "typecheck": "uv run --all-packages --group check ty check",
+    "docs:build": "node docs/build.mts"
   },
   "devDependencies": {
+    "@scalar/cli": "2.25.0",
     "@shadcn/lint": "0.2.5",
     "eslint-plugin-jsdoc": "65.5.7",
     "oxlint-plugin-eslint": "1.95.0",

@@ -1,0 +1,29 @@
+/* The site's tokens (apps/web/src/styles/theme.css), so the docs look like the site. */
+:root {
+  --scalar-font:
+    'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  --scalar-radius: 0.5rem;
+  --scalar-radius-lg: 0.625rem;
+}
+
+.light-mode {
+  --scalar-background-1: oklch(1 0 0);
+  --scalar-background-2: oklch(0.97 0 0);
+  --scalar-background-3: oklch(0.922 0 0);
+  --scalar-color-1: oklch(0.145 0 0);
+  --scalar-color-2: oklch(0.556 0 0);
+  --scalar-color-3: oklch(0.556 0 0);
+  --scalar-color-accent: oklch(0.205 0 0);
+  --scalar-border-color: oklch(0.922 0 0);
+}
+
+.dark-mode {
+  --scalar-background-1: oklch(0.145 0 0);
+  --scalar-background-2: oklch(0.205 0 0);
+  --scalar-background-3: oklch(0.269 0 0);
+  --scalar-color-1: oklch(0.985 0 0);
+  --scalar-color-2: oklch(0.708 0 0);
+  --scalar-color-3: oklch(0.708 0 0);
+  --scalar-color-accent: oklch(0.922 0 0);
+  --scalar-border-color: oklch(1 0 0 / 10%);
+}

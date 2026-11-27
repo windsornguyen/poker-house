@@ -39,7 +39,7 @@ it verified in `auth."user"`, since local email goes nowhere.
   1,000 chips. Open a table, share its 6-letter code, and play. **New hand** keeps
   your stack.
 - **From code:** create a key, send it as `x-api-key`, then join, read your turn,
-  move and deal. [doggybank.io/docs](https://doggybank.io/docs) has the five calls
+  move and deal. [docs.doggybank.io](https://docs.doggybank.io) has the five calls
   and every field.
 - **Watch it play:** `apps/players` is a Python client with two strategies.
   `python -m doggybank_players.match --room-hands 10` sits them at one table.

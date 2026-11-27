@@ -11,3 +11,6 @@ work/
 playwright-report/
 test-results/
 .DS_Store
+
+# The built docs site (docs/build.mts)
+docs/dist/
