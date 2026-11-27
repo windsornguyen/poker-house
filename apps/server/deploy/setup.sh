@@ -30,7 +30,7 @@ fi
 password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
 cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/poker-house.conf" <<CONF
 shared_buffers = 512MB
-effective_cache_size = 2GB
+effective_cache_size = 1GB
 synchronous_commit = off
 wal_compression = lz4
 checkpoint_timeout = 15min

@@ -23,7 +23,7 @@ export async function ensureMachine(machineId: string | undefined): Promise<stri
 	}
 	const machine = await client.machines.create({
 		vcpu: 1,
-		memory_mib: 4096,
+		memory_mib: 2048,
 		storage_gib: 10,
 		autosleep: "300s",
 	});
