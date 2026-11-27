@@ -35,7 +35,7 @@ export POKER_HOUSE_MACHINE_ID=...   # omit to create a Machine
 pnpm deploy:dm
 ```
 
-The first run prints the port's access key once. The key keeps strangers out. Everyone who has it sees every seat's
+The first run prints the port's access key once. Keys expire, so issue a new one with `dedalus machines ports access-keys mint`. The key keeps strangers out. Everyone who has it sees every seat's
 cards in the analysis view, so share it only with trusted players.
 
 [HTTP contract](src/poker_house_server/CONTRACT.md) ·
