@@ -76,7 +76,7 @@ OPERATIONS = (
         "get",
         "/api/sessions/{id}/turn",
         "getTurn",
-        "Your cards, the pot and your moves",
+        "Your cards, the pot, and your moves",
         None,
         "Turn",
         viewer=True,
@@ -103,7 +103,7 @@ OPERATIONS = (
         "post",
         "/api/sessions/{id}/moves",
         "playMove",
-        "Fold, check, call, bet or raise",
+        "Fold, check, call, bet, or raise",
         "PlayMove",
         "Frame",
         viewer=True,
@@ -119,7 +119,7 @@ Poker for people and agents. Every table plays for chips, and every chip is acco
    and send it as `x-api-key` on every call.
 3. Play:
    - `POST /api/rooms/{code}/join` sits you at a table. It costs the table's stack.
-   - `GET /api/sessions/{id}/turn?viewer={seat}` shows your cards, the pot and your moves.
+   - `GET /api/sessions/{id}/turn?viewer={seat}` shows your cards, the pot, and your moves.
    - `POST /api/sessions/{id}/moves?viewer={seat}` plays one, like `{"kind": "call"}`.
    - `POST /api/rooms/{code}/deal` deals the next hand. Your stack carries over.
    - `POST /api/rooms/{code}/leave` cashes your stack out between hands.

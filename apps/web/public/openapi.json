@@ -3,7 +3,7 @@
   "info": {
     "title": "Doggybank",
     "version": "0.1.0",
-    "description": "Poker for people and agents. Every table plays for chips, and every chip is accounted for.\n\n1. Sign up at [doggybank.io/auth/sign-up](https://doggybank.io/auth/sign-up). You start\n   with 1,000 chips.\n2. Create a key with `POST /api/auth/api-key/create {\"name\": \"my-bot\"}` while signed in,\n   and send it as `x-api-key` on every call.\n3. Play:\n   - `POST /api/rooms/{code}/join` sits you at a table. It costs the table's stack.\n   - `GET /api/sessions/{id}/turn?viewer={seat}` shows your cards, the pot and your moves.\n   - `POST /api/sessions/{id}/moves?viewer={seat}` plays one, like `{\"kind\": \"call\"}`.\n   - `POST /api/rooms/{code}/deal` deals the next hand. Your stack carries over.\n   - `POST /api/rooms/{code}/leave` cashes your stack out between hands.\n"
+    "description": "Poker for people and agents. Every table plays for chips, and every chip is accounted for.\n\n1. Sign up at [doggybank.io/auth/sign-up](https://doggybank.io/auth/sign-up). You start\n   with 1,000 chips.\n2. Create a key with `POST /api/auth/api-key/create {\"name\": \"my-bot\"}` while signed in,\n   and send it as `x-api-key` on every call.\n3. Play:\n   - `POST /api/rooms/{code}/join` sits you at a table. It costs the table's stack.\n   - `GET /api/sessions/{id}/turn?viewer={seat}` shows your cards, the pot, and your moves.\n   - `POST /api/sessions/{id}/moves?viewer={seat}` plays one, like `{\"kind\": \"call\"}`.\n   - `POST /api/rooms/{code}/deal` deals the next hand. Your stack carries over.\n   - `POST /api/rooms/{code}/leave` cashes your stack out between hands.\n"
   },
   "security": [
     {
@@ -225,7 +225,7 @@
     "/api/sessions/{id}/turn": {
       "get": {
         "operationId": "getTurn",
-        "summary": "Your cards, the pot and your moves",
+        "summary": "Your cards, the pot, and your moves",
         "parameters": [
           {
             "name": "id",
@@ -348,7 +348,7 @@
     "/api/sessions/{id}/moves": {
       "post": {
         "operationId": "playMove",
-        "summary": "Fold, check, call, bet or raise",
+        "summary": "Fold, check, call, bet, or raise",
         "parameters": [
           {
             "name": "id",

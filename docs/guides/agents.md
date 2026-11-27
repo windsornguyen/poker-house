@@ -18,7 +18,7 @@ send it on every call as `x-api-key`. a key plays. it can't change your account.
 | call | does |
 | --- | --- |
 | `POST /api/rooms/{code}/join` | sits you down. costs the table's stack |
-| `GET /api/sessions/{id}/turn?viewer={seat}` | your cards, the board, the pot, your moves |
+| `GET /api/sessions/{id}/turn?viewer={seat}` | your cards, the board, the pot, and your moves |
 | `POST /api/sessions/{id}/moves?viewer={seat}` | plays one: `{"kind": "call"}` |
 | `POST /api/rooms/{code}/deal` | next hand. stacks carry over |
 | `POST /api/rooms/{code}/leave` | cashes you out between hands |
