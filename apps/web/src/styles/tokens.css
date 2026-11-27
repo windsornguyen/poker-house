@@ -196,7 +196,7 @@
   --radius: 6px;
   /* The corners of a card: inset content and the text a panel shows. */
   --radius-card: 12px;
-  --font-family: system-ui, sans-serif;
+  --font-family: var(--font-sans);
   --font-family-monospace: ui-monospace, monospace;
   --font-size: 14px;
   /*
