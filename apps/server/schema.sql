@@ -5,6 +5,7 @@ create table if not exists poker.session (
     game text not null,
     parameters jsonb not null,
     seed bigint not null,
+    chance_policy text not null,
     created_at timestamptz not null default now(),
     finished_at timestamptz,
     returns double precision[],

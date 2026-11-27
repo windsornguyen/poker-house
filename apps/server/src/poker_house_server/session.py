@@ -27,11 +27,11 @@ import dataclasses
 import random
 import secrets
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 import pyspiel
 
-from poker_house_server import builds, contract, errors, loader, plies, request, seats, views
+from poker_house_server import builds, contract, db, errors, loader, plies, request, seats, views
 from poker_house_server import controllers as controllers_lib
 from poker_house_server import frame as frame_lib
 
@@ -65,9 +65,10 @@ class Session:
         *,
         seed: int,
         chance_policy: contract.ChancePolicy,
+        session_id: str,
     ) -> None:
-        """Starts a session with every seat human; use `create` instead."""
-        self.id = secrets.token_hex(8)
+        """Starts a session with every seat human; use `create` or `restore`."""
+        self.id = session_id
         self.game_name = loaded.name
         self._loaded = loaded
         self._seed = seed
@@ -95,6 +96,7 @@ class Session:
         # How many chance outcomes the session has sampled; never rewound.
         self._draws = 0
         self._lock = threading.RLock()
+        self.on_change: Callable[[Session], None] | None = None
         self._changed = threading.Condition(self._lock)
         self._version = 0
         self._closed = False
@@ -139,6 +141,7 @@ class Session:
             loaded,
             seed=seats.random_seed() if seed is None else seed,
             chance_policy=chance_policy,
+            session_id=secrets.token_hex(8),
         )
         with session._lock:  # A build may finish on its own thread meanwhile.
             session._seats.assign(
@@ -194,9 +197,59 @@ class Session:
             return self._version, self._build(self._state, len(self._plies), viewer)
 
     def _touch(self) -> None:
-        """Records a change and wakes every `wait`."""
+        """Records a change, wakes every `wait`, and tells `on_change`."""
         self._version += 1
         self._changed.notify_all()
+        if self.on_change is not None:
+            self.on_change(self)
+
+    @property
+    def seed(self) -> int:
+        """The seed of every chance outcome and controller."""
+        return self._seed
+
+    @property
+    def chance_policy(self) -> contract.ChancePolicy:
+        """How chance nodes are resolved."""
+        return self._chance_policy
+
+    @property
+    def parameters(self) -> Mapping[str, contract.ParameterValue]:
+        """The game's parameters."""
+        return self._loaded.parameters
+
+    @property
+    def plies(self) -> tuple[plies.Ply, ...]:
+        """Every ply of the live game."""
+        with self._lock:
+            return tuple(self._plies)
+
+    @property
+    def returns(self) -> tuple[float, ...] | None:
+        """Each seat's net result once the hand is over, else None."""
+        with self._lock:
+            if not self._state.is_terminal():
+                return None
+            return tuple(float(value) for value in self._state.returns())
+
+    @classmethod
+    def restore(cls, stored: db.StoredSession) -> Session:
+        """Rebuilds a stored session by replaying its plies; no controller moves."""
+        session = cls(
+            loader.load(stored.game, stored.parameters),
+            seed=stored.seed,
+            chance_policy=stored.chance_policy,
+            session_id=stored.id,
+        )
+        with session._lock:
+            session._seats.assign(
+                {index: (seat.spec, seat.autoplay) for index, seat in enumerate(stored.seats)}
+            )
+            for index, ply in enumerate(stored.plies):
+                played = plies.apply(session._state, ply.action, ply=index)
+                session._plies.append(dataclasses.replace(played, bot_output=ply.bot_output))
+            session._draws = sum(ply.seat is None for ply in stored.plies)
+        return session
 
     def replay_frame(self, viewer: contract.Viewer, step: int) -> frame_lib.Frame:
         """Returns the position after `step` plies, as `viewer` may see it.

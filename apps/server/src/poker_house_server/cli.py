@@ -33,6 +33,7 @@ from poker_house_server import (
     api,
     builds,
     controllers,
+    db,
     health_report,
     loader,
     remote_bot,
@@ -257,10 +258,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             "Remote bot seats may post to this machine and to %s.",
             ", ".join(args.remote_bot_host),
         )
+    database_url = os.environ.get("DATABASE_URL", "")
+    journal = store.Journal(db.Database(database_url)) if database_url else None
+    logging.info("Sessions are kept in %s.", "Postgres" if journal is not None else "memory only")
     server = server_lib.Server(
         (args.host, args.port),
         api.Api(
-            store.SessionStore(),
+            store.SessionStore(journal=journal),
             catalogue=loader.build_catalogue,
             health=health_report.build,
         ),

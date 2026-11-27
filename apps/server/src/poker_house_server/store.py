@@ -28,7 +28,7 @@ import collections
 import threading
 from collections.abc import Mapping, Sequence
 
-from poker_house_server import contract, errors
+from poker_house_server import contract, db, errors, plies
 from poker_house_server import controllers as controllers_lib
 from poker_house_server import session as session_lib
 
@@ -36,11 +36,70 @@ from poker_house_server import session as session_lib
 DEFAULT_CAPACITY = 256
 
 
+class Journal:
+    """Writes each session's changes to the database as they happen."""
+
+    def __init__(self, database: db.Database) -> None:
+        self.database = database
+        self.saved: dict[str, tuple[plies.Ply, ...]] = {}
+
+    def follow(self, session: session_lib.Session, seats: Sequence[db.StoredSeat]) -> None:
+        """Records a new session and every change to it from now on."""
+        self.database.insert(
+            db.StoredSession(
+                id=session.id,
+                game=session.game_name,
+                parameters=session.parameters,
+                seed=session.seed,
+                chance_policy=session.chance_policy,
+                seats=tuple(seats),
+                plies=(),
+            )
+        )
+        self.resume(session, ())
+
+    def resume(self, session: session_lib.Session, saved: tuple[plies.Ply, ...]) -> None:
+        """Records every change to a session whose first `saved` plies are stored."""
+        self.saved[session.id] = saved
+        session.on_change = self.sync
+        self.sync(session)
+
+    def sync(self, session: session_lib.Session) -> None:
+        """Writes the plies that differ from those stored, and the hand's result."""
+        current = session.plies
+        before = self.saved.get(session.id, ())
+        kept = 0
+        for old, new in zip(before, current, strict=False):
+            if (old.seat, old.action, old.bot_output) != (new.seat, new.action, new.bot_output):
+                break
+            kept += 1
+        self.database.record(session.id, kept, current[kept:], session.returns)
+        self.saved[session.id] = current
+
+    def load(self, session_id: str) -> session_lib.Session | None:
+        """Rebuilds a stored session, or returns None if there is none."""
+        stored = self.database.load(session_id)
+        if stored is None:
+            return None
+        session = session_lib.Session.restore(stored)
+        self.resume(session, session.plies)
+        return session
+
+    def forget(self, session_id: str) -> None:
+        """Deletes a session from the database."""
+        self.saved.pop(session_id, None)
+        self.database.delete(session_id)
+
+
 class SessionStore:
     """The sessions a server holds, keyed by id, least recently used first."""
 
-    def __init__(self, capacity: int = DEFAULT_CAPACITY) -> None:
-        """Starts an empty store that keeps at most `capacity` sessions."""
+    def __init__(self, capacity: int = DEFAULT_CAPACITY, journal: Journal | None = None) -> None:
+        """Starts a store that keeps at most `capacity` sessions in memory.
+
+        With a `journal`, every session is also kept in the database, and one
+        forgotten from memory is rebuilt from it on its next request.
+        """
         if capacity < 1:
             raise ValueError(f"A store keeps at least one session, not {capacity}.")
         self._capacity = capacity
@@ -48,6 +107,7 @@ class SessionStore:
             collections.OrderedDict()
         )
         self._lock = threading.Lock()
+        self.journal = journal
 
     def create(
         self,
@@ -86,10 +146,22 @@ class SessionStore:
             controllers=controllers,
             autoplay=autoplay,
         )
+        if self.journal is not None:
+            self.journal.follow(
+                session,
+                [
+                    db.StoredSeat(spec, play)
+                    for spec, play in zip(
+                        controllers, autoplay or [False] * len(controllers), strict=True
+                    )
+                ],
+            )
         with self._lock:
             self._sessions[session.id] = session
             while len(self._sessions) > self._capacity:
-                self._sessions.popitem(last=False)[1].close()
+                evicted = self._sessions.popitem(last=False)[1]
+                evicted.on_change = None
+                evicted.close()
         return session
 
     def get(self, session_id: str) -> session_lib.Session:
@@ -106,6 +178,11 @@ class SessionStore:
             session = self._sessions.get(session_id)
             if session is not None:
                 self._sessions.move_to_end(session_id)
+        if session is None and self.journal is not None:
+            session = self.journal.load(session_id)
+            if session is not None:
+                with self._lock:
+                    session = self._sessions.setdefault(session_id, session)
         if session is None:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         return session
@@ -124,6 +201,8 @@ class SessionStore:
         if session is None:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         session.close()
+        if self.journal is not None:
+            self.journal.forget(session_id)
 
     def __len__(self) -> int:
         with self._lock:
