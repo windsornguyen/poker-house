@@ -241,3 +241,62 @@ describe('the tables a player sits at', () => {
     });
   });
 });
+
+describe('joining a room short of its buy-in', () => {
+  it('links to the spectator view beside the refusal', async () => {
+    const room: RoomView = {
+      code: 'ROOM42',
+      buy_in: 5000,
+      session_id: 'hand-1',
+      seat: null,
+      stack: null,
+      stacks: [5000],
+    };
+    const fetch = vi.fn<Fetch>(url => {
+      if (url === '/api/me') return Promise.resolve(Response.json(ME));
+      if (url.endsWith('/join')) {
+        return Promise.resolve(
+          Response.json(
+            {
+              code: 'insufficient_chips',
+              message: 'You have 1000 chips, fewer than the 5000 this needs.',
+              seat: null,
+              ply: null,
+            },
+            {status: 402},
+          ),
+        );
+      }
+      return Promise.resolve(Response.json(room));
+    });
+    rendered = render(
+      <PokerLobby
+        entry={ENTRY}
+        client={new SessionClient({fetch})}
+        onOpen={vi.fn()}
+      />,
+    );
+    const {container} = rendered;
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Room code"]',
+    );
+    if (input === null) throw new Error('No room code input.');
+    enter(input, 'ROOM42');
+    const forms = container.querySelectorAll('form');
+    const join = forms[forms.length - 1];
+    if (join === undefined) throw new Error('No join form.');
+    await act(async () => {
+      join.dispatchEvent(
+        new Event('submit', {bubbles: true, cancelable: true}),
+      );
+      await Promise.resolve();
+    });
+
+    await vi.waitFor(() => {
+      const link = container.querySelector('[role="alert"] a');
+      expect(link?.getAttribute('href')).toBe(
+        '/game/doggybank?session=hand-1&viewer=spectator',
+      );
+    });
+  });
+});

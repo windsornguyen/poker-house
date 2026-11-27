@@ -33,14 +33,17 @@ import type {
   Viewer,
 } from './contract/contract.ts';
 import {BUY_IN, defaultSession, tableSession} from './game/game-defaults.ts';
+import {sessionPath} from './app/route.ts';
 import {openRoom} from './game/game-page.tsx';
 import type {SessionClient} from './session/client.ts';
+import {ContractError} from './session/errors.ts';
 
 import './lobby.css';
 
 const ROOM_CODE_LENGTH = 6;
 const GAME = 'doggybank';
 const FIRST_SEAT: Viewer = {kind: 'seat', seat: 0};
+const SPECTATOR: Viewer = {kind: 'spectator', seat: null};
 
 /** The two bot endpoints and the hand's integer-chip stakes. */
 export interface MatchSettings {
@@ -287,16 +290,28 @@ function JoinRoom({
   const [code, setCode] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [watch, setWatch] = useState<string | null>(null);
 
   async function join(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setPending(true);
     setError(null);
+    setWatch(null);
 
     try {
       onOpen(await client.join(code));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
+      // A player short of the buy-in may still watch the hand.
+      if (
+        caught instanceof ContractError &&
+        caught.code === 'insufficient_chips'
+      ) {
+        const room = await client.room(code);
+        if (room.session_id !== null) {
+          setWatch(sessionPath(GAME, room.session_id, SPECTATOR));
+        }
+      }
     } finally {
       setPending(false);
     }
@@ -326,7 +341,11 @@ function JoinRoom({
           Join
         </Button>
       </div>
-      {error !== null && <p role="alert">{error}</p>}
+      {error !== null && (
+        <p role="alert">
+          {error} {watch !== null && <a href={watch}>Watch the table</a>}
+        </p>
+      )}
     </form>
   );
 }

@@ -14,7 +14,7 @@ alter table poker.player add column if not exists kind text not null default 'pe
 
 create table if not exists poker.session (
     id text primary key check (id ~ '^[0-9a-f]{16}$'),
-    code text not null unique check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),
+    code text not null check (code ~ '^[A-HJ-NP-Z2-9]{6}$'),
     game text not null,
     parameters jsonb not null,
     seed bigint not null,
@@ -86,6 +86,7 @@ create table if not exists poker.room_seat (
 -- Sessions from before rooms become rooms of their own, played for nothing.
 insert into poker.room (code) select code from poker.session on conflict do nothing;
 
+-- Databases made before rooms kept each code unique, but a room deals many hands under one code.
 alter table poker.session drop constraint if exists session_code_key;
 
 do $$
