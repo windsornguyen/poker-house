@@ -26,7 +26,7 @@ import * as z from 'zod';
  *   kind: The player's listing kind; null for the treasury and tables.
  *   balance: The chips it holds.
  */
-export const Account = z.strictObject({
+export const Account = z.object({
   id: z.string(),
   email: z.string().nullable(),
   kind: z.string().nullable(),
@@ -41,7 +41,7 @@ export type Account = z.infer<typeof Account>;
  *   supply: Every chip there is, which the balances always sum to.
  *   accounts: The holders.
  */
-export const Accounts = z.strictObject({
+export const Accounts = z.object({
   supply: z.int(),
   accounts: z.array(Account),
 });
@@ -54,7 +54,7 @@ export type Accounts = z.infer<typeof Accounts>;
  *   id: The OpenSpiel action id, which a client sends to play it.
  *   label: The game's text for the action.
  */
-export const Action = z.strictObject({
+export const Action = z.object({
   id: z.int(),
   label: z.string(),
 });
@@ -74,7 +74,7 @@ export type JsonValue = z.infer<typeof JsonValue>;
  *   hint: The adapter's description of the action, such as the card it plays
  *     or the cells it joins.
  */
-export const ActionHint = z.strictObject({
+export const ActionHint = z.object({
   id: z.int(),
   hint: JsonValue,
 });
@@ -94,7 +94,7 @@ export type ActionHint = z.infer<typeof ActionHint>;
  *   max_plies: The most seat actions to apply, from 1 to 1000, or null for
  *     1000.
  */
-export const Advance = z.strictObject({
+export const Advance = z.object({
   max_plies: z.int().nullable(),
 });
 export type Advance = z.infer<typeof Advance>;
@@ -109,7 +109,7 @@ export type Advance = z.infer<typeof Advance>;
  *     ply plays from that position and takes back every later ply, as only
  *     an omniscient viewer may.
  */
-export const ApplyAction = z.strictObject({
+export const ApplyAction = z.object({
   action: z.int(),
   ply: z.int().nullable(),
 });
@@ -122,7 +122,7 @@ export type ApplyAction = z.infer<typeof ApplyAction>;
  *   outcome: The OpenSpiel action id, one of the frame's `chance_outcomes`.
  *   ply: The position to choose at, as for `ApplyAction`.
  */
-export const ApplyChanceOutcome = z.strictObject({
+export const ApplyChanceOutcome = z.object({
   outcome: z.int(),
   ply: z.int().nullable(),
 });
@@ -139,7 +139,7 @@ export type ApplyChanceOutcome = z.infer<typeof ApplyChanceOutcome>;
  *   label: The game's text for the action.
  *   prob: The probability the bot gave the action, in [0, 1].
  */
-export const PolicyEntry = z.strictObject({
+export const PolicyEntry = z.object({
   action: z.int().nullable(),
   label: z.string(),
   prob: z.number(),
@@ -159,7 +159,7 @@ export type PolicyEntry = z.infer<typeof PolicyEntry>;
  *   decided_by: What part of the bot made the choice, such as `network`,
  *     `search`, `scripted` or `forced`; null when it did not say.
  */
-export const BotOutput = z.strictObject({
+export const BotOutput = z.object({
   policy: z.array(PolicyEntry),
   value: z.number().nullable(),
   decided_by: z.string().nullable(),
@@ -181,7 +181,7 @@ export type BotOutput = z.infer<typeof BotOutput>;
  *     null when it can. A seat is never played by a controller with a
  *     reason.
  */
-export const Controller = z.strictObject({
+export const Controller = z.object({
   name: z.string(),
   label: z.string(),
   config_schema: z.record(z.string(), JsonValue),
@@ -207,7 +207,7 @@ export type ChancePolicy = z.infer<typeof ChancePolicy>;
  *   controllers: Every registered controller, starting with the human one.
  *   chance_policies: The chance policies the server accepts.
  */
-export const Capabilities = z.strictObject({
+export const Capabilities = z.object({
   controllers: z.array(Controller),
   chance_policies: z.array(ChancePolicy),
 });
@@ -292,7 +292,7 @@ export type ParameterKind = z.infer<typeof ParameterKind>;
  *   description: What the parameter controls, or null when the game does not
  *     say.
  */
-export const ParameterSpec = z.strictObject({
+export const ParameterSpec = z.object({
   name: z.string(),
   type: ParameterType,
   kind: ParameterKind,
@@ -331,7 +331,7 @@ export type ParameterSpec = z.infer<typeof ParameterSpec>;
  *     the client has that renderer. Null for a game with no adapter, and for
  *     one that is not loadable; such a game is shown as its text.
  */
-export const CatalogueEntry = z.strictObject({
+export const CatalogueEntry = z.object({
   name: z.string(),
   long_name: z.string(),
   dynamics: Dynamics,
@@ -354,7 +354,7 @@ export type CatalogueEntry = z.infer<typeof CatalogueEntry>;
  * Attributes:
  *   games: One entry per game, ordered by name.
  */
-export const Catalogue = z.strictObject({
+export const Catalogue = z.object({
   games: z.array(CatalogueEntry),
 });
 export type Catalogue = z.infer<typeof Catalogue>;
@@ -367,7 +367,7 @@ export type Catalogue = z.infer<typeof Catalogue>;
  *   label: The game's text for the outcome.
  *   probability: The outcome's probability, in (0, 1].
  */
-export const ChanceOutcome = z.strictObject({
+export const ChanceOutcome = z.object({
   id: z.int(),
   label: z.string(),
   probability: z.number(),
@@ -383,7 +383,7 @@ export type ChanceOutcome = z.infer<typeof ChanceOutcome>;
  *     omniscient, the failing seat included, since the message may describe
  *     any seat's private state.
  */
-export const ControllerFailure = z.strictObject({
+export const ControllerFailure = z.object({
   error: z.string(),
   message: z.string().nullable(),
 });
@@ -398,7 +398,7 @@ export type ControllerFailure = z.infer<typeof ControllerFailure>;
  *   autoplay: Whether the server plays the seat's moves as soon as it is to
  *     move. Must be false for a human seat.
  */
-export const SeatConfig = z.strictObject({
+export const SeatConfig = z.object({
   controller: z.string(),
   config: z.record(
     z.string(),
@@ -419,7 +419,7 @@ export type SeatConfig = z.infer<typeof SeatConfig>;
  *   seed: The chance generator's seed, a non-negative integer, or null for
  *     the server to choose one.
  */
-export const CreateSession = z.strictObject({
+export const CreateSession = z.object({
   game: z.string(),
   parameters: z.record(
     z.string(),
@@ -439,7 +439,7 @@ export type CreateSession = z.infer<typeof CreateSession>;
  *     a newer one, the answer is that hand, so players who ask together all
  *     land on the same one.
  */
-export const Deal = z.strictObject({
+export const Deal = z.object({
   after: z.string(),
 });
 export type Deal = z.infer<typeof Deal>;
@@ -496,7 +496,7 @@ export type ErrorCode = z.infer<typeof ErrorCode>;
  *   seat: The seat the refusal concerns, or null.
  *   ply: The index of the history entry the refusal concerns, or null.
  */
-export const Error = z.strictObject({
+export const Error = z.object({
   code: ErrorCode,
   message: z.string(),
   seat: z.int().nullable(),
@@ -526,7 +526,7 @@ export type Error = z.infer<typeof Error>;
  *     resets or changes the hand.
  *   next: The id of the room's next hand once it is dealt, else null.
  */
-export const SessionInfo = z.strictObject({
+export const SessionInfo = z.object({
   id: z.string(),
   game: z.string(),
   parameters: z.record(
@@ -563,7 +563,7 @@ export type ViewerKind = z.infer<typeof ViewerKind>;
  *   kind: Whether the viewer holds a seat, watches, or sees everything.
  *   seat: The viewer's seat when `kind` is `seat`, otherwise null.
  */
-export const Viewer = z.strictObject({
+export const Viewer = z.object({
   kind: ViewerKind,
   seat: z.int().nullable(),
 });
@@ -621,7 +621,7 @@ export type SeatStatus = z.infer<typeof SeatStatus>;
  *     has no effect on play.
  *   taken: Whether a player holds the seat.
  */
-export const SeatView = z.strictObject({
+export const SeatView = z.object({
   seat: z.int(),
   controller: z.string(),
   config: z.record(
@@ -655,7 +655,7 @@ export type MoverKind = z.infer<typeof MoverKind>;
  *   kind: Whether a seat or chance acts, or the game is over.
  *   seat: The acting seat when `kind` is `seat`, otherwise null.
  */
-export const ToMove = z.strictObject({
+export const ToMove = z.object({
   kind: MoverKind,
   seat: z.int().nullable(),
 });
@@ -680,7 +680,7 @@ export type ToMove = z.infer<typeof ToMove>;
  *     and what decided its move all follow from its hand. Null also when the
  *     controller said nothing.
  */
-export const HistoryEntry = z.strictObject({
+export const HistoryEntry = z.object({
   seat: z.int().nullable(),
   action: z.int().nullable(),
   label: z.string().nullable(),
@@ -701,7 +701,7 @@ export type HistoryEntry = z.infer<typeof HistoryEntry>;
  *     of the frame's `legal_actions` at most once; null exactly when the
  *     frame's `legal_actions` is null.
  */
-export const Presentation = z.strictObject({
+export const Presentation = z.object({
   renderer: z.string(),
   view: JsonValue,
   actions: z.array(ActionHint).nullable(),
@@ -752,7 +752,7 @@ export type Presentation = z.infer<typeof Presentation>;
  *   presentation: The position as the game's adapter presents it to the
  *     viewer; null when no adapter is registered for the game.
  */
-export const Frame = z.strictObject({
+export const Frame = z.object({
   session: SessionInfo,
   viewer: Viewer,
   omniscient: z.boolean(),
@@ -782,7 +782,7 @@ export type Frame = z.infer<typeof Frame>;
  *   email: The player's email.
  *   amount: The chips to give, at least 1.
  */
-export const Grant = z.strictObject({
+export const Grant = z.object({
   email: z.string(),
   amount: z.int(),
 });
@@ -796,7 +796,7 @@ export type Grant = z.infer<typeof Grant>;
  *   revision: The source revision the server runs from, or null when unknown.
  *   capabilities: What the server can do.
  */
-export const Health = z.strictObject({
+export const Health = z.object({
   version: z.string(),
   revision: z.string().nullable(),
   capabilities: Capabilities,
@@ -810,7 +810,7 @@ export type Health = z.infer<typeof Health>;
  *   balance: The chips they hold off the tables.
  *   kind: person, internal or test, from their listing; null for none.
  */
-export const Me = z.strictObject({
+export const Me = z.object({
   balance: z.int(),
   kind: z.string().nullable(),
 });
@@ -829,7 +829,7 @@ export type MoveKind = z.infer<typeof MoveKind>;
  *     rises to, and a call's is the chips it adds.
  *   max: The most it allows, as `min`.
  */
-export const Move = z.strictObject({
+export const Move = z.object({
   kind: MoveKind,
   min: z.int().nullable(),
   max: z.int().nullable(),
@@ -844,7 +844,7 @@ export type Move = z.infer<typeof Move>;
  *   amount: For a bet or a raise, the total the seat's bet rises to, as the
  *     seat's observation lists it. Null for the other kinds.
  */
-export const PlayMove = z.strictObject({
+export const PlayMove = z.object({
   kind: MoveKind,
   amount: z.int().nullable().exactOptional(),
 });
@@ -857,7 +857,7 @@ export type PlayMove = z.infer<typeof PlayMove>;
  *   history: Actions to replay from the initial state, chance outcomes
  *     included, as in a frame's `history`; null or empty for a fresh game.
  */
-export const Reset = z.strictObject({
+export const Reset = z.object({
   history: z.array(z.int()).nullable(),
 });
 export type Reset = z.infer<typeof Reset>;
@@ -873,7 +873,7 @@ export type Reset = z.infer<typeof Reset>;
  *   stack: The player's chips at the table; null when they do not sit there.
  *   stacks: Every stack at the table, in the order the players sat.
  */
-export const RoomView = z.strictObject({
+export const RoomView = z.object({
   code: z.string(),
   buy_in: z.int().nullable(),
   session_id: z.string().nullable(),
@@ -889,7 +889,7 @@ export type RoomView = z.infer<typeof RoomView>;
  * Attributes:
  *   id: The id of the session closed.
  */
-export const SessionClosed = z.strictObject({
+export const SessionClosed = z.object({
   id: z.string(),
 });
 export type SessionClosed = z.infer<typeof SessionClosed>;
@@ -910,7 +910,7 @@ export type SessionClosed = z.infer<typeof SessionClosed>;
  *   bets: Each seat's bet on this street.
  *   moves: The seat's legal moves; empty unless it is to act.
  */
-export const Turn = z.strictObject({
+export const Turn = z.object({
   seat: z.int(),
   to_move: z.boolean(),
   finished: z.boolean(),

@@ -292,7 +292,10 @@ function docComment(text: string | undefined, indent: string): string {
   return `${indent}/**\n${body.join('\n')}\n${indent} */\n`;
 }
 
-/** The strict object schema of a definition with `properties`. */
+/**
+ * The object schema of a definition with `properties`. It ignores fields it does not
+ * know, so a server deployed ahead of the page can add a field without breaking it.
+ */
 function objectOf(schema: Schema, at: string): string {
   if (schema.type !== 'object') {
     throw new Error(`${at}: properties without type object`);
@@ -322,7 +325,7 @@ function objectOf(schema: Schema, at: string): string {
     const member = zodOf(property, where);
     return `${docComment(property.description, '  ')}  ${key}: ${member}${optional},\n`;
   });
-  return `z.strictObject({\n${members.join('')}})`;
+  return `z.object({\n${members.join('')}})`;
 }
 
 /** The schema `name` and the type it infers, under the same name. */
