@@ -23,9 +23,9 @@
     "deploy": "react-router build && wrangler deploy"
   },
   "dependencies": {
+    "better-auth": "1.7.28",
     "dockview": "4.13.1",
     "dockview-core": "4.13.1",
-    "jose": "6.2.18",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router": "8.5.3"

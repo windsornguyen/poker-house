@@ -1,30 +1,25 @@
-import {createRemoteJWKSet, jwtVerify} from 'jose';
+import {getCookieCache} from 'better-auth/cookies';
 
 interface Env {
   readonly API_ORIGIN: string;
+  readonly AUTH_ORIGIN: string;
   readonly PORT_KEY: string;
-  readonly ACCESS_TEAM: string;
-  readonly ACCESS_AUD: string;
+  readonly AUTH_PORT_KEY: string;
+  readonly BETTER_AUTH_SECRET: string;
 }
 
-const keys = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+const SAFE_METHODS = new Set(['GET', 'HEAD']);
 
-/** Whether Cloudflare Access signed this request for this application. */
-async function signedIn(request: Request, env: Env): Promise<boolean> {
-  const token = request.headers.get('Cf-Access-Jwt-Assertion');
-  if (token === null) return false;
-  const issuer = `https://${env.ACCESS_TEAM}.cloudflareaccess.com`;
-  let jwks = keys.get(issuer);
-  if (jwks === undefined) {
-    jwks = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
-    keys.set(issuer, jwks);
-  }
-  try {
-    await jwtVerify(token, jwks, {issuer, audience: env.ACCESS_AUD});
-    return true;
-  } catch {
-    return false;
-  }
+/** Forwards `request` to `origin`, unlocking its Dedalus port with `key`. */
+function forward(
+  request: Request,
+  origin: string,
+  key: string,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const upstream = new Request(origin + url.pathname + url.search, request);
+  upstream.headers.set('X-Dedalus-Port-Key', key);
+  return fetch(upstream);
 }
 
 export default {
@@ -33,16 +28,27 @@ export default {
     if (!url.pathname.startsWith('/api/')) {
       return new Response('Not found', {status: 404});
     }
-    if (!(await signedIn(request, env))) {
+    const origin = request.headers.get('Origin');
+    if (
+      !SAFE_METHODS.has(request.method) &&
+      origin !== null &&
+      origin !== url.origin
+    ) {
+      return new Response('Cross-origin request refused', {status: 403});
+    }
+    if (url.pathname.startsWith('/api/auth/')) {
+      return forward(request, env.AUTH_ORIGIN, env.AUTH_PORT_KEY);
+    }
+    const session = await getCookieCache(request, {
+      secret: env.BETTER_AUTH_SECRET,
+      isSecure: url.protocol === 'https:',
+    });
+    if (session === null) {
       return new Response('Sign in required', {status: 401});
     }
-    const upstream = new Request(
-      env.API_ORIGIN + url.pathname + url.search,
-      request,
-    );
-    upstream.headers.set('X-Dedalus-Port-Key', env.PORT_KEY);
-    upstream.headers.delete('Cookie');
-    upstream.headers.delete('Cf-Access-Jwt-Assertion');
-    return fetch(upstream);
+    const game = new Request(request);
+    game.headers.delete('Cookie');
+    game.headers.delete('Origin');
+    return forward(game, env.API_ORIGIN, env.PORT_KEY);
   },
 } satisfies ExportedHandler<Env>;
