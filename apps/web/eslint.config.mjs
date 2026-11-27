@@ -160,7 +160,15 @@ const googleStyle = [
   },
   {
     // Playwright requires a default export from these files.
-    files: ['playwright.config.ts', 'e2e/global_setup.ts'],
+    files: [
+      'playwright.config.ts',
+      'e2e/global_setup.ts',
+      'react-router.config.ts',
+      'src/root.tsx',
+      'src/routes.ts',
+      'src/routes/*.tsx',
+      'worker/*.ts',
+    ],
     rules: {'no-restricted-syntax': ['error', ...RESTRICTED_SYNTAX]},
   },
 ];
@@ -175,6 +183,8 @@ export default defineConfig(
   {
     ignores: [
       'dist/',
+      '.react-router/',
+      '.wrangler/',
       'node_modules/',
       'playwright-report/',
       'test-results/',

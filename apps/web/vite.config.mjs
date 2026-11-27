@@ -16,7 +16,9 @@
 
 import process from 'node:process';
 
-import react from '@vitejs/plugin-react';
+import {reactRouter} from '@react-router/dev/vite';
+import babel from '@rolldown/plugin-babel';
+import react, {reactCompilerPreset} from '@vitejs/plugin-react';
 import {defineConfig} from 'vitest/config';
 
 import {thirdPartyNotices} from './scripts/third_party_notices.ts';
@@ -28,7 +30,11 @@ import {thirdPartyNotices} from './scripts/third_party_notices.ts';
 const API_SERVER = process.env['POKER_HOUSE_SERVER'] ?? 'http://127.0.0.1:8787';
 
 export default defineConfig({
-  plugins: [react(), thirdPartyNotices()],
+  plugins: [
+    process.env['VITEST'] ? react() : reactRouter(),
+    babel({presets: [reactCompilerPreset()]}),
+    thirdPartyNotices(),
+  ],
   server: {proxy: {'/api': {target: API_SERVER, changeOrigin: false}}},
   test: {
     environment: 'jsdom',

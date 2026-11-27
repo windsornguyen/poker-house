@@ -25,7 +25,7 @@ import pathlib
 import urllib.parse
 
 # Where the client's build writes it, relative to this package.
-DEFAULT_ROOT = pathlib.Path(__file__).resolve().parents[3] / "web" / "dist"
+DEFAULT_ROOT = pathlib.Path(__file__).resolve().parents[3] / "web" / "dist" / "client"
 
 # The files a client build contains, by extension. Anything else is refused.
 CONTENT_TYPES = {
@@ -94,7 +94,7 @@ class ClientFiles:
         if any(part.startswith(".") or "\\" in part or "\0" in part for part in parts):
             return None
         if not parts or "." not in parts[-1]:
-            parts = [_INDEX]
+            parts = [*parts, _INDEX]
         path = self._root.joinpath(*parts).resolve()
         content_type = CONTENT_TYPES.get(path.suffix)
         if content_type is None or not path.is_relative_to(self._root) or not path.is_file():

@@ -1,2 +1,4 @@
 # Licence texts are kept verbatim.
 licenses/*/LICENSE.md
+.react-router/
+.wrangler/

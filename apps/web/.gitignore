@@ -7,3 +7,5 @@ test-results/
 /piece_sets/
 # The user's own client add-ons (src/INTERFACES.md, "Client add-ons").
 /addons/
+.react-router/
+.wrangler/

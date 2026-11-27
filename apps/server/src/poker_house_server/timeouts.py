@@ -8,7 +8,7 @@ from poker_house_server import session as session_lib
 
 TURN_SECONDS = 60.0
 HAND_SECONDS = 30 * 60.0
-STREAM_IDLE_SECONDS = 10 * 60.0
+STREAM_IDLE_SECONDS = 5 * 60.0
 
 ORACLE = contract.Viewer(contract.ViewerKind.ORACLE)
 PASSIVE_KINDS = ("check", "fold")

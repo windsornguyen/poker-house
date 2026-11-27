@@ -27,6 +27,7 @@ import dataclasses
 import random
 import secrets
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 
 import pyspiel
@@ -99,6 +100,7 @@ class Session:
         self.listeners: list[Callable[[Session], None]] = []
         self._changed = threading.Condition(self._lock)
         self._version = 0
+        self.changed_at = time.monotonic()
         self._closed = False
 
     @classmethod
@@ -199,6 +201,7 @@ class Session:
     def touch(self) -> None:
         """Records a change, wakes every `wait`, and tells every listener."""
         self._version += 1
+        self.changed_at = time.monotonic()
         self._changed.notify_all()
         for listener in self.listeners:
             listener(self)

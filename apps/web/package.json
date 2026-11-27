@@ -9,30 +9,36 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "react-router build",
     "check": "pnpm format:check && pnpm lint && pnpm lint:style && pnpm contrast && pnpm typecheck",
     "contrast": "node scripts/contrast_check.ts",
-    "dev": "vite",
+    "dev": "react-router dev",
     "format": "prettier --write . \"!dist/**\" \"!playwright-report/**\" \"!test-results/**\" \"!licenses/*/LICENSE.md\"",
     "format:check": "prettier --check . \"!dist/**\" \"!playwright-report/**\" \"!test-results/**\" \"!licenses/*/LICENSE.md\"",
     "generate:contract": "node scripts/generate_contract.ts",
     "lint": "eslint --max-warnings 0 .",
     "lint:style": "node scripts/style_lint.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "react-router typegen && tsc --noEmit && tsc --noEmit -p worker",
+    "deploy": "react-router build && wrangler deploy"
   },
   "dependencies": {
     "dockview": "4.13.1",
     "dockview-core": "4.13.1",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-router": "8.5.3"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261127.1",
     "@eslint/js": "9.39.5",
+    "@react-router/dev": "8.5.3",
+    "@rolldown/plugin-babel": "0.3.1",
     "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "5.2.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "babel-plugin-react-compiler": "1.0.0",
     "eslint": "9.39.5",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-jsdoc": "65.4.0",
@@ -41,8 +47,9 @@
     "prettier": "3.9.10",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
-    "vite": "7.3.7",
-    "vitest": "4.1.12"
+    "vite": "8.4.0",
+    "vitest": "4.1.12",
+    "wrangler": "4.168.0"
   },
   "prettier": {
     "bracketSpacing": false,

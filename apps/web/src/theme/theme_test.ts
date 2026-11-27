@@ -14,8 +14,7 @@
 
 /// <reference types="node" />
 
-import {readFileSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {FIRST_PAINT_THEME} from '../root.tsx';
 import {runInThisContext} from 'node:vm';
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
@@ -129,19 +128,9 @@ describe('applyTheme', () => {
   });
 });
 
-describe('the first-paint script in index.html', () => {
-  const html = readFileSync(
-    resolve(import.meta.dirname, '../../index.html'),
-    'utf8',
-  );
-  const scripts = Array.from(
-    html.matchAll(/<script>([\s\S]*?)<\/script>/g),
-    match => match[1] ?? '',
-  );
-
+describe('the first-paint theme script', () => {
   function firstPaintTheme(): string | undefined {
-    expect(scripts).toHaveLength(1);
-    runInThisContext(scripts[0] ?? '');
+    runInThisContext(FIRST_PAINT_THEME);
     return document.documentElement.dataset['theme'];
   }
 

@@ -64,7 +64,7 @@ describe('lintClient', () => {
   it('reads the page, the stylesheets and the scripts, and nothing else', async () => {
     const problems = await lintClient(
       await client({
-        'index.html': '<p>\n</p><p style="font-size: 10px"></p>',
+        'src/page.html': '<p>\n</p><p style="font-size: 10px"></p>',
         'src/styles/tokens.css': ':root { --text-small: 10px; }',
         'src/styles/dock.css': '',
         'src/panel/small.css': 'a { font-size: var(--text-small); }',
@@ -78,7 +78,7 @@ describe('lintClient', () => {
     expect(
       problems.map(({file, line}) => `${file}:${String(line)}`).sort(),
     ).toEqual([
-      'index.html:2',
+      'src/page.html:2',
       'src/panel/panel.css:4',
       'src/panel/panel.tsx:3',
       'src/panel/small.css:1',
@@ -87,7 +87,6 @@ describe('lintClient', () => {
 
   it('rejects a stylesheet it cannot read', async () => {
     const unbalanced = await client({
-      'index.html': '',
       'src/styles/tokens.css': '',
       'src/styles/dock.css': '',
       'src/broken.css': 'a { color: var(--color-text);',

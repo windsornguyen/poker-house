@@ -41,7 +41,7 @@
 // hover filters. The lesson the gates keep is the one about text: the
 // contrast check (`npm run contrast`) measures every text colour.
 //
-// It reads every stylesheet under src/, the inline styles of index.html, and
+// It reads every stylesheet under src/, the inline styles of its HTML, and
 // in TypeScript the literal values of JSX `style` attributes, of the JSX
 // paint attributes (`fill`, `stroke` and the like), of assignments
 // to `element.style` and of a canvas context's colour properties; a value
@@ -586,7 +586,7 @@ const LINTERS: Array<
   [/\.tsx?$/, lintScript],
 ];
 
-/** Every problem in the client rooted at `root`: src/ and index.html. */
+/** Every problem in the client rooted at `root`: everything under src/. */
 export async function lintClient(root: string): Promise<Problem[]> {
   const tokens = themeVariables(
     await Promise.all(
@@ -594,7 +594,7 @@ export async function lintClient(root: string): Promise<Problem[]> {
     ),
   );
   const sources = await readdir(join(root, 'src'), {recursive: true});
-  const files = ['index.html', ...sources.map(path => join('src', path))];
+  const files = sources.map(path => join('src', path));
   const problems = await Promise.all(
     files.map(async file => {
       const linter = LINTERS.find(([pattern]) => pattern.test(file))?.[1];
