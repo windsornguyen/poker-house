@@ -589,7 +589,11 @@ const LINTERS: Array<
 // Tailwind's theme source and the code copied from the shadcn and Better
 // Auth UI registries are styled through the shadcn theme, not this gate's
 // tokens, and the theme file is Tailwind syntax this reader does not parse.
-const UNGATED = [/^src\/styles\/theme\.css$/, /^src\/components\//, /^src\/lib\/auth\//];
+const UNGATED = [
+  /^src\/styles\/theme\.css$/,
+  /^src\/components\//,
+  /^src\/lib\/auth\//,
+];
 
 /** Every problem in the client rooted at `root`: everything under src/. */
 export async function lintClient(root: string): Promise<Problem[]> {
