@@ -18,7 +18,7 @@
 This module holds what every part of the contract shares, and the parts of a
 session that a `frame.Frame` is built from. Every response body is a
 `frame.Frame`, a `catalogue.Catalogue`, a `health.Health` or an
-`errors.Error`, serialised with `to_json`; request bodies are defined in
+`errors.Error`, serialized with `to_json`; request bodies are defined in
 `request.py`. `contract.schema.json` is generated from these definitions by
 `schema.py`, and clients generate their types from it.
 

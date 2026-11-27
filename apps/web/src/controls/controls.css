@@ -51,7 +51,7 @@
 
 /*
   A square button that holds only an icon, and names itself with aria-label.
-  Its edge is drawn in no colour, so it reads as part of what it sits on.
+  Its edge is drawn in no color, so it reads as part of what it sits on.
 */
 .button--icon {
   display: inline-flex;
@@ -67,7 +67,7 @@
 }
 
 /*
-  The icons, drawn in CSS in the text colour, each in a 16px box: the client
+  The icons, drawn in CSS in the text color, each in a 16px box: the client
   ships no images.
 */
 .icon {
@@ -370,7 +370,7 @@
 
 /*
   The copy button sits in the top right corner of the text it copies. Its
-  outcome is drawn in the outcome's colour.
+  outcome is drawn in the outcome's color.
 */
 .copy-button {
   position: absolute;

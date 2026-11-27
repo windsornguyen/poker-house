@@ -18,7 +18,7 @@
 // moves, so a player can see what the bot just did without reading the
 // action history.
 //
-// - Chips: a seat whose contribution grew sends a chip, labelled with the
+// - Chips: a seat whose contribution grew sends a chip, labeled with the
 //   amount, from its plate to the pot. Seats that acted in one update (the
 //   viewer's bet and the bot's call arrive together: the server answers once
 //   the bot has replied) send theirs in the order they acted, each a flight
@@ -162,9 +162,9 @@ function snapshotOf(state: PokerUiState | null): Snapshot | null {
     : null;
 }
 
-/** The centre of `el` in `table`'s padding-box px, corrected for any
+/** The center of `el` in `table`'s padding-box px, corrected for any
  *  ancestor scale (the table's measured width over its layout width). */
-function centreIn(table: HTMLElement, el: Element): {x: number; y: number} {
+function centerIn(table: HTMLElement, el: Element): {x: number; y: number} {
   const t = table.getBoundingClientRect();
   const r = el.getBoundingClientRect();
   const scale =
@@ -195,7 +195,7 @@ function chipFlights(
   stepBaseMs: number,
 ): ChipFlight[] {
   const chips: ChipFlight[] = [];
-  const to = centreIn(table, pot);
+  const to = centerIn(table, pot);
   const order = chipOrder(prev, next);
   const movers = next.contributions
     .map((value, slot) => ({
@@ -209,7 +209,7 @@ function chipFlights(
     if (!plate) {
       throw new Error(`poker motion: no plate for seat ${String(slot)}`);
     }
-    const from = centreIn(table, plate);
+    const from = centerIn(table, plate);
     counter.current += 1;
     chips.push({
       key: `chip-${String(counter.current)}`,

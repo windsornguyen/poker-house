@@ -16,7 +16,7 @@
 
 """An in-memory store of sessions, shared by the server's threads.
 
-The store's lock guards only which sessions exist; each session serialises
+The store's lock guards only which sessions exist; each session serializes
 its own changes, so requests to different sessions never wait on each other.
 
 Every new game a client sets up is a new session, and no client says when it

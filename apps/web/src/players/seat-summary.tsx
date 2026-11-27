@@ -28,7 +28,7 @@ export interface SeatSummaryProps {
 /**
  * The settings of a seat the viewer may not change, as label and value rows:
  * whether a person or a bot plays it, its controller, whether it autoplays,
- * then each setting, defaults included, labelled and ordered as the editor
+ * then each setting, defaults included, labeled and ordered as the editor
  * shows them. Settings no form can show are shown as their JSON.
  */
 export function SeatSummary({

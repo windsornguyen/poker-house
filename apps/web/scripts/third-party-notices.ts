@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Adds dist/THIRD_PARTY_NOTICES.txt to a build: the licence text of every
+// Adds dist/THIRD_PARTY_NOTICES.txt to a build: the license text of every
 // third-party package listed in licenses/DEPENDENCIES.md, which those
-// licences ask to accompany every copy of the client.
+// licenses ask to accompany every copy of the client.
 
 /// <reference types="node" />
 
@@ -33,8 +33,8 @@ export const DEPENDENCIES_PATH = 'licenses/DEPENDENCIES.md';
 export interface Notice {
   readonly name: string;
   readonly version: string;
-  readonly licence: string;
-  /** The path of its licence text, relative to the client's root. */
+  readonly license: string;
+  /** The path of its license text, relative to the client's root. */
   readonly text: string;
 }
 
@@ -45,19 +45,19 @@ export function parseNotices(markdown: string): Notice[] {
     .filter(line => line.startsWith('|'))
     .slice(2);
   return rows.map(row => {
-    const [name = '', version = '', licence = '', text = ''] = row
+    const [name = '', version = '', license = '', text = ''] = row
       .trim()
       .replace(/^\||\|$/g, '')
       .split('|')
       .map(cell => cell.trim());
-    return {name, version, licence, text};
+    return {name, version, license, text};
   });
 }
 
-/** The notices file: each package with its licence text. */
+/** The notices file: each package with its license text. */
 export function noticesText(licensed: ReadonlyArray<[Notice, string]>): string {
   const sections = licensed.map(([notice, text]) => {
-    const title = `${notice.name} ${notice.version} (${notice.licence})`;
+    const title = `${notice.name} ${notice.version} (${notice.license})`;
     return `${title}\n${'-'.repeat(title.length)}\n\n${text.trimEnd()}\n`;
   });
   return [

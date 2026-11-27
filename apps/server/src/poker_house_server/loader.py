@@ -96,7 +96,7 @@ class LoadedGame:
 
     @property
     def provides_struct(self) -> bool:
-        """Whether the game's states serialise to structured JSON.
+        """Whether the game's states serialize to structured JSON.
 
         Decided once per game and parameters, on first use, by
         `loader_support.struct_support`.

@@ -43,7 +43,7 @@ body,
 /*
   The page's name: OpenSpiel, the largest text, anchoring the corner; then a
   muted bullet and the page's own title, smaller and lighter. The three share a
-  baseline, and the row is centred in the header.
+  baseline, and the row is centerd in the header.
 */
 .app__brand {
   display: flex;

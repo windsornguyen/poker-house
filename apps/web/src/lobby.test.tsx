@@ -19,7 +19,7 @@ import type {CatalogueEntry} from './contract/contract.ts';
 import {PokerLobby} from './lobby.tsx';
 import {type Fetch, SessionClient} from './session/client.ts';
 import {frame} from './testing/frames.ts';
-import {enter, labelled} from './testing/input.ts';
+import {enter, labeled} from './testing/input.ts';
 import {type Rendered, render} from './testing/render.tsx';
 
 const ENTRY = {
@@ -46,8 +46,8 @@ describe('the poker lobby', () => {
       <PokerLobby entry={ENTRY} client={client} onOpen={open} />,
     );
     const {container} = rendered;
-    enter(labelled(container, 'Player 1 bot URL'), 'http://alice.local:9001');
-    enter(labelled(container, 'Player 2 bot URL'), 'https://bob.example/bot');
+    enter(labeled(container, 'Player 1 bot URL'), 'http://alice.local:9001');
+    enter(labeled(container, 'Player 2 bot URL'), 'https://bob.example/bot');
     const form = container.querySelector('form');
     if (form === null) throw new Error('No match form.');
     await act(async () => {
@@ -88,7 +88,7 @@ describe('the poker lobby', () => {
     rendered = render(
       <PokerLobby entry={ENTRY} client={client} onOpen={vi.fn()} />,
     );
-    enter(labelled(rendered.container, 'Starting stack'), '1');
+    enter(labeled(rendered.container, 'Starting stack'), '1');
     const form = rendered.container.querySelector('form');
     if (form === null) throw new Error('No match form.');
     await act(async () => {

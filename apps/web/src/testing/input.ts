@@ -35,7 +35,7 @@ export function enter(element: Editable, value: string): void {
 }
 
 /** The one control under `parent` whose label reads `label`; throws otherwise. */
-export function labelled(parent: ParentNode, label: string): Editable {
+export function labeled(parent: ParentNode, label: string): Editable {
   const found = Array.from(
     parent.querySelectorAll<Editable>('input, select, textarea'),
   ).filter(control =>
@@ -46,7 +46,7 @@ export function labelled(parent: ParentNode, label: string): Editable {
   const [control] = found;
   if (found.length !== 1 || control === undefined) {
     throw new Error(
-      `Expected one control labelled ${label}, found ${String(found.length)}.`,
+      `Expected one control labeled ${label}, found ${String(found.length)}.`,
     );
   }
   return control;

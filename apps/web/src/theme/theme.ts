@@ -14,7 +14,7 @@
 
 // Modified for Poker House: poker-only application integration.
 
-// The colour theme. The user picks a preference; the page shows the theme it
+// The color theme. The user picks a preference; the page shows the theme it
 // resolves to, written to <html data-theme> where src/styles/tokens.css reads
 // it. The inline script in index.html applies the same resolution before the
 // first paint; keep the two in step.
@@ -35,7 +35,7 @@ export const THEME_PREFERENCES: readonly ThemePreference[] = [
 /** The localStorage key holding an explicit preference. */
 export const THEME_STORAGE_KEY = 'poker_house.theme';
 
-/** The media query that reports a system preference for dark colours. */
+/** The media query that reports a system preference for dark colors. */
 export const DARK_QUERY = '(prefers-color-scheme: dark)';
 
 /** Whether `value` is a preference. */

@@ -340,7 +340,7 @@ export function SeatView(props: SeatViewProps): JSX.Element {
   );
 }
 
-/** A bet or call travelling from its seat to the pot: plain text, the amount. */
+/** A bet or call traveling from its seat to the pot: plain text, the amount. */
 export function ChipFlightView({
   chip,
   motion,
@@ -358,7 +358,7 @@ export function ChipFlightView({
     '--poker-flight-ms': `${String(scaleMs(motion.flightBaseMs, motion.scale))}ms`,
     '--poker-delay-ms': `${String(scaleMs(chip.delayBaseMs, motion.scale))}ms`,
   };
-  // A cancelled animation fires animationcancel, not animationend, and the
+  // A canceled animation fires animationcancel, not animationend, and the
   // pot and the seat's numbers wait for one of them. A native listener:
   // React has no animationcancel prop.
   const ref = useRef<HTMLSpanElement>(null);

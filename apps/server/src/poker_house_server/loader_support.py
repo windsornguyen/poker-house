@@ -18,7 +18,7 @@
 
 `loader` loads games; this module holds what it asks of a loaded game: the
 parameters a session reports, and whether the game's states and observations
-serialise to structured JSON, probed once per game and parameters.
+serialize to structured JSON, probed once per game and parameters.
 """
 
 import enum

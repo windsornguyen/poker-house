@@ -13,13 +13,13 @@
 // limitations under the License.
 
 // The contrast gate, part of `pnpm check`. In both themes it resolves the
-// design tokens to colours and measures each pair
+// design tokens to colors and measures each pair
 // that is drawn one on the other against WCAG 2.2's minimum contrast ratio:
 // 4.5:1 for text (success criterion 1.4.3) and 3:1 for the focus ring and a
 // control's edge (1.4.11).
 //
 // It measures the tokens, not how rules combine: a rule that changes a
-// background must leave alone any state whose text colour assumes another
+// background must leave alone any state whose text color assumes another
 
 /// <reference types="node" />
 
@@ -31,10 +31,10 @@ import type {Theme} from '../src/theme/theme.ts';
 import {readDeclarations} from './css.ts';
 import {isEntryPoint} from './entry-point.ts';
 
-/** A colour as red, green and blue, each from 0 to 255. */
+/** A color as red, green and blue, each from 0 to 255. */
 export type Rgb = readonly [number, number, number];
 
-/** A colour drawn on another, and the least contrast it needs. */
+/** A color drawn on another, and the least contrast it needs. */
 export interface Pair {
   foreground: string;
   background: string;
@@ -74,13 +74,13 @@ const TEXTS = [
 ];
 const MARKS = ['--color-focus', '--color-border-strong'];
 
-function onSurfaces(colours: string[], minimum: number): Pair[] {
-  return colours.flatMap(foreground =>
+function onSurfaces(colors: string[], minimum: number): Pair[] {
+  return colors.flatMap(foreground =>
     SURFACES.map(background => ({foreground, background, minimum})),
   );
 }
 
-/** Every pair the client draws, one colour on the other. */
+/** Every pair the client draws, one color on the other. */
 export const PAIRS: readonly Pair[] = [
   ...onSurfaces(TEXTS, TEXT_MINIMUM),
   ...onSurfaces(MARKS, MARK_MINIMUM),
@@ -149,8 +149,8 @@ export function themeVariables(
   return variables;
 }
 
-/** The colour `name` resolves to, as red, green and blue from 0 to 255. */
-export function resolveColour(
+/** The color `name` resolves to, as red, green and blue from 0 to 255. */
+export function resolveColor(
   variables: ReadonlyMap<string, string>,
   name: string,
   seen: readonly string[] = [],
@@ -164,11 +164,11 @@ export function resolveColour(
   }
   const reference = /^var\(\s*(--[\w-]+)\s*\)$/.exec(value);
   if (reference?.[1] !== undefined) {
-    return resolveColour(variables, reference[1], [...seen, name]);
+    return resolveColor(variables, reference[1], [...seen, name]);
   }
   const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value)?.[1];
   if (hex === undefined) {
-    throw new Error(`${name} is ${value}, not an opaque hex colour.`);
+    throw new Error(`${name} is ${value}, not an opaque hex color.`);
   }
   const digits = hex.length === 3 ? hex.replace(/./g, '$&$&') : hex;
   const channel = (start: number): number =>
@@ -176,7 +176,7 @@ export function resolveColour(
   return [channel(0), channel(2), channel(4)];
 }
 
-// WCAG 2.2's relative luminance of an sRGB colour.
+// WCAG 2.2's relative luminance of an sRGB color.
 function luminance([red, green, blue]: Rgb): number {
   const linear = (channel: number): number => {
     const value = channel / 255;
@@ -185,7 +185,7 @@ function luminance([red, green, blue]: Rgb): number {
   return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue);
 }
 
-/** WCAG 2.2's contrast ratio between two colours, from 1 to 21. */
+/** WCAG 2.2's contrast ratio between two colors, from 1 to 21. */
 export function contrastRatio(first: Rgb, second: Rgb): number {
   const lighter = Math.max(luminance(first), luminance(second));
   const darker = Math.min(luminance(first), luminance(second));
@@ -200,8 +200,8 @@ export function measureContrast(stylesheets: readonly string[]): Measurement[] {
       ...pair,
       theme,
       ratio: contrastRatio(
-        resolveColour(variables[theme], pair.foreground),
-        resolveColour(variables[theme], pair.background),
+        resolveColor(variables[theme], pair.foreground),
+        resolveColor(variables[theme], pair.background),
       ),
     })),
   );

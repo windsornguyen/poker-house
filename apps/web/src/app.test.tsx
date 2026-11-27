@@ -21,7 +21,7 @@ import {App} from './app.tsx';
 import {SessionClient} from './session/client.ts';
 import {FakeServer} from './session/testing/fake-server.ts';
 import {fakeColorScheme} from './testing/color-scheme.ts';
-import {enter, labelled} from './testing/input.ts';
+import {enter, labeled} from './testing/input.ts';
 import {render, type Rendered} from './testing/render.tsx';
 import {chooseTab} from './testing/tabs.ts';
 import {ThemeProvider} from './theme/theme-provider.tsx';
@@ -85,7 +85,7 @@ function openTab(title: string): void {
   if (tab.getAttribute('aria-selected') !== 'true') chooseTab(tab);
 }
 
-/** The legal action labelled `label`, in Actions › Legal, which it opens. */
+/** The legal action labeled `label`, in Actions › Legal, which it opens. */
 function legal(label: string): HTMLElement {
   tool('Actions');
   openTab('Legal');
@@ -106,7 +106,7 @@ function historyText(): string | undefined {
 /** The Perspective list, in the View panel, which it brings forward. */
 function perspective(): HTMLSelectElement {
   tool('View');
-  return labelled(document.body, 'Perspective') as HTMLSelectElement;
+  return labeled(document.body, 'Perspective') as HTMLSelectElement;
 }
 
 /** Every viewer the page sent a session request as, once each. */

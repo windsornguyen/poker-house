@@ -13,9 +13,9 @@
 // limitations under the License.
 
 // The style gate, part of `pnpm check`. It refuses the styling that makes
-// text hard to read or a colour impossible to theme:
+// text hard to read or a color impossible to theme:
 //
-// - a colour written anywhere but src/styles/tokens.css, the one place both
+// - a color written anywhere but src/styles/tokens.css, the one place both
 //   themes define and the contrast check measures, `transparent` included;
 // - text under 12 px, and any text size it cannot evaluate, a token's
 //   included: a size given by a token is checked as each theme defines it.
@@ -27,9 +27,9 @@
 //   control refusing presses while a request is in flight is enabled, and
 //   such a selector outranks base.css's disabled rule;
 // - an accent edge: a one-sided border on the left or right (the physical
-//   or logical side, shorthand or longhand) wider than 1 px or in any colour
+//   or logical side, shorthand or longhand) wider than 1 px or in any color
 //   but the neutral border tokens, and an inset box-shadow drawn as a side
-//   stripe. A coloured stripe down a notice, card or callout is the look the
+//   stripe. A colored stripe down a notice, card or callout is the look the
 //   UI refuses: say a tone with the text, or draw a plain full border. A
 //   pseudo-element's edges draw icon glyphs (the copy icon's sheet, the
 //   check mark) and are left alone. So is a stripe a pseudo-element draws
@@ -39,15 +39,15 @@
 // Opacity, filters and how a disabled control looks are not refused: a
 // game board keeps its own faded controls, washed-out ghost cards and
 // hover filters. The lesson the gates keep is the one about text: the
-// contrast check (scripts/contrast-check.ts) measures every text colour.
+// contrast check (scripts/contrast-check.ts) measures every text color.
 //
 // It reads every stylesheet under src/, the inline styles of its HTML, and
 // in TypeScript the literal values of JSX `style` attributes, of the JSX
 // paint attributes (`fill`, `stroke` and the like), of assignments
-// to `element.style` and of a canvas context's colour properties; a value
+// to `element.style` and of a canvas context's color properties; a value
 // chosen by `?:`, `??`, `||` or `&&` is read branch by branch. It judges each
 // declaration alone, not how rules combine, so a hover rule that changes the
-// background behind text another rule colours is left to review and tests.
+// background behind text another rule colors is left to review and tests.
 
 /// <reference types="node" />
 
@@ -62,7 +62,7 @@ import {STYLESHEETS, themeVariables} from './contrast-check.ts';
 import {readDeclarations} from './css.ts';
 import {isEntryPoint} from './entry-point.ts';
 
-/** The one stylesheet allowed to write colours, from the client root. */
+/** The one stylesheet allowed to write colors, from the client root. */
 export const TOKENS_FILE = 'src/styles/tokens.css';
 
 /**
@@ -88,7 +88,7 @@ export interface Style {
   selectors: readonly string[];
 }
 
-const NAMED_COLOURS = new Set(
+const NAMED_COLORS = new Set(
   (
     'aliceblue antiquewhite aqua aquamarine azure beige bisque black ' +
     'blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse ' +
@@ -112,17 +112,17 @@ const NAMED_COLOURS = new Set(
     'salmon sandybrown seagreen seashell sienna silver skyblue slateblue ' +
     'slategray slategrey snow springgreen steelblue tan teal thistle tomato ' +
     'turquoise violet wheat white whitesmoke yellow yellowgreen ' +
-    // No colour at all, which fades text as surely as opacity 0.
+    // No color at all, which fades text as surely as opacity 0.
     'transparent ' +
-    // The system colours: just as fixed, and just as unthemed.
+    // The system colors: just as fixed, and just as unthemed.
     'accentcolor accentcolortext activetext buttonborder buttonface ' +
     'buttontext canvas canvastext field fieldtext graytext highlight ' +
     'highlighttext linktext mark marktext selecteditem selecteditemtext ' +
     'visitedtext'
   ).split(' '),
 );
-const HEX_COLOUR = /#[0-9a-f]{3,8}\b/i;
-const COLOUR_FUNCTION =
+const HEX_COLOR = /#[0-9a-f]{3,8}\b/i;
+const COLOR_FUNCTION =
   /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(/i;
 const LIVE_SELECTOR = /:enabled|:hover/;
 const NOT_ARIA_DISABLED = /:not\(\[aria-disabled=(['"])true\1\]\)/;
@@ -160,8 +160,8 @@ const MATH_FUNCTION = /^(?:calc|min|max|clamp)\(.*\)$/s;
 // A side edge: border-left, border-inline-start, border-right-color...
 const SIDE_EDGE =
   /^border-(?:left|right|inline-start|inline-end)(?:-(width|color|style))?$/;
-// The colours a side edge may take: the neutral dividers'.
-const NEUTRAL_EDGE_COLOURS = new Set([
+// The colors a side edge may take: the neutral dividers'.
+const NEUTRAL_EDGE_COLORS = new Set([
   'var(--color-border)',
   'var(--color-border-strong)',
 ]);
@@ -179,7 +179,7 @@ const BORDER_STYLES = new Set([
 const GLASS_MESSAGE =
   'a glass blur (backdrop-filter) is refused; draw an opaque surface.';
 const ACCENT_EDGE_MESSAGE =
-  'an accent edge (a coloured or heavy stripe down one side) is refused;' +
+  'an accent edge (a colored or heavy stripe down one side) is refused;' +
   ' say the tone with the text, or draw a plain 1px full border.';
 
 /**
@@ -193,16 +193,16 @@ function bareValue(value: string): string {
     .replace(/\bvar\(\s*--[\w-]+\s*,?/gi, 'var(');
 }
 
-function colourProblem(value: string): string | null {
+function colorProblem(value: string): string | null {
   const bare = bareValue(value);
   const words = bare.toLowerCase().match(/(?<![\w-])[a-z]+(?![\w-])/g) ?? [];
   if (
-    HEX_COLOUR.test(bare) ||
-    COLOUR_FUNCTION.test(bare) ||
-    words.some(word => NAMED_COLOURS.has(word))
+    HEX_COLOR.test(bare) ||
+    COLOR_FUNCTION.test(bare) ||
+    words.some(word => NAMED_COLORS.has(word))
   ) {
     return (
-      `the colour in ${JSON.stringify(value)} belongs in ${TOKENS_FILE};` +
+      `the color in ${JSON.stringify(value)} belongs in ${TOKENS_FILE};` +
       ' refer to a token with var().'
     );
   }
@@ -336,7 +336,7 @@ function heavyEdge(width: string): boolean {
   return !['thin'].includes(width);
 }
 
-// A side edge wider than 1 px or in a colour other than the neutral
+// A side edge wider than 1 px or in a color other than the neutral
 // dividers', or an inset shadow drawn as a stripe down one side.
 function accentEdgeProblem({property, value, selectors}: Style): string | null {
   if (selectors.some(selector => /::?(?:before|after)\b/.test(selector))) {
@@ -354,11 +354,11 @@ function accentEdgeProblem({property, value, selectors}: Style): string | null {
   if (part === 'style') return null;
   if (part === 'width') return heavyEdge(bare) ? ACCENT_EDGE_MESSAGE : null;
   if (part === 'color') {
-    return NEUTRAL_EDGE_COLOURS.has(bare) ? null : ACCENT_EDGE_MESSAGE;
+    return NEUTRAL_EDGE_COLORS.has(bare) ? null : ACCENT_EDGE_MESSAGE;
   }
-  // The shorthand: a width, a style and a colour, in any order.
+  // The shorthand: a width, a style and a color, in any order.
   const words = bare.split(/\s+(?![^(]*\))/);
-  const colours = words.filter(
+  const colors = words.filter(
     word => !BORDER_STYLES.has(word) && !/^\d*\.?\d+[a-z]*$/.test(word),
   );
   const widths = words.filter(word => /^\d*\.?\d+[a-z]*$/.test(word));
@@ -366,7 +366,7 @@ function accentEdgeProblem({property, value, selectors}: Style): string | null {
     // CSS's default width is medium, 3 px.
     return ACCENT_EDGE_MESSAGE;
   }
-  return colours.length === 1 && NEUTRAL_EDGE_COLOURS.has(colours[0] ?? '')
+  return colors.length === 1 && NEUTRAL_EDGE_COLORS.has(colors[0] ?? '')
     ? null
     : ACCENT_EDGE_MESSAGE;
 }
@@ -382,7 +382,7 @@ function glassProblem({property, value}: Style): string | null {
 /** What is wrong with one declaration, if anything. */
 export function styleProblems(
   style: Style,
-  allowColours: boolean,
+  allowColors: boolean,
   tokens: Tokens,
 ): string[] {
   const {property, value} = style;
@@ -399,17 +399,17 @@ export function styleProblems(
   if (property.includes('font-size')) {
     problems.push(fontSizeProblem(value, tokens));
   }
-  if (!allowColours) {
-    problems.push(colourProblem(value));
+  if (!allowColors) {
+    problems.push(colorProblem(value));
   }
   return problems.filter(problem => problem !== null);
 }
 
 /** Every problem in the stylesheet `css`, read from `file`. */
 export function lintCss(file: string, css: string, tokens: Tokens): Problem[] {
-  const allowColours = file === TOKENS_FILE;
+  const allowColors = file === TOKENS_FILE;
   return readDeclarations(css).flatMap(declaration =>
-    styleProblems(declaration, allowColours, tokens).map(message => ({
+    styleProblems(declaration, allowColors, tokens).map(message => ({
       file,
       line: declaration.line,
       message,
@@ -440,7 +440,7 @@ export function lintHtml(
 }
 
 // The JSX attributes that paint SVG, by their CSS names, and the canvas
-// context's colours.
+// context's colors.
 const PAINT_ATTRIBUTES = new Set([
   'fill',
   'stroke',
@@ -449,7 +449,7 @@ const PAINT_ATTRIBUTES = new Set([
   'flood-color',
   'lighting-color',
 ]);
-const CANVAS_COLOURS = new Set(['fillStyle', 'strokeStyle', 'shadowColor']);
+const CANVAS_COLORS = new Set(['fillStyle', 'strokeStyle', 'shadowColor']);
 
 function kebabCase(name: string): string {
   return name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
@@ -544,7 +544,7 @@ function writtenStyles(node: ts.Node): Style[] {
     ts.isBinaryExpression(node) &&
     node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
     ts.isPropertyAccessExpression(node.left) &&
-    CANVAS_COLOURS.has(node.left.name.text)
+    CANVAS_COLORS.has(node.left.name.text)
   ) {
     return stylesOf(kebabCase(node.left.name.text), node.right);
   }

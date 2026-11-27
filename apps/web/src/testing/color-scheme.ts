@@ -16,7 +16,7 @@ import {vi} from 'vite-plus/test';
 
 import {DARK_QUERY} from '../theme/theme.ts';
 
-/** The system colour scheme, as a test controls it. */
+/** The system color scheme, as a test controls it. */
 export interface ColorScheme {
   /** Switches the system scheme and notifies every listener. */
   setDark: (dark: boolean) => void;
@@ -25,8 +25,8 @@ export interface ColorScheme {
 }
 
 /**
- * Stands in for window.matchMedia so a test sets the colour scheme the page
- * sees, answering the dark colour scheme query only. Undo it with
+ * Stands in for window.matchMedia so a test sets the color scheme the page
+ * sees, answering the dark color scheme query only. Undo it with
  * vi.unstubAllGlobals().
  */
 export function fakeColorScheme(dark: boolean): ColorScheme {

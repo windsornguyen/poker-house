@@ -169,7 +169,7 @@ def full_state_output(
 
     A bot output (`HistoryEntry.bot_output`) reaches omniscient viewers and
     the seat's own, and can carry hidden information to the seat as a notice
-    does (`full_state_notice`): a policy computed from the full state favours
+    does (`full_state_notice`): a policy computed from the full state favors
     the moves that hidden cards make good. Under `StatePolicy.ANALYSIS` every
     output is passed on; this is where a stricter policy would drop the
     outputs of seats that read the full state, in a game that hides

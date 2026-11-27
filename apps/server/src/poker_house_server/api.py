@@ -136,8 +136,8 @@ class Api:
     """Answers the contract's routes.
 
     Safe to call from several threads. Each route makes one call on a session,
-    and a session serialises its calls under its own lock, so calls that
-    concern one session are serialised and calls that concern different
+    and a session serializes its calls under its own lock, so calls that
+    concern one session are serialized and calls that concern different
     sessions run concurrently.
     """
 

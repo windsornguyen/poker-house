@@ -15,12 +15,12 @@
 */
 
 /*
-  The design tokens: every colour the client draws with, in both themes. The
-  rest of the stylesheets refer to these names and never to a colour (checked
+  The design tokens: every color the client draws with, in both themes. The
+  rest of the stylesheets refer to these names and never to a color (checked
   by scripts/style-lint.ts). The light theme is the default; <html
   data-theme="dark"> selects the dark one. scripts/contrast-check.ts checks that every
-  text colour reaches 4.5:1, and every other mark 3:1, on every surface; the
-  colours it checks are opaque hex values.
+  text color reaches 4.5:1, and every other mark 3:1, on every surface; the
+  colors it checks are opaque hex values.
 */
 
 :root {
@@ -56,7 +56,7 @@
   /* The overlay that marks where a dragged panel will land. */
   --color-drop-target: rgb(36 86 211 / 0.2);
 
-  /* No colour: a divider that shows only while it is dragged. */
+  /* No color: a divider that shows only while it is dragged. */
   --color-none: transparent;
 
   /* The shadow that lifts a notice off the board under it. */
@@ -111,7 +111,7 @@
   --card-badge-muted-fill: rgb(255 255 255 / 0.82);
   --card-badge-muted-ink: #333333;
   --card-badge-muted-edge: rgb(0 0 0 / 0.2);
-  /* An empty place's dashed outline: 45% of the text colour around it. */
+  /* An empty place's dashed outline: 45% of the text color around it. */
   --card-empty-dash: color-mix(in srgb, currentColor 45%, var(--color-none));
   /*
     Card text sizes a card sets inline from its width;
@@ -159,10 +159,10 @@
   --felt-swatch-rainbow: conic-gradient(#e33, #ec3, #3c5, #3ae, #93e, #e33);
 
   /*
-    The card table's felt (cards/library, cards/table_cards): its colour,
+    The card table's felt (cards/library, cards/table_cards): its color,
     the darker shade and edge it fades to, the text written on it, the ink
     of a card that names a discarded card, and the felt's shadows. A table
-    whose player picks a colour overrides the first five (table_cards
+    whose player picks a color overrides the first five (table_cards
     surface.ts), mixing its shades with --felt-shade-ink.
   */
   --color-felt: #236b3f;
@@ -260,7 +260,7 @@
   --hearts-over-badge-text: #ffd700;
   /*
     Euchre's board (games/euchre): the felt, the cards' backs and glows,
-    the trump colours, the panels and buttons over the felt.
+    the trump colors, the panels and buttons over the felt.
   */
   --euchre-felt: #2d5a3a;
   --euchre-felt-dark: #1a3d24;
@@ -368,7 +368,7 @@
   --poker-betbox-hint-text: #ffc9c9;
   /*
     Chess's board (games/chess): each theme's light and dark squares, which
-    also colour the coordinates drawn on the other kind; the last move, the
+    also color the coordinates drawn on the other kind; the last move, the
     king in check, the selected square and the moves it has; the pieces'
     fill and lines; the promotion choice; the move list's current move.
   */
@@ -571,7 +571,7 @@
   --hearts-over-badge-text: #ffd700;
   /*
     Euchre's board (games/euchre): the felt, the cards' backs and glows,
-    the trump colours, the panels and buttons over the felt.
+    the trump colors, the panels and buttons over the felt.
   */
   --euchre-felt: #2d5a3a;
   --euchre-felt-dark: #1a3d24;

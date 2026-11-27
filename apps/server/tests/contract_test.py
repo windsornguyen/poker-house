@@ -13,7 +13,7 @@
 # limitations under the License.
 # Modified for Poker House.
 
-"""Tests for the session parts of the wire contract and their serialisation."""
+"""Tests for the session parts of the wire contract and their serialization."""
 
 from absl.testing import absltest
 

@@ -100,7 +100,7 @@
   max-width: 100%;
   padding: 6px 12px;
   /* A plain, squared plaque, lifted just off the board it covers. Its tone
-     is told by its text, never by a coloured edge. */
+     is told by its text, never by a colored edge. */
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius);
   background: var(--color-surface-raised);

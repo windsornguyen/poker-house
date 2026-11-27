@@ -47,7 +47,7 @@ export const CONTRACT_PATH = resolve(
 export const ROOT_NAME = 'ResponseBody';
 const ROOT_DESCRIPTION = 'Every response body the server sends.';
 
-// The generated file opens with this file's licence header, then this notice.
+// The generated file opens with this file's license header, then this notice.
 const NOTICE = `// Generated from apps/server/src/poker_house_server/contract.schema.json by
 // scripts/generate-contract.ts. Do not edit; run pnpm generate:contract.`;
 

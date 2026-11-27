@@ -2154,14 +2154,14 @@ class TarokContract:
     
       OPEN_BEGGAR
     
-      COLOUR_VALAT_WITHOUT
+      COLOR_VALAT_WITHOUT
     
       VALAT_WITHOUT
     
       NOT_SELECTED
     """
     BEGGAR: typing.ClassVar[TarokContract]
-    COLOUR_VALAT_WITHOUT: typing.ClassVar[TarokContract]
+    COLOR_VALAT_WITHOUT: typing.ClassVar[TarokContract]
     KLOP: typing.ClassVar[TarokContract]
     NOT_SELECTED: typing.ClassVar[TarokContract]
     ONE: typing.ClassVar[TarokContract]

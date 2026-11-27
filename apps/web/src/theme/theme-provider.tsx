@@ -61,7 +61,7 @@ function subscribeToSystemScheme(onChange: () => void): () => void {
 }
 
 /**
- * Owns the theme: reads the stored preference, follows the system's colour
+ * Owns the theme: reads the stored preference, follows the system's color
  * scheme while the preference is 'system', and shows the result on <html>.
  */
 export function ThemeProvider({children}: {children: ReactNode}): JSX.Element {

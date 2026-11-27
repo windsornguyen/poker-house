@@ -21,7 +21,7 @@ import type {Action, Frame, HistoryEntry} from '../contract/contract.ts';
 import type {SessionCommands} from '../session/session-store.ts';
 import type {Session} from '../session/use-session.ts';
 
-/** `count` actions with ids 0 up, labelled by `label`. */
+/** `count` actions with ids 0 up, labeled by `label`. */
 export function actions(
   count: number,
   label: (id: number) => string = id => `action ${String(id)}`,

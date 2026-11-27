@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // The client's icons. The client ships no images, so each is drawn in CSS,
-// in the text colour (controls.css, .icon). Every icon is hidden from
+// in the text color (controls.css, .icon). Every icon is hidden from
 // assistive technology: the control that holds one carries its name.
 
 import type {JSX} from 'react';

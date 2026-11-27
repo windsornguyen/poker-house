@@ -53,7 +53,7 @@ path that does not exist, with `not_found`.
   any human seat; a spectator never acts.
 - **Chance** chooses an outcome under the `expose` policy. In a game that
   hides information only the oracle may choose; otherwise any viewer may,
-  a spectator or the seat the outcome favours included. Choosing chance is
+  a spectator or the seat the outcome favors included. Choosing chance is
   not acting for a seat: `expose` trusts the client with chance, for
   analysis and teaching, and a session that must keep chance fair uses
   `auto`.
@@ -258,7 +258,7 @@ shows it to every viewer.
 
 ## Chance
 
-| `chance_policy` | Behaviour                                                                                                         |
+| `chance_policy` | Behavior                                                                                                         |
 | --------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `auto`          | The server samples every outcome from a generator seeded with `session.seed`. Frames never rest at a chance node. |
 | `expose`        | The server stops at each chance node, and the outcome is chosen through the chance route.                         |
@@ -323,7 +323,7 @@ client shows it for any ply of the history. It reaches the viewers who see
 the move in full (omniscient viewers and the seat's own) and no other, since
 a bot's output follows from its hand; it has no effect on play. A bot
 output whose policy names an action that is not legal fails the seat
-(`InvalidBotOutput`). A full-state controller's policy can favour the moves
+(`InvalidBotOutput`). A full-state controller's policy can favor the moves
 hidden information makes good, as a notice can carry it;
 `controller_registry.full_state_output` is the place to drop such outputs.
 

@@ -297,7 +297,7 @@
   color: var(--poker-card-red-text);
 }
 
-/* The four-colour deck as the poker clients draw it (PokerStars, GGPoker):
+/* The four-color deck as the poker clients draw it (PokerStars, GGPoker):
    spades black, hearts red, diamonds blue, clubs green. Spades were green
    and clubs black, so a player who knows the deck read a spade as a club. */
 .poker-card--s {
@@ -412,7 +412,7 @@
 .poker-seat {
   position: absolute;
   top: var(--seat-y);
-  /* A plate never leaves the table: its centre is held half a plate in from
+  /* A plate never leaves the table: its center is held half a plate in from
        either side, so a seat drawn at the rail cannot run past the screen
        edge and clip its BB chip. */
   left: clamp(
