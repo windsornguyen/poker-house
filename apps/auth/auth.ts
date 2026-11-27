@@ -15,7 +15,9 @@ const Env = z.object({
 const env = Env.parse(process.env);
 const pool = new Pool({
   connectionString: env.DATABASE_URL,
-  options: '-c search_path=auth',
+  // public holds citext's operators; without it the player lookup compares as
+  // case-sensitive text. auth stays first, where the auth tables live.
+  options: '-c search_path=auth,public',
 });
 
 /** Whether `email` is on the player list, which decides who may sign up. */
