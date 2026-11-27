@@ -44,6 +44,12 @@ else holds a seat, and the page switches to your own seat when a friend sits dow
 
 ### From code
 
+The site publishes the player-facing API as OpenAPI 3.1 at `/openapi.json`, which LLM
+tool frameworks read directly. `POST /api/sessions/{id}/moves` takes a move by what it
+does, `{"kind": "raise", "amount": 40}`, and refuses an illegal one with the legal moves.
+Regenerate the document with
+`uv run --all-packages python -m poker_house_server.openapi apps/web/public/openapi.json`.
+
 `apps/web/scripts/join-room.ts` is a complete client in 80 lines. It signs in with
 Better Auth's client, joins by code, and checks every answer against the generated
 Zod contract (`apps/web/src/contract/contract.ts`):
