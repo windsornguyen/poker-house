@@ -1,4 +1,5 @@
 import {getCookieCache} from 'better-auth/cookies';
+import * as z from 'zod';
 
 interface Env {
   readonly API_ORIGIN: string;
@@ -30,6 +31,10 @@ const MAILS = new Map<string, MailKind>([
 ]);
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+// An agent signs its requests with an API key in this header instead of a cookie.
+const API_KEY_HEADER = 'x-api-key';
+const API_KEY_PATH = '/internal/api-key';
+const KeyOwner = z.object({player: z.string()});
 const ENTITIES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -115,6 +120,37 @@ async function signedPlayer(player: string, key: string): Promise<string> {
   return `${player}.${hex}`;
 }
 
+/**
+ * The player a request comes from: an agent by its API key, which the auth
+ * service checks, or a browser by its session cookie, which the Worker reads
+ * itself for five minutes at a time.
+ */
+async function playerOf(
+  request: Request,
+  env: Env,
+  url: URL,
+): Promise<string | null> {
+  const key = request.headers.get(API_KEY_HEADER);
+  if (key !== null) {
+    const checked = await fetch(`${env.AUTH_ORIGIN}${API_KEY_PATH}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Dedalus-Port-Key': env.AUTH_PORT_KEY,
+      },
+      body: JSON.stringify({key}),
+    });
+    if (!checked.ok) return null;
+    return KeyOwner.parse(await checked.json()).player;
+  }
+
+  const session = await getCookieCache(request, {
+    secret: env.BETTER_AUTH_SECRET,
+    isSecure: url.protocol === 'https:',
+  });
+  return session === null ? null : session.user.id;
+}
+
 /** Forwards `request` to `origin`, unlocking its Dedalus port with `key`. */
 function forward(
   request: Request,
@@ -144,19 +180,17 @@ export default {
     if (url.pathname.startsWith('/api/auth/')) {
       return forward(request, env.AUTH_ORIGIN, env.AUTH_PORT_KEY);
     }
-    const session = await getCookieCache(request, {
-      secret: env.BETTER_AUTH_SECRET,
-      isSecure: url.protocol === 'https:',
-    });
-    if (session === null) {
+    const player = await playerOf(request, env, url);
+    if (player === null) {
       return new Response('Sign in required', {status: 401});
     }
     const game = new Request(request);
     game.headers.delete('Cookie');
     game.headers.delete('Origin');
+    game.headers.delete(API_KEY_HEADER);
     game.headers.set(
       'X-Poker-Player',
-      await signedPlayer(session.user.id, env.PLAYER_KEY),
+      await signedPlayer(player, env.PLAYER_KEY),
     );
     return forward(game, env.API_ORIGIN, env.PORT_KEY);
   },

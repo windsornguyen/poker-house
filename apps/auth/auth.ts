@@ -1,3 +1,4 @@
+import {apiKey} from '@better-auth/api-key';
 import {type BetterAuthOptions, betterAuth} from 'better-auth';
 import {Pool} from 'pg';
 import * as z from 'zod';
@@ -61,6 +62,9 @@ export const options = {
     expiresIn: WEEK_SECONDS,
     cookieCache: {enabled: true, maxAge: COOKIE_CACHE_SECONDS},
   },
+  // Agents play with keys. A key is checked on every game request, so the
+  // plugin's default of 10 checks a day would stop a player mid-hand.
+  plugins: [apiKey({rateLimit: {enabled: false}})],
 } satisfies BetterAuthOptions;
 
 /** The Better Auth instance the server mounts. */

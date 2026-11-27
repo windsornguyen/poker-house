@@ -3,8 +3,13 @@
   "info": {
     "title": "Poker House",
     "version": "0.1.0",
-    "description": "Sign in with POST /api/auth/sign-in/email to get the session cookie every call carries. Renew it every four minutes with GET /api/auth/get-session?disableCookieCache=true."
+    "description": "Every call carries your API key in the x-api-key header. Create one while signed in with POST /api/auth/api-key/create. Rooms whose every seat is a player's are played for chips: joining buys in, a hand's result moves chips between stacks, and leaving cashes your stack out."
   },
+  "security": [
+    {
+      "apiKey": []
+    }
+  ],
   "paths": {
     "/api/sessions": {
       "post": {
@@ -58,7 +63,7 @@
     "/api/rooms/{code}/join": {
       "post": {
         "operationId": "joinRoom",
-        "summary": "Sit at the lowest open seat of the room with this code.",
+        "summary": "Sit at the room with this code, buying in with its stack. The answer is your seat's view of its hand, or a spectator's when you are dealt into the next.",
         "parameters": [
           {
             "name": "code",
@@ -76,6 +81,206 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Frame"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}": {
+      "get": {
+        "operationId": "getRoom",
+        "summary": "The room: its latest hand, your seat in it and every stack.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoomView",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}/deal": {
+      "post": {
+        "operationId": "dealNextHand",
+        "summary": "Deal the hand after the one you saw finish, or get it if it is already dealt.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Frame",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Frame"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Deal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rooms/{code}/leave": {
+      "post": {
+        "operationId": "leaveRoom",
+        "summary": "Get up between hands, moving your stack back to your account.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "RoomView",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomView"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/turn": {
+      "get": {
+        "operationId": "getTurn",
+        "summary": "Your turn: your cards, the board, the pot, the price and your legal moves.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewer",
+            "in": "query",
+            "required": true,
+            "description": "Your seat's index, the one the room seated you at.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Turn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Turn"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "A refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "operationId": "getMe",
+        "summary": "Your chips off the tables.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Me",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
                 }
               }
             }
@@ -200,6 +405,57 @@
   },
   "components": {
     "schemas": {
+      "Account": {
+        "additionalProperties": false,
+        "description": "One holder of chips.\n\nAttributes:\n  id: The player's id, `treasury`, or `room:<code>` for a table.\n  email: The player's email; null for the treasury and tables.\n  kind: The player's listing kind; null for the treasury and tables.\n  balance: The chips it holds.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "balance": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "email", "kind", "balance"],
+        "type": "object"
+      },
+      "Accounts": {
+        "additionalProperties": false,
+        "description": "Every holder of chips, the largest balance first.\n\nAttributes:\n  supply: Every chip there is, which the balances always sum to.\n  accounts: The holders.",
+        "properties": {
+          "supply": {
+            "type": "integer"
+          },
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/Account"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["supply", "accounts"],
+        "type": "object"
+      },
       "Action": {
         "additionalProperties": false,
         "description": "A legal action at a position.\n\nAttributes:\n  id: The OpenSpiel action id, which a client sends to play it.\n  label: The game's text for the action.",
@@ -571,6 +827,17 @@
         "required": ["game", "parameters", "seats", "chance_policy", "seed"],
         "type": "object"
       },
+      "Deal": {
+        "additionalProperties": false,
+        "description": "Deals a room's next hand.\n\nAttributes:\n  after: The id of the hand the player saw finish. When the room has dealt\n    a newer one, the answer is that hand, so players who ask together all\n    land on the same one.",
+        "properties": {
+          "after": {
+            "type": "string"
+          }
+        },
+        "required": ["after"],
+        "type": "object"
+      },
       "Dynamics": {
         "description": "How players move, as the game declares it.\n\nAttributes:\n  SEQUENTIAL: One player acts at a time.\n  SIMULTANEOUS: Players act together; served through the turn-based wrapper.\n  MEAN_FIELD: A mean-field game.",
         "enum": ["sequential", "simultaneous", "mean_field"],
@@ -611,7 +878,7 @@
         "type": "object"
       },
       "ErrorCode": {
-        "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.\n  UNAUTHORIZED: The request names no signed-in player.\n  ROOM_FULL: Every human seat of the room is taken.",
+        "description": "Why a request was refused.\n\nAttributes:\n  BAD_REQUEST: The request is malformed.\n  NOT_FOUND: The session, game, seat or ply does not exist.\n  METHOD_NOT_ALLOWED: The path exists but does not accept the method.\n  GAME_UNAVAILABLE: The game cannot be served; its catalogue entry says why.\n  VIEWER_UNAVAILABLE: The game cannot build a frame for the viewer.\n  NOT_YOUR_TURN: The viewer may not choose the next action.\n  ILLEGAL_ACTION: The action is not legal at the position.\n  CONTROLLER_UNAVAILABLE: The controller cannot play the game, or its\n    settings do not satisfy its `config_schema`.\n  CONTROLLER_FAILED: A seat's controller failed and the session is paused.\n  NOTHING_TO_UNDO: The live game has no action to undo.\n  UNAUTHORIZED: The request names no signed-in player.\n  ROOM_FULL: Every human seat of the room is taken.\n  FORBIDDEN: The player may not make the request.\n  INSUFFICIENT_CHIPS: The account holds fewer chips than the request moves.\n  TABLE_NOT_READY: The room cannot deal its next hand yet.\n  LEDGER_UNAVAILABLE: The server keeps no ledger, so it cannot stake chips.",
         "enum": [
           "bad_request",
           "not_found",
@@ -624,7 +891,11 @@
           "controller_failed",
           "nothing_to_undo",
           "unauthorized",
-          "room_full"
+          "room_full",
+          "forbidden",
+          "insufficient_chips",
+          "table_not_ready",
+          "ledger_unavailable"
         ],
         "type": "string"
       },
@@ -787,6 +1058,20 @@
         ],
         "type": "object"
       },
+      "Grant": {
+        "additionalProperties": false,
+        "description": "Gives a player chips from the treasury.\n\nAttributes:\n  email: The player's email.\n  amount: The chips to give, at least 1.",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer"
+          }
+        },
+        "required": ["email", "amount"],
+        "type": "object"
+      },
       "Health": {
         "additionalProperties": false,
         "description": "The server's identity and capabilities.\n\nAttributes:\n  version: The installed Poker House server package's version.\n  revision: The source revision the server runs from, or null when unknown.\n  capabilities: What the server can do.",
@@ -896,6 +1181,58 @@
       },
       "JsonValue": {
         "description": "Any JSON value."
+      },
+      "Me": {
+        "additionalProperties": false,
+        "description": "The signed-in player's account.\n\nAttributes:\n  balance: The chips they hold off the tables.\n  kind: person, internal or test, from their listing; null for none.",
+        "properties": {
+          "balance": {
+            "type": "integer"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["balance", "kind"],
+        "type": "object"
+      },
+      "Move": {
+        "additionalProperties": false,
+        "description": "A kind of legal move.\n\nAttributes:\n  kind: fold, check, call, bet or raise.\n  min: For a call, bet or raise, the least amount it allows; null for a\n    fold or a check. A bet or raise amount is the total the seat's bet\n    rises to, and a call's is the chips it adds.\n  max: The most it allows, as `min`.",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/MoveKind"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["kind", "min", "max"],
+        "type": "object"
       },
       "MoveKind": {
         "enum": ["fold", "check", "call", "bet", "raise"],
@@ -1107,6 +1444,63 @@
         "required": ["history"],
         "type": "object"
       },
+      "RoomView": {
+        "additionalProperties": false,
+        "description": "A room, as the player asking sees it.\n\nAttributes:\n  code: The code players join it with.\n  buy_in: The chips a seat costs; null for a room played for nothing.\n  session_id: The id of its latest hand; null once it has closed.\n  seat: The seat the player holds in the latest hand; null when they sit it out.\n  stack: The player's chips at the table; null when they do not sit there.\n  stacks: Every stack at the table, in the order the players sat.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "buy_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stack": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stacks": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["code", "buy_in", "session_id", "seat", "stack", "stacks"],
+        "type": "object"
+      },
       "SeatConfig": {
         "additionalProperties": false,
         "description": "Who plays a seat.\n\nAttributes:\n  controller: The `Controller.name` to play the seat.\n  config: The controller's settings, satisfying its `config_schema`.\n  autoplay: Whether the server plays the seat's moves as soon as it is to\n    move. Must be false for a human seat.",
@@ -1240,7 +1634,7 @@
       },
       "SessionInfo": {
         "additionalProperties": false,
-        "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.\n  code: The room code another player joins the session with.",
+        "description": "The fixed properties of a session.\n\nAttributes:\n  id: The session's identifier.\n  game: The game's short name.\n  parameters: The game's parameters, defaults included.\n  num_seats: The number of seats.\n  chance_policy: How chance nodes are resolved.\n  turn_based: Whether a simultaneous game is served through the turn-based\n    wrapper, which has its seats act one after another.\n  hides_information: Whether some seat may not see the full state. When\n    false, every viewer is omniscient.\n  seed: The chance generator's seed; null for every viewer but the oracle,\n    since it determines every chance outcome to come.\n  controllers: The controllers that can play a seat of this game.\n  code: The room code another player joins the session with.\n  staked: Whether the hand is played for chips: every seat is a player's,\n    each stack is chips they bought in with, and no one takes back,\n    resets or changes the hand.\n  next: The id of the room's next hand once it is dealt, else null.",
         "properties": {
           "id": {
             "type": "string"
@@ -1297,6 +1691,19 @@
           },
           "code": {
             "type": "string"
+          },
+          "staked": {
+            "type": "boolean"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1309,7 +1716,9 @@
           "hides_information",
           "seed",
           "controllers",
-          "code"
+          "code",
+          "staked",
+          "next"
         ],
         "type": "object"
       },
@@ -1339,6 +1748,81 @@
         "required": ["kind", "seat"],
         "type": "object"
       },
+      "Turn": {
+        "additionalProperties": false,
+        "description": "A seat's turn, in the few fields a decision is made from.\n\nAttributes:\n  seat: The seat whose turn it is to read.\n  to_move: Whether the seat is to act now.\n  finished: Whether the hand is over.\n  street: 0 preflop, then 1 to 3 for the flop, turn and river; null once over.\n  hole: The seat's two cards, written like `As`.\n  board: The cards on the board.\n  pot: Every chip bet this hand, the current bets included.\n  to_call: The chips the seat adds to call.\n  stacks: Each seat's chips behind, not yet bet.\n  bets: Each seat's bet on this street.\n  moves: The seat's legal moves; empty unless it is to act.",
+        "properties": {
+          "seat": {
+            "type": "integer"
+          },
+          "to_move": {
+            "type": "boolean"
+          },
+          "finished": {
+            "type": "boolean"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hole": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "board": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "pot": {
+            "type": "integer"
+          },
+          "to_call": {
+            "type": "integer"
+          },
+          "stacks": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "bets": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/Move"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "seat",
+          "to_move",
+          "finished",
+          "street",
+          "hole",
+          "board",
+          "pot",
+          "to_call",
+          "stacks",
+          "bets",
+          "moves"
+        ],
+        "type": "object"
+      },
       "Viewer": {
         "additionalProperties": false,
         "description": "The audience a frame is built for.\n\nAttributes:\n  kind: Whether the viewer holds a seat, watches, or sees everything.\n  seat: The viewer's seat when `kind` is `seat`, otherwise null.",
@@ -1364,6 +1848,13 @@
         "description": "Who a frame is built for.\n\nAttributes:\n  SEAT: A player, who sees what that player may observe.\n  SPECTATOR: A watcher in no seat, who sees only public state.\n  ORACLE: An omniscient observer, who sees the full state.",
         "enum": ["seat", "spectator", "oracle"],
         "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
       }
     }
   }

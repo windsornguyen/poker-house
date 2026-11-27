@@ -397,6 +397,11 @@ class Api:
         action = moves.resolve(session.frame(viewer).observation_struct, body)
         return ok(session.apply_action(viewer, action))
 
+    def turn(self, req: _Request) -> Response:
+        """Answers with the seat's turn: its cards, the pot, the price and its legal moves."""
+        session, viewer = self.seated(req)
+        return ok(moves.turn_of(session.frame(viewer).observation_struct))
+
     def chance(self, req: _Request) -> Response:
         """Chooses a chance outcome."""
         session, viewer = self.seated(req)
@@ -448,6 +453,7 @@ class Api:
         route("DELETE", "sessions/{id}", close),
         route("GET", "sessions/{id}/plies/{ply}", replay),
         route("POST", "sessions/{id}/actions", action),
+        route("GET", "sessions/{id}/turn", turn),
         route("POST", "sessions/{id}/moves", move),
         route("POST", "sessions/{id}/chance", chance),
         route("POST", "sessions/{id}/advance", advance),

@@ -820,6 +820,23 @@ export const MoveKind = z.enum(['fold', 'check', 'call', 'bet', 'raise']);
 export type MoveKind = z.infer<typeof MoveKind>;
 
 /**
+ * A kind of legal move.
+ *
+ * Attributes:
+ *   kind: fold, check, call, bet or raise.
+ *   min: For a call, bet or raise, the least amount it allows; null for a
+ *     fold or a check. A bet or raise amount is the total the seat's bet
+ *     rises to, and a call's is the chips it adds.
+ *   max: The most it allows, as `min`.
+ */
+export const Move = z.strictObject({
+  kind: MoveKind,
+  min: z.int().nullable(),
+  max: z.int().nullable(),
+});
+export type Move = z.infer<typeof Move>;
+
+/**
  * Plays a move by what it does, as a person or an LLM names it.
  *
  * Attributes:
@@ -878,6 +895,37 @@ export const SessionClosed = z.strictObject({
 export type SessionClosed = z.infer<typeof SessionClosed>;
 
 /**
+ * A seat's turn, in the few fields a decision is made from.
+ *
+ * Attributes:
+ *   seat: The seat whose turn it is to read.
+ *   to_move: Whether the seat is to act now.
+ *   finished: Whether the hand is over.
+ *   street: 0 preflop, then 1 to 3 for the flop, turn and river; null once over.
+ *   hole: The seat's two cards, written like `As`.
+ *   board: The cards on the board.
+ *   pot: Every chip bet this hand, the current bets included.
+ *   to_call: The chips the seat adds to call.
+ *   stacks: Each seat's chips behind, not yet bet.
+ *   bets: Each seat's bet on this street.
+ *   moves: The seat's legal moves; empty unless it is to act.
+ */
+export const Turn = z.strictObject({
+  seat: z.int(),
+  to_move: z.boolean(),
+  finished: z.boolean(),
+  street: z.int().nullable(),
+  hole: z.array(z.string()),
+  board: z.array(z.string()),
+  pot: z.int(),
+  to_call: z.int(),
+  stacks: z.array(z.int()),
+  bets: z.array(z.int()),
+  moves: z.array(Move),
+});
+export type Turn = z.infer<typeof Turn>;
+
+/**
  * Every response body the server sends.
  */
 export const ResponseBody = z.union([
@@ -889,5 +937,6 @@ export const ResponseBody = z.union([
   Me,
   Accounts,
   RoomView,
+  Turn,
 ]);
 export type ResponseBody = z.infer<typeof ResponseBody>;

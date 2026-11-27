@@ -26,6 +26,9 @@
     },
     {
       "$ref": "#/$defs/RoomView"
+    },
+    {
+      "$ref": "#/$defs/Turn"
     }
   ],
   "$defs": {
@@ -908,6 +911,41 @@
       ],
       "type": "object"
     },
+    "Move": {
+      "additionalProperties": false,
+      "description": "A kind of legal move.\n\nAttributes:\n  kind: fold, check, call, bet or raise.\n  min: For a call, bet or raise, the least amount it allows; null for a\n    fold or a check. A bet or raise amount is the total the seat's bet\n    rises to, and a call's is the chips it adds.\n  max: The most it allows, as `min`.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MoveKind"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
     "MoveKind": {
       "enum": [
         "fold",
@@ -1474,6 +1512,81 @@
       "required": [
         "kind",
         "seat"
+      ],
+      "type": "object"
+    },
+    "Turn": {
+      "additionalProperties": false,
+      "description": "A seat's turn, in the few fields a decision is made from.\n\nAttributes:\n  seat: The seat whose turn it is to read.\n  to_move: Whether the seat is to act now.\n  finished: Whether the hand is over.\n  street: 0 preflop, then 1 to 3 for the flop, turn and river; null once over.\n  hole: The seat's two cards, written like `As`.\n  board: The cards on the board.\n  pot: Every chip bet this hand, the current bets included.\n  to_call: The chips the seat adds to call.\n  stacks: Each seat's chips behind, not yet bet.\n  bets: Each seat's bet on this street.\n  moves: The seat's legal moves; empty unless it is to act.",
+      "properties": {
+        "seat": {
+          "type": "integer"
+        },
+        "to_move": {
+          "type": "boolean"
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "street": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hole": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "board": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pot": {
+          "type": "integer"
+        },
+        "to_call": {
+          "type": "integer"
+        },
+        "stacks": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "bets": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "moves": {
+          "items": {
+            "$ref": "#/$defs/Move"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "seat",
+        "to_move",
+        "finished",
+        "street",
+        "hole",
+        "board",
+        "pot",
+        "to_call",
+        "stacks",
+        "bets",
+        "moves"
       ],
       "type": "object"
     },

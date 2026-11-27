@@ -1,12 +1,15 @@
-"""Plays two strategies against each other through the site, duplicate style.
+"""Plays two strategies against each other through the site.
 
-Each deal is played twice with the seats swapped, so both strategies hold both
-hands and the cards' luck cancels. One request is in flight at a time.
+By default each deal is played twice with the seats swapped, so both
+strategies hold both hands and the cards' luck cancels: each hand opens a room,
+and both players leave it after, cashing out. With --room-hands, they instead
+sit at one room and play hand after hand, their stacks carried over, until the
+count is reached or one of them busts. One request is in flight at a time.
 
   POKER_HOUSE_ACCOUNTS=accounts.json python -m poker_house_players.match \\
     --site https://poker-house.example --deals 150
 
-`accounts.json` maps each strategy name to {"email", "password"}.
+`accounts.json` maps each strategy name to {"key": <API key>}.
 """
 
 import argparse
@@ -20,7 +23,7 @@ import statistics
 from collections.abc import Sequence
 
 from poker_house_players import client, strategies
-from poker_house_server import contract
+from poker_house_server import contract, moves
 
 BIG_BLIND = 2
 STACK = 200
@@ -35,8 +38,8 @@ class Seat:
     player: client.Player
 
 
-def table(seed: int) -> dict[str, contract.JsonValue]:
-    """A heads-up hand at 1/2 blinds with 200-chip stacks, dealt from `seed`."""
+def table(seed: int | None) -> dict[str, contract.JsonValue]:
+    """A heads-up table at 1/2 blinds with 200-chip stacks, its first hand dealt from `seed`."""
     human: dict[str, contract.JsonValue] = {"controller": "human", "config": {}, "autoplay": False}
     return {
         "game": "poker_house",
@@ -51,52 +54,74 @@ def table(seed: int) -> dict[str, contract.JsonValue]:
 
 
 def play_hand(host: Seat, guest: Seat, seed: int, log: pathlib.Path) -> list[float]:
-    """Plays one hand, `host` at seat 0, and returns each seat's chips won."""
+    """Plays one hand at a room of its own, `host` at seat 0, and returns each seat's chips won."""
     created = host.player.create(table(seed))
-    session_id = created.session.id
-    guest.player.join(created.session.code)
-    seats = (host, guest)
+    code = created.session.code
+    guest.player.join(code)
 
-    frame = host.player.frame(session_id, 0)
-    while frame.returns is None:
-        seat = frame.to_move.seat
-        if seat is None:
-            raise RuntimeError(f"Hand {session_id} waits on no seat.")
+    returns = play_out((host, guest), created.session.id, seed, log)
+    host.player.leave(code)
+    guest.player.leave(code)
+    return returns
 
-        actor = seats[seat]
-        view = actor.player.frame(session_id, seat)
-        observation = view.observation_struct
-        if not isinstance(observation, dict):
-            raise RuntimeError(f"Seat {seat} has no observation.")
-        decision = strategies.decide(actor.strategy, observation)
-        record(log, seed, seat, actor.name, observation, decision)
-        frame = actor.player.act(session_id, seat, decision.choice.id)
 
-    return list(frame.returns)
+def play_room(tight: Seat, odds: Seat, hands: int, log: pathlib.Path) -> None:
+    """Plays up to `hands` hands at one room, then both players leave it."""
+    dealt = tight.player.create(table(None))
+    code = dealt.session.code
+    odds.player.join(code)
+
+    for played in range(1, hands + 1):
+        seats = (tight, odds) if dealt.viewer.seat == 0 else (odds, tight)
+        play_out(seats, dealt.session.id, played, log)
+        room = tight.player.room(code)
+        print(f"hand {played}: stacks {list(room.stacks)}")
+        if len(room.stacks) < len(seats) or played == hands:
+            break
+        dealt = tight.player.deal(code, dealt.session.id)
+
+    for seat in (tight, odds):
+        seat.player.leave(code)
+
+
+def play_out(seats: Sequence[Seat], hand: str, seed: int, log: pathlib.Path) -> list[float]:
+    """Plays `hand` to its end with `seats` in seat order, and returns each seat's chips won."""
+    while True:
+        for index, actor in enumerate(seats):
+            turn = actor.player.turn(hand, index)
+            if turn.finished:
+                returns = actor.player.frame(hand).returns
+                assert returns is not None
+                return list(returns)
+            if turn.to_move:
+                decision = strategies.decide(actor.strategy, turn)
+                record(log, seed, actor.name, turn, decision)
+                actor.player.move(hand, index, decision.move)
+                break
+        else:
+            raise RuntimeError(f"Hand {hand} waits on no seat.")
 
 
 def record(
     log: pathlib.Path,
     seed: int,
-    seat: int,
     name: str,
-    observation: dict[str, contract.JsonValue],
+    turn: moves.Turn,
     decision: strategies.Decision,
 ) -> None:
     """Appends one decision to the log as a JSON line."""
-    spot = strategies.spot_of(observation)
     line = {
         "seed": seed,
-        "seat": seat,
+        "seat": turn.seat,
         "strategy": name,
-        "street": spot.street,
-        "hole": [repr(card) for card in spot.hole],
-        "board": [repr(card) for card in spot.board],
-        "pot": spot.pot,
-        "to_call": spot.to_call,
+        "street": turn.street,
+        "hole": list(turn.hole),
+        "board": list(turn.board),
+        "pot": turn.pot,
+        "to_call": turn.to_call,
         "equity": round(decision.equity, 3),
-        "action": decision.choice.kind,
-        "amount": decision.choice.amount,
+        "action": decision.move.kind,
+        "amount": decision.move.amount,
     }
     with log.open("a") as out:
         out.write(json.dumps(line) + "\n")
@@ -109,6 +134,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--deals", type=int, default=150)
     parser.add_argument("--log", type=pathlib.Path, default=pathlib.Path("match.jsonl"))
     parser.add_argument("--seed", type=int, default=0, help="Seeds the deals, so a run repeats.")
+    parser.add_argument("--room-hands", type=int, help="Plays this many hands at one room instead.")
     return parser.parse_args(argv)
 
 
@@ -120,6 +146,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         Seat(name, strategies.STRATEGIES[name], client.Player(args.site, **accounts[name]))
         for name in ("tight", "pot_odds")
     )
+    if args.room_hands is not None:
+        play_room(tight, odds, args.room_hands, args.log)
+        return
 
     deals = random.Random(args.seed)
     per_deal: list[float] = []

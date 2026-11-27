@@ -1,74 +1,67 @@
-"""One account at the table, through the same Worker a browser uses."""
-
-import time
+"""One account at the table, signed in with an API key, through the Worker a browser uses."""
 
 import httpx
 
-from poker_house_server import contract
+from poker_house_server import contract, moves, request, rooms
 from poker_house_server import frame as frame_lib
 
 FRAME = contract.adapter(frame_lib.Frame)
-
-# The Worker trusts a session cookie for five minutes, so a player renews it
-# before then, as the site's pages do.
-RENEW_SECONDS = 4 * 60
+TURN = contract.adapter(moves.Turn)
+ROOM = contract.adapter(rooms.RoomView)
 
 
 class Player:
-    """A signed-in account that creates, joins and plays rooms."""
+    """An account that opens, joins and plays rooms."""
 
-    def __init__(self, site: str, email: str, password: str) -> None:
-        """Signs in to `site`.
-
-        Raises:
-          httpx.HTTPStatusError: If the site refuses the email and password.
-        """
-        self.http = httpx.Client(base_url=site, headers={"Origin": site}, timeout=30)
-        signed_in = self.http.post(
-            "/api/auth/sign-in/email", json={"email": email, "password": password}
-        )
-        signed_in.raise_for_status()
-        self.renewed_at = time.monotonic()
-
-    def renew(self) -> None:
-        """Has the session cookie reissued once it is old enough to lapse soon."""
-        if time.monotonic() - self.renewed_at < RENEW_SECONDS:
-            return
-
-        renewed = self.http.get("/api/auth/get-session", params={"disableCookieCache": "true"})
-        renewed.raise_for_status()
-        self.renewed_at = time.monotonic()
+    def __init__(self, site: str, key: str) -> None:
+        """Plays at `site` as the account API key `key` belongs to."""
+        self.http = httpx.Client(base_url=site, headers={"x-api-key": key}, timeout=30)
 
     def create(self, body: dict[str, contract.JsonValue]) -> frame_lib.Frame:
         """Opens a room with `body`, seated at its first seat."""
-        self.renew()
-        return self.frame_of(self.http.post("/api/sessions", params={"viewer": 0}, json=body))
+        return FRAME.validate_json(self.send("POST", "/api/sessions?viewer=0", body))
 
     def join(self, code: str) -> frame_lib.Frame:
-        """Sits in the room `code` names."""
-        self.renew()
-        return self.frame_of(self.http.post(f"/api/rooms/{code}/join", json={}))
+        """Sits at room `code`, buying in."""
+        return FRAME.validate_json(self.send("POST", f"/api/rooms/{code}/join", {}))
 
-    def frame(self, session_id: str, seat: int) -> frame_lib.Frame:
-        """The live position as `seat` sees it."""
-        self.renew()
-        return self.frame_of(self.http.get(f"/api/sessions/{session_id}", params={"viewer": seat}))
+    def deal(self, code: str, after: str) -> frame_lib.Frame:
+        """Deals room `code`'s hand after `after`, or finds it if it is dealt."""
+        return FRAME.validate_json(self.send("POST", f"/api/rooms/{code}/deal", {"after": after}))
 
-    def act(self, session_id: str, seat: int, action: int) -> frame_lib.Frame:
-        """Plays `action` for `seat`."""
-        self.renew()
-        response = self.http.post(
-            f"/api/sessions/{session_id}/actions",
-            params={"viewer": seat},
-            json={"action": action, "ply": None},
+    def room(self, code: str) -> rooms.RoomView:
+        """Room `code` as this account sees it."""
+        return ROOM.validate_json(self.send("GET", f"/api/rooms/{code}"))
+
+    def leave(self, code: str) -> rooms.RoomView:
+        """Gets up from room `code`, cashing the stack out."""
+        return ROOM.validate_json(self.send("POST", f"/api/rooms/{code}/leave", {}))
+
+    def frame(self, session_id: str) -> frame_lib.Frame:
+        """The hand as a spectator sees it."""
+        return FRAME.validate_json(self.send("GET", f"/api/sessions/{session_id}?viewer=spectator"))
+
+    def turn(self, session_id: str, seat: int) -> moves.Turn:
+        """`seat`'s turn: its cards, the pot, the price and its legal moves."""
+        return TURN.validate_json(
+            self.send("GET", f"/api/sessions/{session_id}/turn?viewer={seat}")
         )
-        return self.frame_of(response)
 
-    def frame_of(self, response: httpx.Response) -> frame_lib.Frame:
-        """The frame `response` carries.
+    def move(self, session_id: str, seat: int, move: request.PlayMove) -> frame_lib.Frame:
+        """Plays `move` for `seat`."""
+        body: dict[str, contract.JsonValue] = {"kind": move.kind, "amount": move.amount}
+        return FRAME.validate_json(
+            self.send("POST", f"/api/sessions/{session_id}/moves?viewer={seat}", body)
+        )
+
+    def send(
+        self, method: str, path: str, body: dict[str, contract.JsonValue] | None = None
+    ) -> bytes:
+        """The body of the site's answer.
 
         Raises:
-          httpx.HTTPStatusError: If the server refused the request.
+          httpx.HTTPStatusError: If the site refused the request.
         """
+        response = self.http.request(method, path, json=body)
         response.raise_for_status()
-        return FRAME.validate_json(response.content)
+        return response.content

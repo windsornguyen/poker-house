@@ -23,7 +23,17 @@ import pathlib
 
 import pydantic
 
-from poker_house_server import accounts, catalogue, contract, errors, frame, health, request, rooms
+from poker_house_server import (
+    accounts,
+    catalogue,
+    contract,
+    errors,
+    frame,
+    health,
+    moves,
+    request,
+    rooms,
+)
 
 SCHEMA_PATH = pathlib.Path(__file__).with_name("contract.schema.json")
 
@@ -52,6 +62,7 @@ type ResponseBody = (
     | accounts.Me
     | accounts.Accounts
     | rooms.RoomView
+    | moves.Turn
 )
 type RequestBody = (
     request.CreateSession

@@ -270,6 +270,15 @@ class ArenaTest(absltest.TestCase):
         self.assertEqual((status, refused["code"]), (409, "illegal_action"))
         self.assertIn("Legal moves: fold, call", refused["message"])
 
+        status, turn = self.request(
+            "GET", f"/api/sessions/{session_id}/turn?viewer=1", player="guest"
+        )
+        self.assertEqual(status, 200, turn)
+        self.assertEqual((turn["seat"], turn["to_move"], turn["to_call"]), (1, True, 1))
+        self.assertEqual(len(turn["hole"]), 2)
+        self.assertEqual([move["kind"] for move in turn["moves"]], ["fold", "call", "raise"])
+        self.assertEqual(turn["moves"][2]["max"], 40)
+
         status, called = self.request("POST", target, {"kind": "call"}, player="guest")
         self.assertEqual(status, 200, called)
         self.assertEqual(len(called["history"]), len(frame["history"]) + 1)

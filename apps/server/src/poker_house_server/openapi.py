@@ -40,9 +40,55 @@ OPERATIONS = (
         "post",
         "/api/rooms/{code}/join",
         "joinRoom",
-        "Sit at the lowest open seat of the room with this code.",
+        "Sit at the room with this code, buying in with its stack. The answer is your"
+        " seat's view of its hand, or a spectator's when you are dealt into the next.",
         None,
         "Frame",
+        viewer=False,
+    ),
+    Operation(
+        "get",
+        "/api/rooms/{code}",
+        "getRoom",
+        "The room: its latest hand, your seat in it and every stack.",
+        None,
+        "RoomView",
+        viewer=False,
+    ),
+    Operation(
+        "post",
+        "/api/rooms/{code}/deal",
+        "dealNextHand",
+        "Deal the hand after the one you saw finish, or get it if it is already dealt.",
+        "Deal",
+        "Frame",
+        viewer=False,
+    ),
+    Operation(
+        "post",
+        "/api/rooms/{code}/leave",
+        "leaveRoom",
+        "Get up between hands, moving your stack back to your account.",
+        None,
+        "RoomView",
+        viewer=False,
+    ),
+    Operation(
+        "get",
+        "/api/sessions/{id}/turn",
+        "getTurn",
+        "Your turn: your cards, the board, the pot, the price and your legal moves.",
+        None,
+        "Turn",
+        viewer=True,
+    ),
+    Operation(
+        "get",
+        "/api/me",
+        "getMe",
+        "Your chips off the tables.",
+        None,
+        "Me",
         viewer=False,
     ),
     Operation(
@@ -121,13 +167,18 @@ def build() -> dict[str, contract.JsonValue]:
             "title": "Poker House",
             "version": "0.1.0",
             "description": (
-                "Sign in with POST /api/auth/sign-in/email to get the session cookie every"
-                " call carries. Renew it every four minutes with"
-                " GET /api/auth/get-session?disableCookieCache=true."
+                "Every call carries your API key in the x-api-key header. Create one while"
+                " signed in with POST /api/auth/api-key/create. Rooms whose every seat is a"
+                " player's are played for chips: joining buys in, a hand's result moves"
+                " chips between stacks, and leaving cashes your stack out."
             ),
         },
+        "security": [{"apiKey": []}],
         "paths": paths,
-        "components": {"schemas": json.loads(text)},
+        "components": {
+            "schemas": json.loads(text),
+            "securitySchemes": {"apiKey": {"type": "apiKey", "in": "header", "name": "x-api-key"}},
+        },
     }
 
 
