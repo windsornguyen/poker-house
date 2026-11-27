@@ -19,7 +19,7 @@ import {
   perspectiveLock,
   sessionModeOf,
   useAnalysisViewSeat,
-} from '../game/bottom_seat.ts';
+} from '../game/bottom-seat.ts';
 
 import './view.css';
 

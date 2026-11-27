@@ -1,0 +1,125 @@
+// Copyright 2026 DeepMind Technologies Limited
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+import {type JSX, useState} from 'react';
+
+import {NoFrame} from '../actions/note.tsx';
+import {useGame} from '../game/game-context.ts';
+import {SectionTabs} from '../game/section-tabs.tsx';
+import type {PanelGroupDefinition} from '../game/sections.ts';
+import {PlayersPanel} from '../players/players-panel.tsx';
+import {setupRefusal} from './access.ts';
+import {GameOptions} from './game-options.tsx';
+import {setupParameters} from './parameters.ts';
+import {Position} from './position.tsx';
+
+import './setup.css';
+
+// Setup › Game options; nothing for a game that offers no parameters.
+function GameOptionsContent(): JSX.Element | null {
+  const {entry, session} = useGame();
+  const {frame, busy, error, commands} = session;
+  if (setupParameters(entry).length === 0) return null;
+  if (frame === null) return <NoFrame />;
+  return (
+    <div className="setup">
+      <GameOptions
+        entry={entry}
+        frame={frame}
+        busy={busy}
+        error={error}
+        onCreate={commands.create}
+      />
+    </div>
+  );
+}
+
+// Setup › Position; nothing for a spectator, who cannot change the game.
+function PositionContent(): JSX.Element | null {
+  const {frame, busy, error, commands} = useGame().session;
+  if (frame === null) return <NoFrame />;
+  if (setupRefusal(frame) !== null) return null;
+  return (
+    <div className="setup">
+      <Position
+        frame={frame}
+        busy={busy}
+        error={error}
+        onReset={commands.reset}
+      />
+    </div>
+  );
+}
+
+// Setup › Players: every seat and its controller.
+function PlayersContent(): JSX.Element {
+  const {frame, busy, commands} = useGame().session;
+  if (frame === null) return <NoFrame />;
+  return <PlayersPanel frame={frame} busy={busy} commands={commands} />;
+}
+
+/**
+ * The Setup panel's sections: Game options, Position and Players, an inner
+ * tab each. Game options draws nothing for a game that offers no
+ * parameters, and Position nothing for a spectator, so neither has a tab
+ * then.
+ */
+export const SETUP_GROUP: PanelGroupDefinition = {
+  id: 'setup',
+  title: 'Setup',
+  sections: [
+    {
+      id: 'options',
+      title: 'Game options',
+      Content: GameOptionsContent,
+      Shown: () => setupParameters(useGame().entry).length > 0,
+    },
+    {
+      id: 'position',
+      title: 'Position',
+      Content: PositionContent,
+      Shown: () => {
+        const {frame} = useGame().session;
+        return frame === null || setupRefusal(frame) === null;
+      },
+    },
+    {id: 'players', title: 'Players', Content: PlayersContent},
+  ],
+};
+
+/**
+ * The Setup panel: its sections once a session is open; until then, why
+ * none is.
+ */
+export function SetupPanel(): JSX.Element {
+  const {frame, error} = useGame().session;
+  // A session, once open, stays open: a new one replaces it.
+  const [opened, setOpened] = useState(false);
+  // Kept here, so the open section survives a change of viewer.
+  const [chosen, setChosen] = useState<string | undefined>(undefined);
+  if (frame !== null && !opened) setOpened(true);
+  if (frame === null) {
+    return (
+      <p className="setup__notice">
+        {!opened
+          ? 'No game is open.'
+          : error === null
+            ? 'Loading the position.'
+            : `The position could not be loaded. ${error.message}`}
+      </p>
+    );
+  }
+  return (
+    <SectionTabs group={SETUP_GROUP} chosen={chosen} onChoose={setChosen} />
+  );
+}

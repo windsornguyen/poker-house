@@ -18,8 +18,8 @@
 import {vi} from 'vite-plus/test';
 
 import type {Action, Frame, HistoryEntry} from '../contract/contract.ts';
-import type {SessionCommands} from '../session/session_store.ts';
-import type {Session} from '../session/use_session.ts';
+import type {SessionCommands} from '../session/session-store.ts';
+import type {Session} from '../session/use-session.ts';
 
 /** `count` actions with ids 0 up, labelled by `label`. */
 export function actions(

@@ -17,14 +17,14 @@ import {createElement, type JSX, useLayoutEffect, useMemo} from 'react';
 import type {Frame} from '../contract/contract.ts';
 import {RENDERERS} from '../renderers/registry.ts';
 import type {Renderers} from '../renderers/renderer.ts';
-import type {Session} from '../session/use_session.ts';
+import type {Session} from '../session/use-session.ts';
 import {
   type HistoryRenderer,
   historyRendererProps,
-} from './history_renderer.ts';
-import {type HistoryRow, historyRows, rowText} from './history_rows.ts';
+} from './history-renderer.ts';
+import {type HistoryRow, historyRows, rowText} from './history-rows.ts';
 import {NoFrame, Note} from './note.tsx';
-import {useStickToBottom} from './use_stick_to_bottom.ts';
+import {useStickToBottom} from './use-stick-to-bottom.ts';
 
 import './actions.css';
 

@@ -31,10 +31,10 @@ export {
   writeAnimationSpeed,
   type AnimationSpeed,
   type ScaleOptions,
-} from './animation_speed.ts';
+} from './animation-speed.ts';
 export {
   useAnimationHoldScale,
   useAnimationScale,
   useAnimationSpeed,
   useReducedMotion,
-} from './use_animation_speed.ts';
+} from './use-animation-speed.ts';

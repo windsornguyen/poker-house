@@ -17,7 +17,7 @@
 // The colour theme. The user picks a preference; the page shows the theme it
 // resolves to, written to <html data-theme> where src/styles/tokens.css reads
 // it. The inline script in index.html applies the same resolution before the
-// first paint; keep the two in step (theme_test.ts checks that they agree).
+// first paint; keep the two in step.
 
 /** What the user asks for: a fixed theme, or whatever the system prefers. */
 export type ThemePreference = 'system' | 'light' | 'dark';

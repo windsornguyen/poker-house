@@ -209,7 +209,7 @@ export default defineConfig({
         files: [WEB + 'src/**/*.{ts,tsx}'],
         excludeFiles: [
           WEB + 'src/**/testing/**',
-          WEB + 'src/**/*_test.{ts,tsx}',
+          WEB + 'src/**/*.test.{ts,tsx}',
         ],
         rules: {
           'typescript/consistent-type-assertions': [

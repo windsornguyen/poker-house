@@ -17,8 +17,8 @@
 /*
   The design tokens: every colour the client draws with, in both themes. The
   rest of the stylesheets refer to these names and never to a colour (checked
-  by scripts/style_lint.ts). The light theme is the default; <html
-  data-theme="dark"> selects the dark one. scripts/contrast_check.ts checks that every
+  by scripts/style-lint.ts). The light theme is the default; <html
+  data-theme="dark"> selects the dark one. scripts/contrast-check.ts checks that every
   text colour reaches 4.5:1, and every other mark 3:1, on every surface; the
   colours it checks are opaque hex values.
 */

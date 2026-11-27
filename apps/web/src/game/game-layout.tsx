@@ -28,15 +28,15 @@ import {
 import {Tabs, TabsContent, TabsList, TabsTrigger} from '@/components/ui/tabs';
 
 import {useHeaderActions} from '../app/header-actions.ts';
-import {BotOutputView} from '../bot_output/bot_output.tsx';
-import {SETUP_GROUP, SetupPanel} from '../setup/setup_panel.tsx';
-import {STATE_GROUP} from '../state/state_panel.tsx';
-import {VIEW_GROUP} from '../view/view_panel.tsx';
-import {ACTIONS_GROUP} from './actions_panel.tsx';
-import {useGame} from './game_context.ts';
-import {GameplayPanel} from './gameplay_panel.tsx';
+import {BotOutputView} from '../bot_output/bot-output.tsx';
+import {SETUP_GROUP, SetupPanel} from '../setup/setup-panel.tsx';
+import {STATE_GROUP} from '../state/state-panel.tsx';
+import {VIEW_GROUP} from '../view/view-panel.tsx';
+import {ACTIONS_GROUP} from './actions-panel.tsx';
+import {useGame} from './game-context.ts';
+import {GameplayPanel} from './gameplay-panel.tsx';
 import {SectionTabs} from './section-tabs.tsx';
-import {SESSION_GROUP} from './session_panel.tsx';
+import {SESSION_GROUP} from './session-panel.tsx';
 
 interface Tool {
   readonly id: string;

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Generated from apps/server/src/poker_house_server/contract.schema.json by
-// scripts/generate_contract.ts. Do not edit; run pnpm generate:contract.
+// scripts/generate-contract.ts. Do not edit; run pnpm generate:contract.
 
 import * as z from 'zod';
 

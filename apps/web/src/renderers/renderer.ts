@@ -19,7 +19,7 @@
 import type {JSX} from 'react';
 
 import type {Frame, Presentation} from '../contract/contract.ts';
-import type {HistoryRenderer} from '../actions/history_renderer.ts';
+import type {HistoryRenderer} from '../actions/history-renderer.ts';
 import type {SectionDefinition} from '../game/sections.ts';
 
 /** What a renderer is given to draw one frame. */

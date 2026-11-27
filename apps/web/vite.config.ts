@@ -23,7 +23,7 @@ import react, {reactCompilerPreset} from '@vitejs/plugin-react';
 import {defineConfig} from 'vite-plus';
 import {playwright} from 'vite-plus/test/browser-playwright';
 
-import {thirdPartyNotices} from './scripts/third_party_notices.ts';
+import {thirdPartyNotices} from './scripts/third-party-notices.ts';
 
 // `pnpm dev` sends /api/auth to apps/auth (POKER_HOUSE_AUTH) and the rest
 // of /api to `python -m poker_house_server` (POKER_HOUSE_SERVER), as the
@@ -50,13 +50,13 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: {name: 'node', include: ['src/contract/*_test.ts']},
+        test: {name: 'node', include: ['src/contract/*.test.ts']},
       },
       {
         extends: true,
         test: {
           name: 'browser',
-          include: ['src/*_test.tsx'],
+          include: ['src/*.test.tsx'],
           setupFiles: ['src/testing/setup.ts'],
           // Twice app_test's 5 s `until`, so a slow wait reports its failing
           // check rather than the test timeout, and two waits fit in one test.

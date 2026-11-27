@@ -22,7 +22,7 @@ import {
   SESSION_REFRESH_MS,
   authClient,
   queryClient,
-} from './session/auth_client.ts';
+} from './session/auth-client.ts';
 
 import './styles/theme.css';
 import './styles/tokens.css';

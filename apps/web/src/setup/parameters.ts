@@ -19,7 +19,7 @@ import type {
   ParameterSpec,
   SeatConfig,
 } from '../contract/contract.ts';
-import {nameLabel} from '../form/name_label.ts';
+import {nameLabel} from '../form/name-label.ts';
 
 /** A game parameter's value, as the wire format carries it. */
 export type ParameterValue = ParameterSpec['default'];

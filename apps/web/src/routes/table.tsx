@@ -4,8 +4,8 @@ import type {JSX} from 'react';
 import {redirect} from 'react-router';
 
 import {App} from '../app.tsx';
-import {authClient, queryClient} from '../session/auth_client.ts';
-import {ThemeProvider} from '../theme/theme_provider.tsx';
+import {authClient, queryClient} from '../session/auth-client.ts';
+import {ThemeProvider} from '../theme/theme-provider.tsx';
 
 /** The page's title and description, which search engines index. */
 export function meta(): Array<{

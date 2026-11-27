@@ -7,11 +7,11 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "check": "node scripts/style_lint.ts && node scripts/contrast_check.ts",
+    "check": "node scripts/style-lint.ts && node scripts/contrast-check.ts",
     "deploy": "react-router build && wrangler deploy",
     "dev": "react-router dev",
     "fmt": "vp fmt",
-    "generate:contract": "node scripts/generate_contract.ts",
+    "generate:contract": "node scripts/generate-contract.ts",
     "test": "vp test run"
   },
   "dependencies": {

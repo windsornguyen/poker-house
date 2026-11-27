@@ -15,14 +15,14 @@
 import {createElement, type JSX} from 'react';
 
 import {NoFrame} from '../actions/note.tsx';
-import {playBlocker} from '../actions/play_blocker.ts';
+import {playBlocker} from '../actions/play-blocker.ts';
 import type {Frame, Presentation} from '../contract/contract.ts';
-import {CopyableText} from '../controls/copy_button.tsx';
+import {CopyableText} from '../controls/copy-button.tsx';
 import {RENDERERS} from '../renderers/registry.ts';
 import type {Renderers} from '../renderers/renderer.ts';
-import {RendererBoundary} from '../renderers/renderer_boundary.tsx';
-import type {Session} from '../session/use_session.ts';
-import {boardText, missingTextReason} from './board_text.ts';
+import {RendererBoundary} from '../renderers/renderer-boundary.tsx';
+import type {Session} from '../session/use-session.ts';
+import {boardText, missingTextReason} from './board-text.ts';
 
 import './board.css';
 

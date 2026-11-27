@@ -17,8 +17,8 @@ import {useId, useState} from 'react';
 
 import type {Frame} from '../contract/contract.ts';
 import type {RequestError} from '../session/errors.ts';
-import {parseHistory} from './position_text.ts';
-import {ResetControl} from './reset_control.tsx';
+import {parseHistory} from './position-text.ts';
+import {ResetControl} from './reset-control.tsx';
 
 import './setup.css';
 
