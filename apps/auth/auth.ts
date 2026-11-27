@@ -28,7 +28,8 @@ export const options = {
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => Promise.resolve(allowed.has(user.email) ? {data: user} : false),
+        before: async user =>
+          Promise.resolve(allowed.has(user.email) ? {data: user} : false),
       },
     },
   },
