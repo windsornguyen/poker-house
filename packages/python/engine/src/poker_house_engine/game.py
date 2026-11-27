@@ -36,7 +36,7 @@ import decimal
 import inspect
 import math
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Literal, Self, TypedDict
 
 import numpy as np
@@ -118,6 +118,7 @@ VARIANT_PARAM_USAGE = {
 
 _ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING = "Bet/Raise to 1 [ALL-IN EDGECASE]"
 
+
 # WARNING: do not use comma-containing string param values here. Also, do not
 # use strings for single-value integers. Instead respectively use space (" ")
 # separation inside your strings values or plain numeric values (e.g. ints).
@@ -126,53 +127,45 @@ _ALL_IN_FOR_ONE_CHIP_EDGECASE_STRING = "Bet/Raise to 1 [ALL-IN EDGECASE]"
 # serialization/deserialization - e.g. errors or crashes on a round-trip.
 # (This would potentially be fixable via custom __getstate__ and __setstate__
 # methods, but we would have to define and maintain them ourselves if so.)
-_DEFAULT_PARAMS = {
-    # Matches pokerkit.NoLimitTexasHoldem.__name__
-    # but kept as a hardcoded string to provide clarity to readers.
-    # For more details, see the pokerkit docs.
-    "variant": "NoLimitTexasHoldem",
-    "num_players": 2,
-    # Assumed to be "<SB> <BB>", i.e. space-separated numbers (within the
-    # string).
-    # NOTE: Small Blind must be >= 1, Big Blind must be >= 2, and SB <= BB.
-    # TODO: b/437724266 - Add support for any N blinds where 0 < N < num_players
-    # instead of requiring exactly "<SB> <BB>". (Pokerkit already supports this,
-    # we just need to ensure we're handling things properly on our end.)
-    "blinds": "5 10",
-    "num_streets": 4,
-    # Relevant for games with public hole cards. Will be ignored by all
-    # other games (including the default NoLimitTexasHoldem).
-    # NOTE: Must be strictly < small_bet.
-    "bring_in": 5,
-    # Relevant for various FixedLimit ("limit") games. Will be ignored by all
-    # other games (including the default NoLimitTexasHoldem). Must be provided
-    # if bring_in is provided.
-    # NOTE: Must be strictly < big_bet.
-    "small_bet": 10,
-    "big_bet": 20,
-    # NOTE: not yet officially supported. Added primarily for future-proofing.
-    "antes": "0 0",
-    # Stack sizes for each player. Should be a string containing num_players #
-    # of space-separated integers.
-    #
-    # NOTE: Pokerkit considers "positions", not "seat numbers". As per the docs
-    # https://pokerkit.readthedocs.io/en/0.4/simulation.html#position,
-    # """
-    # For non-heads-up button games, this means that the zeroth player will
-    # always be the small blind, the first player will always be the big blind,
-    # the second player will always be UTG, and so on until the last player who
-    # will always be in the button and in position. The notion of position does
-    # not really exist in stud games. In this case, the player to the immediate
-    # left of the dealer should be in the zeroth position while the player to
-    # the immediate right of the dealer should be in the last position.
-    # """
-    #
-    # You may provide floats here (e.g. 2000.0) instead of ints (e.g. 2000) to
-    # turn on fractional split pots. Otherwise (if provided integers) pots will
-    # never be split fractionally, i.e. in the same way pokerkit itself works:
-    # https://pokerkit.readthedocs.io/en/stable/simulation.html#optional-divmod
-    "stack_sizes": "2000 2000",
-}
+@dataclasses.dataclass(frozen=True)
+class Parameters:
+    """A poker game's parameters, each with its default.
+
+    `blinds`, `antes` and `stack_sizes` are space-separated numbers, such as
+    "1 2" for a small blind of 1 and a big blind of 2. `bring_in`, `small_bet`
+    and `big_bet` apply only to the fixed-limit variants; `bring_in` must be
+    below `small_bet`, which must be below `big_bet`.
+    """
+
+    variant: str = "NoLimitTexasHoldem"
+    num_players: int = 2
+    blinds: str = "5 10"
+    num_streets: int = 4
+    bring_in: int = 5
+    small_bet: int = 10
+    big_bet: int = 20
+    antes: str = "0 0"
+    stack_sizes: str = "2000 2000"
+
+    @classmethod
+    def of(cls, given: Mapping[str, int | float | str | bool]) -> Parameters:
+        """Returns the defaults with `given` laid over them, refusing mistyped values."""
+        merged = dataclasses.asdict(cls()) | dict(given)
+        defaults = dataclasses.asdict(cls())
+        unknown = set(merged) - set(defaults)
+        if unknown:
+            raise ValueError(f"Unknown poker parameters: {sorted(unknown)}.")
+        for name, value in merged.items():
+            if type(value) is not type(defaults[name]):
+                raise ValueError(f"Poker parameter {name} must be {type(defaults[name]).__name__}.")
+        return cls(**merged)
+
+    def as_dict(self) -> dict[str, int | float | str | bool]:
+        """The parameters as pyspiel takes them."""
+        return dataclasses.asdict(self)
+
+
+_DEFAULT_PARAMS = Parameters().as_dict()
 
 _GAME_TYPE = pyspiel.GameType(
     short_name="poker_house",
@@ -317,7 +310,7 @@ def card_code(card: pokerkit.Card) -> str | None:
 # of size >= 2.)
 
 
-def parse_values(param_str: str) -> list[int | decimal.Decimal] | None:
+def parse_values(param_str: str) -> list[int | decimal.Decimal]:
     """Convert " "-separated values in a ``str`` to numerical values via pokerkit.
 
     Args:
@@ -327,7 +320,7 @@ def parse_values(param_str: str) -> list[int | decimal.Decimal] | None:
       A list of numerical values, which can be either `int` or `decimal.Decimal`.
     """
     if not param_str:
-        return None
+        return []
     return [pokerkit.parse_value(s) for s in param_str.split(" ")]
 
 
@@ -347,13 +340,14 @@ class PokerkitWrapper(pyspiel.Game):
             params = {}
         # Replicates pyspiel.load_game()'s behavior of using the default's value for
         # each param missing from the provided params.
-        self.params = _DEFAULT_PARAMS | params
+        self.parameters = Parameters.of(params)
+        self.params = self.parameters.as_dict()
         # Prevents accidental usage params instead of self.params below.
         # NOTE: Only removes the reference from *local scope* here; for details see:
         # https://docs.python.org/3/tutorial/classes.html#python-scopes-and-namespaces
         del params
 
-        variant = self.params.get("variant")
+        variant = self.parameters.variant
         if variant not in SUPPORTED_VARIANT_MAP:
             raise ValueError(f"Unknown poker variant: {variant}")
 
@@ -371,7 +365,7 @@ class PokerkitWrapper(pyspiel.Game):
         # (Please also do not remove this comment; LLMs love quietly slipping in
         # usage of self.num_players or self.num_players(). This giant warning is
         # helpful for reminding them that doing so is a bad idea.)
-        num_players = self.params["num_players"]
+        num_players = self.parameters.num_players
         if num_players > game_type.max_num_players:
             raise ValueError(
                 f"Players in game ({num_players}) exceeds"
@@ -391,12 +385,12 @@ class PokerkitWrapper(pyspiel.Game):
         )
 
         # --- Blinds, Bet Sizes, and Antes or Bring-ins ---
-        self.blinds = parse_values(self.params["blinds"])
+        self.blinds = parse_values(self.parameters.blinds)
         if self.blinds is None or len(self.blinds) != 2 or self.blinds[0] > self.blinds[1]:
             raise ValueError(
                 "blinds must parse to a list of 2 values [Small Blind, Big Blind],"
                 " where SB >= 1, BB >= 2, and SB <= BB. But instead got: ",
-                self.params["blinds"],
+                self.parameters.blinds,
                 " which parsed to: ",
                 self.blinds,
             )
@@ -407,9 +401,9 @@ class PokerkitWrapper(pyspiel.Game):
         if not max(self.blinds) >= 2:
             raise ValueError("Big Blind must be at least 2: ", self.blinds)
 
-        assert self.params["small_bet"] < self.params["big_bet"]
+        assert self.parameters.small_bet < self.parameters.big_bet
         if variant in VARIANT_PARAM_USAGE["bring_in"]:
-            assert self.params["bring_in"] < self.params["small_bet"]
+            assert self.parameters.bring_in < self.parameters.small_bet
 
         # This is such a common + confusing mistake that it's helpful to at least
         # warn about it, even if we can't actually throw an error (without losing
@@ -437,11 +431,11 @@ class PokerkitWrapper(pyspiel.Game):
                     param2,
                 )
 
-        stack_sizes = parse_values(self.params["stack_sizes"])
+        stack_sizes = parse_values(self.parameters.stack_sizes)
         if stack_sizes is None or len(stack_sizes) != num_players:
             raise ValueError(
                 "stack_sizes must be a space-separated list of "
-                f" {num_players} values. Was provided: {self.params['stack_sizes']},"
+                f" {num_players} values. Was provided: {self.parameters.stack_sizes},"
                 f" which parsed to: {stack_sizes}"
             )
         self.stack_sizes = stack_sizes
@@ -456,7 +450,7 @@ class PokerkitWrapper(pyspiel.Game):
         self.deck_size = len(self._deck)
         self.card_to_int = {card: i for i, card in enumerate(self._deck)}
         self.int_to_card = {i: card for i, card in enumerate(self._deck)}
-        self.num_streets = self.params.get("num_streets")
+        self.num_streets = self.parameters.num_streets
 
         # --- GameInfo and GameType Setup ---
 
@@ -525,11 +519,11 @@ class PokerkitWrapper(pyspiel.Game):
         min_reraise_amount = max(self.blinds)
         return (
             # Upper bound on check actions from players not betting, on all streets.
-            self.params.get("num_players") * max(self.params.get("num_streets"), 1)
+            self.parameters.num_players * max(self.parameters.num_streets, 1)
             # Upper bound on reraises + calls by the other players. (This is a
             # factor of total chips, and so doesn't need to consider streets.)
             + (max(self.stack_sizes) // min_reraise_amount)
-            * max(1, self.params.get("num_players") - 1)
+            * max(1, self.parameters.num_players - 1)
             # Upper bound on performing all deal actions
             + self.deck_size
         )
@@ -586,8 +580,8 @@ class PokerkitWrapper(pyspiel.Game):
         """
         # TODO: b/437724266 - Stop directly accessing values from the params and
         # instead grab the values we need via getters.
-        params = self.params
-        variant = params.get("variant")
+        params = self.parameters
+        variant = params.variant
         poker_variant_class = SUPPORTED_VARIANT_MAP.get(variant)
         if not poker_variant_class:
             raise ValueError(f"Unknown / unsupported poker variant: {variant}")
@@ -595,13 +589,13 @@ class PokerkitWrapper(pyspiel.Game):
         def in_scope_for_variant(k: str) -> bool:
             return k in inspect.signature(poker_variant_class).parameters
 
-        assert parse_values(params.get("stack_sizes")) == self.stack_sizes
+        assert parse_values(params.stack_sizes) == self.stack_sizes
         game_args = {
             k: v
             for k, v in {
                 "automations": _DEFAULT_AUTOMATIONS,
                 "ante_trimming_status": False,
-                "player_count": params.get("num_players"),
+                "player_count": params.num_players,
                 # As per pokerkit docs:
                 # """
                 # In Pokerkit, the term ``raw`` is used to denote the fact that
@@ -613,8 +607,8 @@ class PokerkitWrapper(pyspiel.Game):
                 # big blind ante whereas ``{-1: 2}`` will be considered as the
                 # button ante.
                 # """
-                "raw_antes": parse_values(params.get("antes")),
-                "raw_starting_stacks": parse_values(params.get("stack_sizes")),
+                "raw_antes": parse_values(params.antes),
+                "raw_starting_stacks": parse_values(params.stack_sizes),
                 "raw_blinds_or_straddles": self.blinds,
                 # Unlike most other args, we don't support custom user inputs for
                 # this. Despite the name, it's only used in nolimit games (NOT any
@@ -626,7 +620,7 @@ class PokerkitWrapper(pyspiel.Game):
                 # key/values.
             }.items()
             if in_scope_for_variant(k)
-        } | {k: v for k, v in params.items() if in_scope_for_variant(k)}
+        } | {k: v for k, v in params.as_dict().items() if in_scope_for_variant(k)}
 
         # Double check that we didn't somehow end up in a situation where we are
         # allowing bet sizes that could conflict with the reserved values for our
@@ -658,8 +652,8 @@ class PokerkitWrapper(pyspiel.Game):
         # approach we use here.** We'll need to create our own state object
         # directly using the pokerkit.State constructor to (properly) disable it.
         game_template = self.wrapped_game_template_factory()
-        stacks = parse_values(self.params.get("stack_sizes"))
-        number_players = self.params.get("num_players")
+        stacks = parse_values(self.parameters.stack_sizes)
+        number_players = self.parameters.num_players
         helper_state = game_template(stacks, number_players)
 
         # Doing this instead of just directly mutating state.streets as per
@@ -1173,7 +1167,7 @@ class PokerkitWrapperState(pyspiel.State):
         legal = self.legal_actions(player) if self.current_player() == player else []
         return {
             "schema_version": 1,
-            "variant": game.params["variant"],
+            "variant": game.parameters.variant,
             "observing_player": player,
             "current_player": int(self.current_player()),
             "street_index": state.street_index,
@@ -1392,7 +1386,7 @@ class PokerkitWrapperState(pyspiel.State):
         # If the game hasn't actually dealt players' cards yet, or maybe also in
         # some other situations, attempting to get the ACPC state from pokerkit
         # will result in an ValueError here.
-        if self.get_game().params.get("variant") in _VARIANTS_SUPPORTING_ACPC_STYLE:
+        if self.get_game().parameters.variant in _VARIANTS_SUPPORTING_ACPC_STYLE:
             for player in range(self.get_game().num_players()):
                 try:
                     phh: pokerkit.HandHistory = pokerkit.HandHistory.from_game_state(
@@ -1417,7 +1411,7 @@ class PokerkitWrapperState(pyspiel.State):
                     logging.warning(
                         "Failed to get ACPC state so leaving it set to default. Game"
                         " variant is %s, caught error is %s",
-                        self.get_game().params.get("variant"),
+                        self.get_game().parameters.variant,
                         e,
                     )
                     pass
