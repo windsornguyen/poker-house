@@ -12,6 +12,7 @@ readonly REPO=https://github.com/windsornguyen/poker-house.git
 readonly APP_USER=poker-house
 readonly APP_DIR=/opt/poker-house
 readonly ENV_FILE=/etc/poker-house/db.env
+readonly AUTH_ENV_FILE=/etc/poker-house/auth.env
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/opt/node/bin:$PATH"
@@ -27,6 +28,12 @@ if [[ ! -f $ENV_FILE ]]; then
   printf 'DATABASE_URL=postgresql://poker_house:%s@localhost/poker_house\n' "$password" >"$ENV_FILE"
   chmod 600 "$ENV_FILE"
 fi
+if [[ ! -f $AUTH_ENV_FILE ]]; then
+  printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
+  chmod 600 "$AUTH_ENV_FILE"
+fi
+sed -i '/^BETTER_AUTH_URL=/d; /^POKER_HOUSE_PLAYERS=/d' "$AUTH_ENV_FILE"
+printf 'BETTER_AUTH_URL=%s\nPOKER_HOUSE_PLAYERS=%s\n' "$SITE_URL" "$PLAYERS" >>"$AUTH_ENV_FILE"
 password=$(sed -n 's|^DATABASE_URL=postgresql://poker_house:\([^@]*\)@.*|\1|p' "$ENV_FILE")
 cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/poker-house.conf" <<CONF
 shared_buffers = 512MB
@@ -68,6 +75,7 @@ as_app uv sync -q --frozen --package poker-house-server
 as_app pnpm install --frozen-lockfile --silent
 as_app pnpm build >/dev/null
 psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
+(set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$APP_DIR/apps/auth" && as_app node migrate.ts)
 
 allow_hosts=()
 for host in "${HOSTS[@]}"; do
@@ -88,13 +96,31 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 UNIT
-systemctl daemon-reload
-systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service
-systemctl restart poker-house.service
+cat >/etc/systemd/system/poker-house-auth.service <<UNIT
+[Unit]
+Description=Poker House sign-in
+After=network-online.target postgresql.service
 
-for _ in $(seq 1 30); do
-  curl -fsS -o /dev/null http://127.0.0.1:8787/ && break
-  sleep 1
+[Service]
+User=$APP_USER
+WorkingDirectory=$APP_DIR/apps/auth
+EnvironmentFile=$ENV_FILE
+EnvironmentFile=$AUTH_ENV_FILE
+ExecStart=/opt/node/bin/node server.ts
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable -q "postgresql@$PG_MAJOR-main.service" poker-house.service poker-house-auth.service
+systemctl restart poker-house.service poker-house-auth.service
+
+for url in http://127.0.0.1:8787/ http://127.0.0.1:8788/api/auth/ok; do
+  for _ in $(seq 1 30); do
+    curl -fsS -o /dev/null "$url" && break
+    sleep 1
+  done
+  curl -fsS -o /dev/null "$url"
 done
-curl -fsS -o /dev/null http://127.0.0.1:8787/
-echo "Poker House $COMMIT is serving on port 8787 with Postgres $PG_MAJOR."
+echo "Poker House $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."

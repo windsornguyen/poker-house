@@ -1,5 +1,8 @@
 create schema if not exists poker;
 
+-- Better Auth owns the tables here (apps/auth/migrate.ts).
+create schema if not exists auth;
+
 create table if not exists poker.session (
     id text primary key check (id ~ '^[0-9a-f]{16}$'),
     game text not null,
