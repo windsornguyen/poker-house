@@ -145,7 +145,7 @@ function Page({
           <div className="app__page-actions" ref={setActions} />
           <a
             className="text-sm text-muted-foreground hover:text-foreground"
-            href="/docs/"
+            href="/docs"
           >
             Docs
           </a>
