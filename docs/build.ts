@@ -30,12 +30,11 @@ await bundle({
   logLevel: 'warning',
 });
 
+// Progress goes to stdout and failures to stderr, so only failures reach the log.
 execFileSync(
   process.execPath,
   [cli, 'project', 'download-isolate', '--no-input'],
-  {
-    stdio: 'inherit',
-  },
+  {stdio: ['ignore', 'ignore', 'inherit']},
 );
 
 // The renderer resolves its bundled packages from ancestors of the build directory.
@@ -53,9 +52,9 @@ try {
       registryBaseUrl: 'https://registry.scalar.com',
       token: '',
       previewServerPort: 7970,
-      logLevel: 'warn',
+      logLevel: 'info',
     }),
-    stdio: ['pipe', 'inherit', 'inherit'],
+    stdio: ['pipe', 'ignore', 'inherit'],
   });
   rmSync(output, {recursive: true, force: true});
   cpSync(join(build, 'dist'), output, {recursive: true});
