@@ -80,8 +80,10 @@ def play_room(tight: Seat, odds: Seat, hands: int, log: pathlib.Path) -> None:
             break
         dealt = tight.player.deal(code, dealt.session.id)
 
+    # A player who busted has no seat left to leave.
     for seat in (tight, odds):
-        seat.player.leave(code)
+        if seat.player.room(code).stack is not None:
+            seat.player.leave(code)
 
 
 def play_out(seats: Sequence[Seat], hand: str, seed: int, log: pathlib.Path) -> list[float]:
