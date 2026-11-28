@@ -15,4 +15,5 @@
 | `CLOUDFLARE_ACCOUNT_ID` | the `windsor` account |
 | `DEDALUS_API_KEY` | deploys the Machine |
 | `DOGGYBANK_MACHINE_ID` | the Machine that serves doggybank.io |
+| `DOGGYBANK_DEPLOY_KEY` | an internal account's API key, which resets the bots' chips before they play |
 | `DOGGYBANK_BOT_ACCOUNTS` | the two test bots' API keys, as `{"tight": {"key": ...}, "pot_odds": {"key": ...}}` |

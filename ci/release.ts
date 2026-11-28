@@ -156,6 +156,24 @@ export const release = workflow({
             'https://docs.doggybank.io/',
           ),
         },
+        // Every run starts its bots at the same balance, so losses never pile up into a red deploy.
+        {
+          name: 'Reset the bots',
+          env: {DOGGYBANK_DEPLOY_KEY: secret('DOGGYBANK_DEPLOY_KEY')},
+          run: run(
+            'uv',
+            'run',
+            '--package',
+            'doggybank-players',
+            'python',
+            '-m',
+            'doggybank_players.reset',
+            '--site',
+            site,
+            'tight@test.poker.invalid',
+            'pot-odds@test.poker.invalid',
+          ),
+        },
         {
           name: 'Play two hands',
           env: {DOGGYBANK_BOT_ACCOUNTS: secret('DOGGYBANK_BOT_ACCOUNTS')},

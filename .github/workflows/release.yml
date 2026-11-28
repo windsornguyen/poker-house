@@ -94,6 +94,11 @@ jobs:
       - name: Smoke the docs
         run: curl -fsS -o /dev/null https://docs.doggybank.io/
         shell: bash
+      - name: Reset the bots
+        env:
+          DOGGYBANK_DEPLOY_KEY: ${{ secrets.DOGGYBANK_DEPLOY_KEY }}
+        run: uv run --package doggybank-players python -m doggybank_players.reset --site https://doggybank.io tight@test.poker.invalid pot-odds@test.poker.invalid
+        shell: bash
       - name: Play two hands
         env:
           DOGGYBANK_BOT_ACCOUNTS: ${{ secrets.DOGGYBANK_BOT_ACCOUNTS }}
