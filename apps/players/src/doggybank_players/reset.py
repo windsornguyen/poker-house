@@ -20,13 +20,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("emails", nargs="+")
     args = parser.parse_args(argv)
 
-    admin = httpx.Client(
-        base_url=args.site, headers={"x-api-key": os.environ["DOGGYBANK_DEPLOY_KEY"]}, timeout=60
-    )
-    for email in args.emails:
-        admin.post(
-            "/api/admin/balances", json={"email": email, "balance": BALANCE}
-        ).raise_for_status()
+    key = os.environ["DOGGYBANK_DEPLOY_KEY"]
+    with httpx.Client(base_url=args.site, headers={"x-api-key": key}, timeout=60) as admin:
+        for email in args.emails:
+            body = {"email": email, "balance": BALANCE}
+            admin.post("/api/admin/balances", json=body).raise_for_status()
 
 
 if __name__ == "__main__":
