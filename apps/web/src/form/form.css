@@ -47,28 +47,6 @@
   color: var(--color-danger);
 }
 
-/* A text box, number box, list or text area in any form. */
-.control {
-  min-height: 28px;
-  padding: 0 6px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-}
-
-.control[aria-invalid='true'] {
-  border-color: var(--color-danger);
-}
-
-.field-form__field .control {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-
 .field-form__check {
   justify-self: start;
   margin: 0;

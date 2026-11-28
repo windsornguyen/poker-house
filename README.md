@@ -1,7 +1,10 @@
 # Doggybank
 
 <div align="center">
-  <img src="docs/doggybank.webp" alt="A long dachshund carrying stacks of poker chips and a fanned hand of cards on its back" width="720">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-wordmark-dark.svg">
+    <img src="assets/logo-wordmark.svg" alt="Doggybank" width="380">
+  </picture>
 </div>
 
 WELCOME TO DOGGYBANK.

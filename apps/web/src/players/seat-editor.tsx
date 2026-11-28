@@ -15,6 +15,9 @@
 import type {JSX} from 'react';
 import {useId} from 'react';
 
+import {NativeSelect, NativeSelectOption} from '@/components/ui/native-select';
+import {Textarea} from '@/components/ui/textarea';
+
 import type {Controller} from '../contract/contract.ts';
 import {FieldForm} from '../form/field-form.tsx';
 import type {SeatDraft, SettingsErrors} from './seat-draft.ts';
@@ -65,9 +68,9 @@ export function SeatEditor({
           Controller
         </label>
         <div className="seat-editor__controller-row">
-          <select
+          <NativeSelect
             id={`${id}-controller`}
-            className="control"
+            className="flex-1"
             value={draft.controller}
             disabled={busy}
             onChange={event => {
@@ -75,7 +78,7 @@ export function SeatEditor({
             }}
           >
             {controllers.map(option => (
-              <option
+              <NativeSelectOption
                 key={option.name}
                 value={option.name}
                 title={option.unavailable_reason ?? undefined}
@@ -83,9 +86,9 @@ export function SeatEditor({
                 {option.unavailable_reason === null
                   ? option.label
                   : `${option.label} — not available here`}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
           {draft.controller !== HUMAN && (
             <label
               className="seat-editor__autoplay"
@@ -153,9 +156,8 @@ function SettingsEditor({
   return (
     <div className="seat-editor__json">
       <label htmlFor={id}>Configuration (JSON)</label>
-      <textarea
+      <Textarea
         id={id}
-        className="control"
         value={settings.text}
         spellCheck={false}
         aria-invalid={error !== null}

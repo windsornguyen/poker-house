@@ -37,20 +37,8 @@
 .view-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 13px;
-}
-
-.view-field__select {
-  min-width: 0;
-  max-width: 100%;
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
 }
 
 .view-note {

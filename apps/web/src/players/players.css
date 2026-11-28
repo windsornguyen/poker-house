@@ -236,7 +236,7 @@
   min-width: 0;
 }
 
-.seat-editor__controller-row > select {
+.seat-editor__controller-row > [data-slot='native-select-wrapper'] {
   flex: 1 1 140px;
   min-width: 0;
 }

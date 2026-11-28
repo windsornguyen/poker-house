@@ -38,6 +38,14 @@ export default defineConfig({
     thirdPartyNotices(),
   ],
   resolve: {tsconfigPaths: true},
+  optimizeDeps: {
+    include: [
+      '@better-auth-ui/core',
+      '@tanstack/react-query',
+      'better-auth/react',
+      'react-router',
+    ],
+  },
   server: {
     proxy: {
       '/api': {target: WORKER, changeOrigin: false},

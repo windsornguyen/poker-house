@@ -14,6 +14,8 @@
 
 import {type JSX, useId} from 'react';
 
+import {NativeSelect, NativeSelectOption} from '@/components/ui/native-select';
+
 import type {Viewer} from '../contract/contract.ts';
 import {
   perspectiveLock,
@@ -74,9 +76,8 @@ export function Perspective({viewer, numSeats}: PerspectiveProps): JSX.Element {
         <>
           <div className="view-field">
             <label htmlFor={id}>Perspective</label>
-            <select
+            <NativeSelect
               id={id}
-              className="view-field__select"
               data-testid="perspective-select"
               value={value}
               disabled={options.length === 0}
@@ -90,15 +91,15 @@ export function Perspective({viewer, numSeats}: PerspectiveProps): JSX.Element {
                 setAnalysisViewSeat(seat);
               }}
             >
-              <option value="" disabled>
+              <NativeSelectOption value="" disabled>
                 Select a seat
-              </option>
+              </NativeSelectOption>
               {options.map(option => (
-                <option key={option.value} value={option.value}>
+                <NativeSelectOption key={option.value} value={option.value}>
                   {option.label}
-                </option>
+                </NativeSelectOption>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           {options.length === 0 && (
             <p className="view-note">
