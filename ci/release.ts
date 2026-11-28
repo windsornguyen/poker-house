@@ -82,6 +82,11 @@ const cloudflare = {
   CLOUDFLARE_ACCOUNT_ID: secret('CLOUDFLARE_ACCOUNT_ID'),
 };
 
+const machine = {
+  DEDALUS_API_KEY: secret('DEDALUS_API_KEY'),
+  DOGGYBANK_MACHINE_ID: secret('DOGGYBANK_MACHINE_ID'),
+};
+
 /** Verifies every push and pull request, and deploys main: the Machine, the site, the docs. */
 export const release = workflow({
   name: 'Release',
@@ -109,12 +114,9 @@ export const release = workflow({
         // The server goes first: the page ignores fields it does not know, so a newer
         // server never breaks an older page.
         {
+          id: 'switch',
           name: 'Deploy the Machine',
-          env: {
-            DEDALUS_API_KEY: secret('DEDALUS_API_KEY'),
-            DOGGYBANK_MACHINE_ID: secret('DOGGYBANK_MACHINE_ID'),
-            DOGGYBANK_SITE_URL: site,
-          },
+          env: {...machine, DOGGYBANK_SITE_URL: site},
           run: run('node', 'apps/server/deploy/provision.ts'),
         },
         {name: 'Build the site', run: web('build')},
@@ -201,6 +203,20 @@ export const release = workflow({
               'DOGGYBANK_ACCOUNTS="$RUNNER_TEMP/accounts.json" uv run --package doggybank-players ' +
               `python -m doggybank_players.match --site ${site} --room-hands 2 --log "$RUNNER_TEMP/hands.jsonl"`,
           ),
+        },
+        {
+          name: 'Retire the old color',
+          env: machine,
+          run: run('node', 'apps/server/deploy/provision.ts', 'retire'),
+        },
+        {
+          name: 'Roll back',
+          if: and(
+            failure(),
+            eq(expr<string>('steps.switch.outcome'), 'success'),
+          ),
+          env: machine,
+          run: run('node', 'apps/server/deploy/provision.ts', 'rollback'),
         },
       ],
     }),

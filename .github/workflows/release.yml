@@ -60,7 +60,8 @@ jobs:
         shell: bash
       - run: uv sync --frozen --all-packages --group check --group test
         shell: bash
-      - name: Deploy the Machine
+      - id: switch
+        name: Deploy the Machine
         env:
           DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
           DOGGYBANK_MACHINE_ID: ${{ secrets.DOGGYBANK_MACHINE_ID }}
@@ -111,3 +112,16 @@ jobs:
         env:
           DOGGYBANK_BOT_ACCOUNTS: ${{ secrets.DOGGYBANK_BOT_ACCOUNTS }}
         run: printf %s "$DOGGYBANK_BOT_ACCOUNTS" > "$RUNNER_TEMP/accounts.json" && DOGGYBANK_ACCOUNTS="$RUNNER_TEMP/accounts.json" uv run --package doggybank-players python -m doggybank_players.match --site https://doggybank.io --room-hands 2 --log "$RUNNER_TEMP/hands.jsonl"
+      - name: Retire the old color
+        env:
+          DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
+          DOGGYBANK_MACHINE_ID: ${{ secrets.DOGGYBANK_MACHINE_ID }}
+        run: node apps/server/deploy/provision.ts retire
+        shell: bash
+      - name: Roll back
+        if: ${{ failure() && steps.switch.outcome == 'success' }}
+        env:
+          DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
+          DOGGYBANK_MACHINE_ID: ${{ secrets.DOGGYBANK_MACHINE_ID }}
+        run: node apps/server/deploy/provision.ts rollback
+        shell: bash
