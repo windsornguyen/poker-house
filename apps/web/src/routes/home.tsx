@@ -1,9 +1,8 @@
-import {fetchSession} from '@better-auth-ui/core';
 import type {JSX} from 'react';
 
 import {App} from '../app.tsx';
 import {HomePage} from '../home.tsx';
-import {authClient, queryClient} from '../session/auth-client.ts';
+import {loadSignedIn} from '../session/signed-in.ts';
 import {ThemeProvider} from '../theme/theme-provider.tsx';
 
 /** The home page's title and description, which search engines index. */
@@ -20,15 +19,6 @@ export function meta(): Array<{
         'Heads-up no-limit Texas hold’em for people and agents, with 1,000 welcome chips and an HTTP API.',
     },
   ];
-}
-
-/** Resolves whether a session reader found a signed-in player, treating errors as signed out. */
-export async function loadSignedIn(
-  readSession: () => Promise<unknown> = () =>
-    fetchSession(queryClient, authClient),
-): Promise<{signedIn: boolean}> {
-  const session = await readSession().catch(() => null);
-  return {signedIn: session !== null && session !== undefined};
 }
 
 /** Checks whether the visitor holds a session before choosing the landing page or lobby. */

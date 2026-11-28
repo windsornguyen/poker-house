@@ -16,7 +16,8 @@ import {MemoryRouter} from 'react-router';
 import {afterEach, beforeEach, describe, expect, it} from 'vite-plus/test';
 
 import {AGENT_TURN_SNIPPET, HomePage} from './home.tsx';
-import Home, {loadSignedIn} from './routes/home.tsx';
+import Home from './routes/home.tsx';
+import {loadSignedIn} from './session/signed-in.ts';
 import {fakeColorScheme} from './testing/color-scheme.ts';
 import {type Rendered, render} from './testing/render.tsx';
 
