@@ -207,6 +207,11 @@ describe('App, its header', () => {
       ['SPAN', '•', 'true'],
       ['H1', 'Heads-up Hold’em', null],
     ]);
+    expect(
+      brand
+        ?.querySelector('.app__home svg.app__logo')
+        ?.getAttribute('aria-hidden'),
+    ).toBe('true');
   });
 });
 

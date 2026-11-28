@@ -62,6 +62,17 @@
   /* The shadow that lifts a notice off the board under it. */
   --color-shadow: rgb(0 0 0 / 0.22);
 
+  /* The Doggybank dachshund mark: its coat, ear, collar, and slotted chip. */
+  --logo-coat: #b86430;
+  --logo-ear: #703318;
+  --logo-brow: #eba970;
+  --logo-nose: #4a1d0d;
+  --logo-eye: #261006;
+  --logo-collar: #7d191d;
+  --logo-chip: #de3b2a;
+  --logo-chip-ring: #7d191d;
+  --logo-chip-inlay: #fdf8f3;
+
   /*
     Cards: the face and the suits drawn on it (the back is the card
     library's, below). A card is drawn the same in both themes.

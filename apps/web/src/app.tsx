@@ -22,6 +22,7 @@ import {SettingsMenu} from './controls/settings-menu.tsx';
 import {HeaderActionsContext} from './app/header-actions.ts';
 import {GamePage} from './game/game-page.tsx';
 import {PokerLobby} from './lobby.tsx';
+import {LogoMark} from './logo.tsx';
 import {SessionClient} from './session/client.ts';
 
 import './app.css';
@@ -134,6 +135,7 @@ function Page({
       <header className="app__header">
         <div className="app__brand">
           <a className="app__home" href="/">
+            <LogoMark className="app__logo" />
             Doggybank
           </a>
           <span className="app__separator" aria-hidden="true">
