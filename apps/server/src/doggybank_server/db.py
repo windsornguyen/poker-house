@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 
 import psycopg
 import pydantic
+from absl import logging
 from psycopg.types.json import Jsonb
 
 from doggybank_server import contract, controllers, errors, plies
@@ -91,7 +92,11 @@ class Database:
                     if notice.pid != own_pid:
                         on_hand(notice.payload)
             except psycopg.OperationalError, psycopg.InterfaceError:
-                return
+                if listener.closed:
+                    return
+                # Without its listener, this process would keep serving hands other
+                # processes change, with stale streams. Stop, so systemd restarts it.
+                logging.fatal("The poker_hand listener lost its connection.")
 
         threading.Thread(target=watch, name="poker-hand-listen", daemon=True).start()
 

@@ -237,6 +237,7 @@ rm -f "$ARCHIVE"
 
 db_url=$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")
 psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/server/schema.sql"
+# shellcheck source=/dev/null
 (set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$release_dir/apps/auth" && as_app node migrate.ts)
 psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/auth/players.sql"
 
