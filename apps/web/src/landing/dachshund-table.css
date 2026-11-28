@@ -1,0 +1,38 @@
+/* The dachshund table: the drawing on top, and room below it for the floor the chips land on. */
+.dachshund {
+  position: relative;
+  width: min(100%, 720px);
+  margin: 0;
+  overflow: visible;
+  user-select: none;
+}
+
+.dachshund__dog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.dachshund__chips {
+  position: absolute;
+  inset: 0;
+  perspective: 900px;
+  pointer-events: none;
+}
+
+.dachshund__chip {
+  position: absolute;
+  height: auto;
+  transform: translate(-50%, -50%);
+  transform-origin: 0 0;
+  backface-visibility: visible;
+  will-change: transform;
+  transition: opacity 200ms ease;
+}
+
+.dachshund__chips[data-fading] .dachshund__chip {
+  opacity: 0;
+}
