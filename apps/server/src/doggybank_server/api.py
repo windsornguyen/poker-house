@@ -14,29 +14,44 @@
 # Modified for Doggybank.
 
 
-"""The JSON API: the contract's routes, independent of the HTTP transport.
+"""The JSON API: the contract's routes, one typed function each.
 
-`Api.handle` takes a request's method, target and body and returns the
-response's status and JSON body. CONTRACT.md specifies every route and its
-errors.
+CONTRACT.md specifies every route and its errors. Each route makes one call on
+a session, and a session serializes its calls under its own lock, so calls
+that concern one session are serialized and calls that concern different
+sessions run concurrently. Routes and dependencies that touch a session or the
+database are plain functions, which FastAPI runs on its thread pool; the rest
+are coroutines, which never block the event loop.
 """
 
 import dataclasses
 import hashlib
 import hmac
-import http
+import json
+import math
 import re
-import urllib.parse
-from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeVar
+import time
+from collections.abc import AsyncIterator, Callable, Iterator
+from typing import Annotated
 
-import pydantic
+import anyio
+import fastapi
+from fastapi import Depends, Header, Path, Query
+from fastapi.security import APIKeyHeader
+from sse_starlette import EventSourceResponse, ServerSentEvent
 
-if TYPE_CHECKING:
-    from _typeshed import DataclassInstance
-
-from doggybank_server import accounts, contract, controllers, errors, moves, request, store
+from doggybank_server import (
+    accounts,
+    contract,
+    controllers,
+    errors,
+    moves,
+    request,
+    store,
+    timeouts,
+)
 from doggybank_server import catalogue as catalogue_lib
+from doggybank_server import frame as frame_lib
 from doggybank_server import health as health_lib
 from doggybank_server import ledger as ledger_lib
 from doggybank_server import rooms as rooms_lib
@@ -45,12 +60,30 @@ from doggybank_server import session as session_lib
 # The path prefix of every API route.
 PREFIX = "/api/"
 
-_T = TypeVar("_T")
-
 # The header the Worker names the signed-in account in, signed with the player key.
 PLAYER_HEADER = "X-Poker-Player"
 ADMIN_KIND = "internal"
 PLAYER_KEY_ENV = "DOGGYBANK_PLAYER_KEY"
+
+_NON_NEGATIVE_INTEGER = re.compile(r"0|[1-9][0-9]*")
+
+# Seconds between keepalive comments on an idle event stream, under the
+# idle timeouts of the proxies in front of a deployed server.
+KEEPALIVE_SECONDS = 15.0
+
+# Each event stream holds a thread while it waits for a change. Its own
+# unbounded limiter keeps open streams from taking the threads the routes run on.
+_STREAMS = anyio.CapacityLimiter(math.inf)
+
+# Players reach the API through the Worker, which takes their key and names
+# them in `PLAYER_HEADER`. The server never reads the key; the scheme documents it.
+API_KEY = APIKeyHeader(name="x-api-key", scheme_name="apiKey", auto_error=False)
+
+router = fastapi.APIRouter(
+    prefix=PREFIX.rstrip("/"),
+    dependencies=[fastapi.Security(API_KEY)],
+    responses={"default": {"model": errors.Error, "description": "A refusal"}},
+)
 
 
 def signed_player(player: str, key: str) -> str:
@@ -59,93 +92,108 @@ def signed_player(player: str, key: str) -> str:
     return f"{player}.{digest}"
 
 
-_NON_NEGATIVE_INTEGER = re.compile(r"0|[1-9][0-9]*")
-
-_EVENTS = re.compile(PREFIX + r"sessions/(?P<id>[^/]+)/events")
-
-
 @dataclasses.dataclass(frozen=True)
-class Response:
-    """An API response.
+class Arena:
+    """What the routes serve.
 
     Attributes:
-      status: The HTTP status.
-      body: A contract object in its wire form.
+      sessions: Holds the sessions the API creates and serves.
+      catalogue: Returns the catalogue of every game.
+      health: Returns the server's health report.
+      player_key: The key the Worker signs the player header with.
     """
 
-    status: http.HTTPStatus
-    body: contract.JsonValue
+    sessions: store.SessionStore
+    catalogue: Callable[[], catalogue_lib.Catalogue]
+    health: Callable[[], health_lib.Health]
+    player_key: str
 
 
-def ok(value: DataclassInstance) -> Response:
-    """Answers with a contract object."""
-    return Response(http.HTTPStatus.OK, contract.to_json(value))
+async def find_arena(req: fastapi.Request) -> Arena:
+    """The arena the app serves."""
+    return req.app.state.arena
 
 
-def refusal(error: errors.Error) -> Response:
-    """Answers with an error body and its status."""
-    return Response(error.code.http_status, contract.to_json(error))
+ArenaDep = Annotated[Arena, Depends(find_arena)]
+
+
+async def identify(
+    arena: ArenaDep,
+    header: Annotated[str | None, Header(alias=PLAYER_HEADER, include_in_schema=False)] = None,
+) -> str | None:
+    """The account a signed player header names, or None for any other."""
+    if header is None:
+        return None
+
+    player, _, _ = header.rpartition(".")
+    if not player or not hmac.compare_digest(header, signed_player(player, arena.player_key)):
+        return None
+    return player
+
+
+async def require_player(player: Annotated[str | None, Depends(identify)]) -> str:
+    """The account the Worker vouches for.
+
+    Raises:
+      UnauthorizedError: If the request names no signed-in player.
+    """
+    if not player:
+        raise errors.UnauthorizedError("Sign in to play.")
+    return player
+
+
+Player = Annotated[str, Depends(require_player)]
+
+
+async def parse_viewer(
+    viewer: Annotated[str, Query(description="Your seat's index, the one the room seated you at.")],
+) -> contract.Viewer:
+    """The viewer the `viewer` query parameter names."""
+    if viewer == contract.ViewerKind.ORACLE:
+        return contract.Viewer(contract.ViewerKind.ORACLE)
+    if viewer == contract.ViewerKind.SPECTATOR:
+        return contract.Viewer(contract.ViewerKind.SPECTATOR)
+    if _NON_NEGATIVE_INTEGER.fullmatch(viewer):
+        return contract.Viewer(contract.ViewerKind.SEAT, int(viewer))
+    raise errors.BadRequestError(f"Viewer {viewer!r} is not oracle, spectator or a seat index.")
+
+
+Viewer = Annotated[contract.Viewer, Depends(parse_viewer)]
+SessionId = Annotated[str, Path(alias="id")]
+Index = Annotated[int, Path(ge=0)]
 
 
 @dataclasses.dataclass(frozen=True)
-class _Request:
-    """A request, with the path parameters its route matched."""
+class Seated:
+    """A session, and the viewer the request's player may take there."""
 
-    query: dict[str, list[str]]
-    body: bytes
-    path: dict[str, str]
-    player: str | None
+    session: session_lib.Session
+    viewer: contract.Viewer
 
-    @property
-    def session_id(self) -> str:
-        """The session the request concerns."""
-        return self.path["id"]
 
-    def room_code(self) -> str:
-        """The room code the path names, as players type it in either case."""
-        return self.path["code"].upper()
+def seat_player(arena: ArenaDep, session_id: SessionId, viewer: Viewer, player: Player) -> Seated:
+    """The session the request concerns, and the viewer its player may take there."""
+    session = arena.sessions.get(session_id)
+    session.authorize(viewer, player)
+    return Seated(session, viewer)
 
-    def viewer(self) -> contract.Viewer:
-        """Returns the viewer named by the `viewer` query parameter."""
-        values = self.query.get("viewer", [])
-        if len(values) != 1:
-            raise errors.BadRequestError(
-                "Name one viewer: viewer=oracle, viewer=spectator or viewer=<seat>."
-            )
-        value = values[0]
-        if value == contract.ViewerKind.ORACLE:
-            return contract.Viewer(contract.ViewerKind.ORACLE)
-        if value == contract.ViewerKind.SPECTATOR:
-            return contract.Viewer(contract.ViewerKind.SPECTATOR)
-        if _NON_NEGATIVE_INTEGER.fullmatch(value):
-            return contract.Viewer(contract.ViewerKind.SEAT, int(value))
-        raise errors.BadRequestError(f"Viewer {value!r} is not oracle, spectator or a seat index.")
 
-    def signed_in(self) -> str:
-        """The account the Worker vouches for.
+SeatedView = Annotated[Seated, Depends(seat_player)]
 
-        Raises:
-          UnauthorizedError: If the request names no signed-in player.
-        """
-        if not self.player:
-            raise errors.UnauthorizedError("Sign in to play.")
-        return self.player
 
-    def index(self, name: str) -> int:
-        """Returns the path parameter `name`, a non-negative integer."""
-        value = self.path[name]
-        if not _NON_NEGATIVE_INTEGER.fullmatch(value):
-            raise errors.BadRequestError(f"The {name} {value!r} is not a non-negative integer.")
-        return int(value)
+def admin(arena: ArenaDep, player: Player) -> ledger_lib.Ledger:
+    """The ledger, for a player whose listing is internal.
 
-    def decode(self, cls: type[_T]) -> _T:
-        """Returns the body decoded as the request type `cls`."""
-        try:
-            return contract.adapter(cls).validate_json(self.body, strict=True)
-        except pydantic.ValidationError as e:
-            first = e.errors()[0]
-            where = ".".join(str(part) for part in first["loc"]) or "body"
-            raise errors.BadRequestError(f"{where}: {first['msg']}.") from e
+    Raises:
+      errors.ForbiddenError: If the player's listing is not internal.
+    """
+    chips = arena.sessions.ledger()
+    if chips.kind(player) != ADMIN_KIND:
+        raise errors.ForbiddenError("Only an internal account may manage chips.")
+    return chips
+
+
+Admin = Annotated[ledger_lib.Ledger, Depends(admin)]
 
 
 def seat_view(seat: int | None) -> contract.Viewer:
@@ -160,319 +208,222 @@ def spec(seat: request.SeatConfig) -> controllers.Spec:
     return controllers.Spec(seat.controller, seat.config)
 
 
-_Handler = Callable[["Api", _Request], Response]
-_Route = tuple[str, re.Pattern[str], _Handler]
-
-
-def route(method: str, path: str, handler: _Handler) -> _Route:
-    """Compiles a route under `PREFIX`; `{name}` matches one path segment."""
-    pattern = re.sub(r"{(\w+)}", r"(?P<\1>[^/]+)", PREFIX + path)
-    return method, re.compile(pattern), handler
-
-
-class Api:
-    """Answers the contract's routes.
-
-    Safe to call from several threads. Each route makes one call on a session,
-    and a session serializes its calls under its own lock, so calls that
-    concern one session are serialized and calls that concern different
-    sessions run concurrently.
-    """
-
-    def __init__(
-        self,
-        sessions: store.SessionStore,
-        *,
-        catalogue: Callable[[], catalogue_lib.Catalogue],
-        health: Callable[[], health_lib.Health],
-        player_key: str,
-    ) -> None:
-        """Initializes the API.
-
-        Args:
-          sessions: Holds the sessions the API creates and serves.
-          catalogue: Returns the catalogue of every game.
-          health: Returns the server's health report.
-          player_key: The key the Worker signs the player header with.
-        """
-        self._sessions = sessions
-        self._player_key = player_key
-        self._catalogue_of = catalogue
-        self._health_of = health
-
-    def problem(self) -> str | None:
-        """Returns why the API cannot serve sessions, or None when it can."""
-        return self._sessions.problem()
-
-    def identify(self, header: str | None) -> str | None:
-        """Returns the account a signed player header names, or None for any other."""
-        if header is None:
-            return None
-
-        player, _, _ = header.rpartition(".")
-        if not player or not hmac.compare_digest(header, signed_player(player, self._player_key)):
-            return None
-        return player
-
-    def handle(
-        self, method: str, target: str, body: bytes = b"", player_header: str | None = None
-    ) -> Response:
-        """Answers one request.
-
-        Args:
-          method: The HTTP method.
-          target: The request target: an API path and its query string.
-          body: The request body.
-          player_header: The Worker's signed player header, or None.
-
-        Returns:
-          The response. A request the contract refuses (an `errors.RequestError`)
-          is answered with its error body. Any other exception is a fault, not a
-          refusal, and propagates.
-        """
-        url = urllib.parse.urlsplit(target)
-        query = urllib.parse.parse_qs(url.query, keep_blank_values=True)
-        try:
-            handler, path = self.match_route(method, url.path)
-            return handler(self, _Request(query, body, path, self.identify(player_header)))
-        except errors.RequestError as error:
-            return refusal(error.to_error())
-
-    def is_events(self, method: str, target: str) -> bool:
-        """Whether the request subscribes to a session's events."""
-        path = urllib.parse.urlsplit(target).path
-        return method == "GET" and _EVENTS.fullmatch(path) is not None
-
-    def subscribe(
-        self, target: str, player_header: str | None
-    ) -> tuple[session_lib.Session, contract.Viewer, str]:
-        """Returns the session, viewer and player an events request subscribes.
-
-        Raises:
-          errors.RequestError: If the session or viewer does not exist.
-        """
-        url = urllib.parse.urlsplit(target)
-        match = _EVENTS.fullmatch(url.path)
-        assert match is not None
-        req = _Request(
-            urllib.parse.parse_qs(url.query, keep_blank_values=True),
-            b"",
-            match.groupdict(),
-            self.identify(player_header),
-        )
-        session, viewer = self.seated(req)
-        session.frame(viewer)
-        return session, viewer, req.signed_in()
-
-    def match_route(self, method: str, path: str) -> tuple[_Handler, dict[str, str]]:
-        """Returns the handler for a request and its path parameters."""
-        methods = []
-        for route_method, pattern, handler in self._ROUTES:
-            match = pattern.fullmatch(path)
-            if match is None:
-                continue
-            if route_method == method:
-                return handler, match.groupdict()
-            methods.append(route_method)
-        if methods:
-            raise errors.MethodNotAllowedError(
-                f"{path} accepts {' and '.join(methods)}, not {method}."
-            )
-        raise errors.NotFoundError(f"There is no route {path}.")
-
-    def health(self, unused_request: _Request) -> Response:
-        """Answers with the health report."""
-        return ok(self._health_of())
-
-    def catalogue(self, unused_request: _Request) -> Response:
-        """Answers with the catalogue."""
-        return ok(self._catalogue_of())
-
-    def me(self, req: _Request) -> Response:
-        """Answers with the signed-in player's balance, kind and seats."""
-        player = req.signed_in()
-        chips = self._sessions.ledger()
-        return ok(
-            accounts.Me(
-                balance=chips.balance(player),
-                kind=chips.kind(player),
-                seats=self._sessions.rooms().seats(player),
-            )
-        )
-
-    def admin(self, req: _Request) -> ledger_lib.Ledger:
-        """The ledger, for a player whose listing is internal.
-
-        Raises:
-          errors.ForbiddenError: If the player's listing is not internal.
-        """
-        chips = self._sessions.ledger()
-        if chips.kind(req.signed_in()) != ADMIN_KIND:
-            raise errors.ForbiddenError("Only an internal account may manage chips.")
-        return chips
-
-    def list_accounts(self, req: _Request) -> Response:
-        """Answers with every account, for an admin."""
-        return ok(self.admin(req).holdings())
-
-    def grant(self, req: _Request) -> Response:
-        """Gives a player chips from the treasury, for an admin, and answers with every account."""
-        chips = self.admin(req)
-        body = req.decode(request.Grant)
-
-        chips.grant(body.email, body.amount)
-        return ok(chips.holdings())
-
-    def set_balance(self, req: _Request) -> Response:
-        """Sets a player's chips exactly, for an admin, and answers with every account."""
-        chips = self.admin(req)
-        body = req.decode(request.SetBalance)
-
-        chips.set_balance(body.email, body.balance)
-        return ok(chips.holdings())
-
-    def seated(self, req: _Request) -> tuple[session_lib.Session, contract.Viewer]:
-        """The session the request concerns, and the viewer its player may take there."""
-        viewer, player = req.viewer(), req.signed_in()
-        session = self._sessions.get(req.session_id)
-        session.authorize(viewer, player)
-        return session, viewer
-
-    def create(self, req: _Request) -> Response:
-        """Starts a session with its player seated, keeping it only if the viewer may see it."""
-        viewer, player = req.viewer(), req.signed_in()
-        body = req.decode(request.CreateSession)
-        session = self._sessions.create(
-            body.game,
-            body.parameters,
-            seed=body.seed,
-            chance_policy=body.chance_policy,
-            controllers=[spec(seat) for seat in body.seats],
-            autoplay=[seat.autoplay for seat in body.seats],
-            player=player,
-            viewer=viewer,
-        )
-        return ok(session.frame(viewer))
-
-    def join(self, req: _Request) -> Response:
-        """Sits the player at a room by its code, and answers with their view of its hand."""
-        session, seat = self._sessions.join(req.room_code(), req.signed_in())
-        return ok(session.frame(seat_view(seat)))
-
-    def room(self, req: _Request) -> Response:
-        """Answers with the room as the player sees it."""
-        player = req.signed_in()
-        return ok(self.room_view(self._sessions.rooms().find(req.room_code()), player))
-
-    def room_view(self, room: rooms_lib.Room, player: str) -> rooms_lib.RoomView:
-        """`room` as `player` sees it."""
-        holders = () if room.latest is None else self._sessions.get(room.latest).holders
-        return rooms_lib.RoomView(
-            code=room.code,
-            buy_in=room.buy_in,
-            session_id=room.latest,
-            seat=holders.index(player) if player in holders else None,
-            stack=room.stack(player),
-            stacks=tuple(seat.stack for seat in room.seated),
-        )
-
-    def deal(self, req: _Request) -> Response:
-        """Deals the room's next hand, and answers with the player's view of it."""
-        body = req.decode(request.Deal)
-        session, seat = self._sessions.deal(req.room_code(), body.after, req.signed_in())
-        return ok(session.frame(seat_view(seat)))
-
-    def leave(self, req: _Request) -> Response:
-        """Gets the player up from the room's table, and answers with the room."""
-        player = req.signed_in()
-        return ok(self.room_view(self._sessions.leave(req.room_code(), player), player))
-
-    def get_frame(self, req: _Request) -> Response:
-        """Answers with the live position."""
-        session, viewer = self.seated(req)
-        return ok(session.frame(viewer))
-
-    def replay(self, req: _Request) -> Response:
-        """Answers with an earlier position."""
-        session, viewer = self.seated(req)
-        return ok(session.replay_frame(viewer, req.index("ply")))
-
-    def action(self, req: _Request) -> Response:
-        """Plays a seat's action."""
-        session, viewer = self.seated(req)
-        body = req.decode(request.ApplyAction)
-        return ok(session.apply_action(viewer, body.action, ply=body.ply))
-
-    def move(self, req: _Request) -> Response:
-        """Plays a move named by its kind and amount, resolved to its action id."""
-        session, viewer = self.seated(req)
-        body = req.decode(request.PlayMove)
-
-        action = moves.resolve(session.frame(viewer).observation_struct, body)
-        return ok(session.apply_action(viewer, action))
-
-    def turn(self, req: _Request) -> Response:
-        """Answers with the seat's turn: its cards, the pot, the price and its legal moves."""
-        session, viewer = self.seated(req)
-        return ok(moves.turn_of(session.frame(viewer).observation_struct))
-
-    def chance(self, req: _Request) -> Response:
-        """Chooses a chance outcome."""
-        session, viewer = self.seated(req)
-        body = req.decode(request.ApplyChanceOutcome)
-        return ok(session.apply_chance(viewer, body.outcome, ply=body.ply))
-
-    def advance(self, req: _Request) -> Response:
-        """Lets controllers play, at most `request.MAX_ADVANCE_PLIES` actions."""
-        session, viewer = self.seated(req)
-        body = req.decode(request.Advance)
-        return ok(session.advance(viewer, max_plies=body.limit))
-
-    def undo(self, req: _Request) -> Response:
-        """Undoes the latest choice of a seat."""
-        session, viewer = self.seated(req)
-        return ok(session.undo(viewer))
-
-    def reset(self, req: _Request) -> Response:
-        """Restarts the game."""
-        session, viewer = self.seated(req)
-        body = req.decode(request.Reset)
-        return ok(session.reset(viewer, history=body.history or ()))
-
-    def close(self, req: _Request) -> Response:
-        """Forgets a session; any viewer but a spectator closes it."""
-        session, viewer = self.seated(req)
-        session.check_closer(viewer)
-        self._sessions.delete(req.session_id)
-        return ok(contract.SessionClosed(id=req.session_id))
-
-    def set_seat(self, req: _Request) -> Response:
-        """Changes a seat's controller."""
-        session, viewer = self.seated(req)
-        seat, body = req.index("seat"), req.decode(request.SeatConfig)
-        return ok(session.set_controller(viewer, seat, spec(body), autoplay=body.autoplay))
-
-    _ROUTES: tuple[_Route, ...] = (
-        route("GET", "health", health),
-        route("GET", "games", catalogue),
-        route("GET", "me", me),
-        route("GET", "admin/accounts", list_accounts),
-        route("POST", "admin/grants", grant),
-        route("POST", "admin/balances", set_balance),
-        route("POST", "sessions", create),
-        route("GET", "rooms/{code}", room),
-        route("POST", "rooms/{code}/join", join),
-        route("POST", "rooms/{code}/deal", deal),
-        route("POST", "rooms/{code}/leave", leave),
-        route("GET", "sessions/{id}", get_frame),
-        route("DELETE", "sessions/{id}", close),
-        route("GET", "sessions/{id}/plies/{ply}", replay),
-        route("POST", "sessions/{id}/actions", action),
-        route("GET", "sessions/{id}/turn", turn),
-        route("POST", "sessions/{id}/moves", move),
-        route("POST", "sessions/{id}/chance", chance),
-        route("POST", "sessions/{id}/advance", advance),
-        route("POST", "sessions/{id}/undo", undo),
-        route("POST", "sessions/{id}/reset", reset),
-        route("PUT", "sessions/{id}/seats/{seat}", set_seat),
+def room_view(arena: Arena, room: rooms_lib.Room, player: str) -> rooms_lib.RoomView:
+    """`room` as `player` sees it."""
+    holders = () if room.latest is None else arena.sessions.get(room.latest).holders
+    return rooms_lib.RoomView(
+        code=room.code,
+        buy_in=room.buy_in,
+        session_id=room.latest,
+        seat=holders.index(player) if player in holders else None,
+        stack=room.stack(player),
+        stacks=tuple(seat.stack for seat in room.seated),
     )
+
+
+@router.get("/health", include_in_schema=False)
+def health(arena: ArenaDep) -> health_lib.Health:
+    """Answers with the health report."""
+    return arena.health()
+
+
+@router.get("/games", include_in_schema=False)
+def games(arena: ArenaDep) -> catalogue_lib.Catalogue:
+    """Answers with the catalogue."""
+    return arena.catalogue()
+
+
+@router.get("/me", summary="Your chips and open tables")
+def get_me(arena: ArenaDep, player: Player) -> accounts.Me:
+    """Answers with the signed-in player's balance, kind and seats."""
+    chips = arena.sessions.ledger()
+    return accounts.Me(
+        balance=chips.balance(player),
+        kind=chips.kind(player),
+        seats=arena.sessions.rooms().seats(player),
+    )
+
+
+@router.get("/admin/accounts", include_in_schema=False)
+def list_accounts(chips: Admin) -> accounts.Accounts:
+    """Answers with every account, for an admin."""
+    return chips.holdings()
+
+
+@router.post("/admin/grants", include_in_schema=False)
+def grant(chips: Admin, body: request.Grant) -> accounts.Accounts:
+    """Gives a player chips from the treasury, for an admin, and answers with every account."""
+    chips.grant(body.email, body.amount)
+    return chips.holdings()
+
+
+@router.post("/admin/balances", include_in_schema=False)
+def set_balance(chips: Admin, body: request.SetBalance) -> accounts.Accounts:
+    """Sets a player's chips exactly, for an admin, and answers with every account."""
+    chips.set_balance(body.email, body.balance)
+    return chips.holdings()
+
+
+@router.post("/sessions", summary="Open a table and take a seat")
+def create_room(
+    arena: ArenaDep, viewer: Viewer, player: Player, body: request.CreateSession
+) -> frame_lib.Frame:
+    """Starts a session with its player seated, keeping it only if the viewer may see it."""
+    session = arena.sessions.create(
+        body.game,
+        body.parameters,
+        seed=body.seed,
+        chance_policy=body.chance_policy,
+        controllers=[spec(seat) for seat in body.seats],
+        autoplay=[seat.autoplay for seat in body.seats],
+        player=player,
+        viewer=viewer,
+    )
+    return session.frame(viewer)
+
+
+@router.get("/rooms/{code}", summary="A table's latest hand and stacks")
+def get_room(arena: ArenaDep, code: str, player: Player) -> rooms_lib.RoomView:
+    """Answers with the room as the player sees it."""
+    return room_view(arena, arena.sessions.rooms().find(code.upper()), player)
+
+
+@router.post("/rooms/{code}/join", summary="Sit at a table by its code")
+def join_room(arena: ArenaDep, code: str, player: Player) -> frame_lib.Frame:
+    """Sits the player at a room by its code, and answers with their view of its hand."""
+    session, seat = arena.sessions.join(code.upper(), player)
+    return session.frame(seat_view(seat))
+
+
+@router.post("/rooms/{code}/deal", summary="Deal the next hand")
+def deal_next_hand(
+    arena: ArenaDep, code: str, player: Player, body: request.Deal
+) -> frame_lib.Frame:
+    """Deals the room's next hand, and answers with the player's view of it."""
+    session, seat = arena.sessions.deal(code.upper(), body.after, player)
+    return session.frame(seat_view(seat))
+
+
+@router.post("/rooms/{code}/leave", summary="Cash out between hands")
+def leave_room(arena: ArenaDep, code: str, player: Player) -> rooms_lib.RoomView:
+    """Gets the player up from the room's table, and answers with the room."""
+    return room_view(arena, arena.sessions.leave(code.upper(), player), player)
+
+
+@router.get("/sessions/{id}", summary="The table as your seat sees it")
+def get_table(seated: SeatedView) -> frame_lib.Frame:
+    """Answers with the live position."""
+    return seated.session.frame(seated.viewer)
+
+
+@router.delete("/sessions/{id}", include_in_schema=False)
+def close(arena: ArenaDep, seated: SeatedView, session_id: SessionId) -> contract.SessionClosed:
+    """Forgets a session; any viewer but a spectator closes it."""
+    seated.session.check_closer(seated.viewer)
+    arena.sessions.delete(session_id)
+    return contract.SessionClosed(id=session_id)
+
+
+@router.get("/sessions/{id}/events", include_in_schema=False)
+def watch(seated: SeatedView, player: Player) -> EventSourceResponse:
+    """Streams the viewer's live frame as Server-Sent Events."""
+    seated.session.frame(seated.viewer)
+    # The stream writes its own keepalives, so it never pings.
+    return EventSourceResponse(in_threads(events(seated.session, seated.viewer, player)), ping=0)
+
+
+def events(
+    session: session_lib.Session, viewer: contract.Viewer, player: str
+) -> Iterator[ServerSentEvent]:
+    """The viewer's live frame after every change, while the player may still take the view.
+
+    A view that another player's arrival closes ends with a `refused` event, and
+    a session idle for `timeouts.STREAM_IDLE_SECONDS` ends its streams with an
+    `idle` event.
+    """
+    version = -1
+    while not session.closed:
+        version, frame = session.wait(viewer, version, KEEPALIVE_SECONDS)
+        if frame is None:
+            if time.monotonic() - session.changed_at >= timeouts.STREAM_IDLE_SECONDS:
+                yield ServerSentEvent(event="idle", data="")
+                return
+            yield ServerSentEvent(comment="keepalive")
+            continue
+        try:
+            session.authorize(viewer, player)
+        except errors.RequestError:
+            yield ServerSentEvent(event="refused", data="")
+            return
+        data = json.dumps(contract.to_json(frame), allow_nan=False, separators=(",", ":"))
+        yield ServerSentEvent(data=data)
+
+
+async def in_threads[T](items: Iterator[T]) -> AsyncIterator[T]:
+    """Yields `items`, drawing each on a thread of `_STREAMS`.
+
+    A cancelled draw abandons its thread, which ends with its wait, so a client
+    that disconnects is let go at once.
+    """
+    while True:
+        item = await anyio.to_thread.run_sync(
+            next, items, None, limiter=_STREAMS, abandon_on_cancel=True
+        )
+        if item is None:
+            return
+        yield item
+
+
+@router.get("/sessions/{id}/plies/{ply}", include_in_schema=False)
+def replay(seated: SeatedView, ply: Index) -> frame_lib.Frame:
+    """Answers with an earlier position."""
+    return seated.session.replay_frame(seated.viewer, ply)
+
+
+@router.post("/sessions/{id}/actions", include_in_schema=False)
+def act(seated: SeatedView, body: request.ApplyAction) -> frame_lib.Frame:
+    """Plays a seat's action."""
+    return seated.session.apply_action(seated.viewer, body.action, ply=body.ply)
+
+
+@router.get("/sessions/{id}/turn", summary="Your cards, the pot, and your moves")
+def get_turn(seated: SeatedView) -> moves.Turn:
+    """Answers with the seat's turn: its cards, the pot, the price and its legal moves."""
+    return moves.turn_of(seated.session.frame(seated.viewer).observation_struct)
+
+
+@router.post("/sessions/{id}/moves", summary="Fold, check, call, bet, or raise")
+def play_move(seated: SeatedView, body: request.PlayMove) -> frame_lib.Frame:
+    """Plays a move named by its kind and amount, resolved to its action id."""
+    action = moves.resolve(seated.session.frame(seated.viewer).observation_struct, body)
+    return seated.session.apply_action(seated.viewer, action)
+
+
+@router.post("/sessions/{id}/chance", include_in_schema=False)
+def chance(seated: SeatedView, body: request.ApplyChanceOutcome) -> frame_lib.Frame:
+    """Chooses a chance outcome."""
+    return seated.session.apply_chance(seated.viewer, body.outcome, ply=body.ply)
+
+
+@router.post("/sessions/{id}/advance", include_in_schema=False)
+def advance(seated: SeatedView, body: request.Advance) -> frame_lib.Frame:
+    """Lets controllers play, at most `request.MAX_ADVANCE_PLIES` actions."""
+    return seated.session.advance(seated.viewer, max_plies=body.limit)
+
+
+@router.post("/sessions/{id}/undo", include_in_schema=False)
+def undo(seated: SeatedView) -> frame_lib.Frame:
+    """Undoes the latest choice of a seat."""
+    return seated.session.undo(seated.viewer)
+
+
+@router.post("/sessions/{id}/reset", include_in_schema=False)
+def reset(seated: SeatedView, body: request.Reset) -> frame_lib.Frame:
+    """Restarts the game."""
+    return seated.session.reset(seated.viewer, history=body.history or ())
+
+
+@router.put("/sessions/{id}/seats/{seat}", include_in_schema=False)
+def set_seat(seated: SeatedView, seat: Index, body: request.SeatConfig) -> frame_lib.Frame:
+    """Changes a seat's controller."""
+    return seated.session.set_controller(seated.viewer, seat, spec(body), autoplay=body.autoplay)

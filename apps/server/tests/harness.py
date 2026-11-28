@@ -1,37 +1,50 @@
 """An API server on a loopback port, and a client that signs requests as the Worker does."""
 
+import dataclasses
 import http.client
 import json
 import threading
 import urllib.parse
 from typing import Any
 
-from doggybank_server import api, contract, health_report, loader, server, static, store
+import uvicorn
+
+from doggybank_server import api, app, contract, health_report, loader, store
 
 PLAYER_KEY = "test-player-key"
 
 
-def start(sessions: store.SessionStore) -> server.Server:
+@dataclasses.dataclass(frozen=True)
+class Listener:
+    """A server `start` started, and the thread it serves on."""
+
+    server: uvicorn.Server
+    thread: threading.Thread
+    url: str
+
+
+def start(sessions: store.SessionStore) -> Listener:
     """Serves `sessions` on a free loopback port until `stop`."""
-    listener = server.Server(
-        ("127.0.0.1", 0),
-        api.Api(
+    socket = app.listen("127.0.0.1", 0)
+    server = app.server(
+        app.create_app(
             sessions,
             catalogue=loader.build_catalogue,
             health=health_report.build,
             player_key=PLAYER_KEY,
-        ),
-        static.ClientFiles(static.DEFAULT_ROOT),
-        server.LOOPBACK_HOSTS,
+            client=app.CLIENT_ROOT,
+            allowed_hosts=app.LOOPBACK_HOSTS,
+        )
     )
-    threading.Thread(target=listener.serve_forever, daemon=True).start()
-    return listener
+    thread = threading.Thread(target=server.run, kwargs={"sockets": [socket]}, daemon=True)
+    thread.start()
+    return Listener(server, thread, app.url_of(socket))
 
 
-def stop(listener: server.Server) -> None:
+def stop(listener: Listener) -> None:
     """Stops a server `start` started."""
-    listener.shutdown()
-    listener.server_close()
+    listener.server.should_exit = True
+    listener.thread.join()
 
 
 def call(

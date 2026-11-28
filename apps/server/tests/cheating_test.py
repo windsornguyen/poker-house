@@ -16,11 +16,13 @@ game means:
    account holds exactly its stacks.
 5. Every refusal is a typed answer, never a fault.
 
-The requests run in process against the production schema in a real Postgres,
-so each example costs milliseconds and a run explores thousands of requests.
+The requests run in process, through the app's own transport, against the
+production schema in a real Postgres, so each example costs milliseconds and a
+run explores thousands of requests.
 """
 
 import atexit
+import contextlib
 import json
 import os
 import unittest.mock
@@ -28,14 +30,17 @@ from typing import Any, LiteralString
 
 import cluster
 import harness
+import httpx2
 import hypothesis
 import psycopg
 from absl.testing import absltest
+from fastapi import testclient
 from hypothesis import stateful
 from hypothesis import strategies as st
 
 from doggybank_server import (
     api,
+    app,
     contract,
     db,
     errors,
@@ -72,14 +77,14 @@ hypothesis.settings.register_profile(
 hypothesis.settings.load_profile(os.environ.get("DOGGYBANK_HYPOTHESIS", "check"))
 
 POSTGRES: cluster.Cluster
-API: api.Api
+CLIENT: testclient.TestClient
 READS: psycopg.Connection
 ACCOUNTS: dict[str, str] = {}
 
 
 def start() -> None:
     """Starts the cluster, its accounts and the API, once, for every example after."""
-    global POSTGRES, API, READS
+    global POSTGRES, CLIENT, READS
     if ACCOUNTS:
         return
 
@@ -94,13 +99,19 @@ def start() -> None:
     database = db.Database(POSTGRES.url)
     for name in ACCOUNTS:
         ledger.Ledger(database).grant(f"{name}@test.poker.invalid", TOP_UP)
-    API = api.Api(
+    atexit.register(POSTGRES.stop)
+    served = app.create_app(
         store.SessionStore(journal=store.Journal(database)),
         catalogue=loader.build_catalogue,
         health=health_report.build,
         player_key=harness.PLAYER_KEY,
+        client=app.CLIENT_ROOT,
+        allowed_hosts=app.LOOPBACK_HOSTS,
     )
-    atexit.register(POSTGRES.stop)
+    # One client for every example, so each request reuses its event loop.
+    clients = contextlib.ExitStack()
+    CLIENT = clients.enter_context(testclient.TestClient(served, base_url="http://localhost"))
+    atexit.register(clients.close)
 
 
 def rows(sql: LiteralString, *params: object) -> list[tuple[Any, ...]]:
@@ -108,10 +119,19 @@ def rows(sql: LiteralString, *params: object) -> list[tuple[Any, ...]]:
     return READS.execute(sql, params).fetchall()
 
 
-def body(response: api.Response) -> dict[str, Any]:
+def body(response: httpx2.Response) -> dict[str, Any]:
     """An answer's JSON object, at the untyped test boundary."""
-    assert isinstance(response.body, dict), response.body
-    return response.body
+    decoded = response.json()
+    assert isinstance(decoded, dict), decoded
+    return decoded
+
+
+def headers(who: str | None) -> dict[str, str]:
+    """The headers of a JSON request the Worker sends as `who`."""
+    sent = {"Content-Type": "application/json"}
+    if who is not None:
+        sent[api.PLAYER_HEADER] = api.signed_player(ACCOUNTS[who], harness.PLAYER_KEY)
+    return sent
 
 
 class Cheaters(stateful.RuleBasedStateMachine):
@@ -146,16 +166,16 @@ class Cheaters(stateful.RuleBasedStateMachine):
         method: str,
         target: str,
         body: dict[str, contract.JsonValue] | None = None,
-    ) -> api.Response:
+    ) -> httpx2.Response:
         """Sends one request as `who`, and checks invariants 1, 2, 3 and 5 on its answer."""
-        header = None if who is None else api.signed_player(ACCOUNTS[who], harness.PLAYER_KEY)
         encoded = b"" if body is None else json.dumps(body).encode()
-        response = API.handle(method, target, encoded, header)
+        response = CLIENT.request(method, target, content=encoded, headers=headers(who))
 
-        assert response.status < 500, (target, response.body)
-        assert isinstance(response.body, dict), (target, response.body)
-        if response.status == 200:
-            self.check_sight(who, response.body)
+        answer = response.json()
+        assert response.status_code < 500, (target, answer)
+        assert isinstance(answer, dict), (target, answer)
+        if response.status_code == 200:
+            self.check_sight(who, answer)
         self.check_plies(who)
         self.check_stacks()
         return response
@@ -421,7 +441,7 @@ class Cheaters(stateful.RuleBasedStateMachine):
     @stateful.rule(who=st.sampled_from(PLAYERS), viewer=st.sampled_from(VIEWERS))
     def open_another_room(self, who: str | None, viewer: str) -> None:
         response = self.call(who, "POST", f"/api/sessions?viewer={viewer}", TABLE)
-        if response.status == 200:
+        if response.status_code == 200:
             self.codes.append(body(response)["session"]["code"])
 
     @stateful.rule(
@@ -437,18 +457,23 @@ class Cheaters(stateful.RuleBasedStateMachine):
     def watch(self, who: str | None, viewer: str) -> None:
         """An event stream opens only for a view its player may take."""
         hand = self.target(0)
-        header = None if who is None else api.signed_player(ACCOUNTS[who], harness.PLAYER_KEY)
-        try:
-            session, opened, _ = API.subscribe(
-                f"/api/sessions/{hand}/events?viewer={viewer}", header
-            )
-        except Exception as refused:
-            assert isinstance(refused, errors.RequestError), refused
-            return
+        target = f"/api/sessions/{hand}/events?viewer={viewer}"
+        with CLIENT.stream("GET", target, headers=headers(who)) as response:
+            if response.status_code != 200:
+                response.read()
+                assert response.status_code < 500, (target, response.text)
+                assert body(response)["code"] in errors.ErrorCode, response.text
+                return
+            # The stream opens with the live frame; reading it is enough.
+            first = next(line for line in response.iter_lines() if line)
 
-        assert opened.kind != contract.ViewerKind.ORACLE or session.returns is not None
-        if opened.seat is not None:
-            assert self.holders(hand)[opened.seat] == ACCOUNTS.get(who or "")
+        assert first.startswith("data: "), first
+        frame = json.loads(first.removeprefix("data: "))
+        opened = frame["viewer"]
+        assert opened["kind"] != contract.ViewerKind.ORACLE or frame["returns"] is not None
+        if opened["seat"] is not None:
+            assert self.holders(hand)[opened["seat"]] == ACCOUNTS.get(who or "")
+        self.check_sight(who, frame)
 
 
 CheatingTest = Cheaters.TestCase

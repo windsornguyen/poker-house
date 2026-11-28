@@ -22,10 +22,7 @@ import ipaddress
 import math
 import os
 import pathlib
-import signal
-import subprocess
-import threading
-import types
+import socket
 from collections.abc import Sequence
 
 from absl import logging
@@ -38,10 +35,9 @@ from doggybank_server import (
     health_report,
     loader,
     remote_bot,
-    static,
     store,
 )
-from doggybank_server import server as server_lib
+from doggybank_server import app as app_lib
 
 # Bind addresses that listen on every interface, loopback included.
 _WILDCARD_HOSTS = frozenset({"0.0.0.0", "::"})
@@ -108,7 +104,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--client-dir",
         type=pathlib.Path,
-        default=static.DEFAULT_ROOT,
+        default=app_lib.CLIENT_ROOT,
         help="The directory of the built browser client.",
     )
     parser.add_argument(
@@ -191,10 +187,10 @@ def allowed_hosts(host: str, extra: Sequence[str]) -> frozenset[str]:
       The loopback names, `host` unless it is a wildcard, and `extra`, in lower
       case.
     """
-    names = set(server_lib.LOOPBACK_HOSTS)
+    names = set(app_lib.LOOPBACK_HOSTS)
     if host not in _WILDCARD_HOSTS:
-        names.add(server_lib.host_name(host))
-    names.update(server_lib.host_name(name) for name in extra)
+        names.add(app_lib.host_name(host))
+    names.update(app_lib.host_name(name) for name in extra)
     return frozenset(names)
 
 
@@ -274,50 +270,25 @@ def main(argv: Sequence[str] | None = None) -> None:
     database_url = os.environ.get("DATABASE_URL", "")
     journal = store.Journal(db.Database(database_url)) if database_url else None
     logging.info("Sessions are kept in %s.", "Postgres" if journal is not None else "memory only")
-    server = server_lib.Server(
-        (args.host, args.port),
-        api.Api(
-            store.SessionStore(journal=journal),
-            catalogue=loader.build_catalogue,
-            health=health_report.build,
-            player_key=player_key(),
-        ),
-        static.ClientFiles(args.client_dir),
-        allowed_hosts(args.host, args.allow_host),
+    app = app_lib.create_app(
+        store.SessionStore(journal=journal),
+        catalogue=loader.build_catalogue,
+        health=health_report.build,
+        player_key=player_key(),
+        client=args.client_dir,
+        allowed_hosts=allowed_hosts(args.host, args.allow_host),
     )
-
-    def stop(signum: int, unused_frame: types.FrameType | None) -> None:
-        """Shuts the server down on a signal."""
-        logging.info("Received %s; shutting down.", signal.Signals(signum).name)
-        # `shutdown` waits for `serve_forever`, which runs on this thread.
-        threading.Thread(target=server.shutdown).start()
-
-    signal.signal(signal.SIGINT, stop)
-    signal.signal(signal.SIGTERM, stop)
-    with server:
-        if not server.client.built:
-            logging.warning(
-                "The client is not built in %s; serving the API only.",
-                server.client.root,
-            )
-        # Flushed, so the line is not held back when stdout is a pipe or a file.
-        print(
-            f"Serving Doggybank at {display_url(server, args.host)}",
-            flush=True,
-        )
-
-        notify_ready()
-        server.serve_forever()
+    if not (args.client_dir / "index.html").is_file():
+        logging.warning("The client is not built in %s; serving the API only.", args.client_dir)
+    listener = app_lib.listen(args.host, args.port)
+    # Flushed, so the line is not held back when stdout is a pipe or a file.
+    print(f"Serving Doggybank at {display_url(listener, args.host)}", flush=True)
+    # uvicorn stops on SIGINT and SIGTERM, and the app tells systemd it is ready.
+    app_lib.server(app).run(sockets=[listener])
 
 
-def notify_ready() -> None:
-    """Tells systemd the server is bound and its database is open, when systemd runs it."""
-    if "NOTIFY_SOCKET" in os.environ:
-        subprocess.run(["systemd-notify", "--ready"], check=True)
-
-
-def display_url(server: server_lib.Server, host: str) -> str:
+def display_url(listener: socket.socket, host: str) -> str:
     """Returns a URL to open the server at; loopback for a wildcard bind."""
     if host in _WILDCARD_HOSTS:
-        return f"http://localhost:{server.server_address[1]}/"
-    return server.url
+        return f"http://localhost:{listener.getsockname()[1]}/"
+    return app_lib.url_of(listener)

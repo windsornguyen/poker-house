@@ -24,13 +24,13 @@ import harness
 from absl.testing import absltest
 
 from doggybank_server import (
+    app,
     builds,
     contract,
     db,
     loader,
     poker_bot,
     remote_bot_server,
-    server,
     store,
 )
 
@@ -74,7 +74,7 @@ class ArenaTest(absltest.TestCase):
         self.addCleanup(builds.set_wait_seconds, builds.wait_seconds())
         builds.set_wait_seconds(10)
 
-    def serve(self, listener: server.Server | remote_bot_server.Server) -> None:
+    def serve(self, listener: remote_bot_server.Server) -> None:
         """Starts an isolated HTTP listener and closes it after the test."""
         thread = threading.Thread(target=listener.serve_forever, daemon=True)
         thread.start()
@@ -231,7 +231,7 @@ class ArenaTest(absltest.TestCase):
             self.assertGreaterEqual(status, 400)
 
     def test_the_probes_answer_without_a_player(self) -> None:
-        for path, body in ((server.LIVE_PATH, b"live"), (server.READY_PATH, b"ready")):
+        for path, body in ((app.LIVE_PATH, b"live"), (app.READY_PATH, b"ready")):
             address = urllib.parse.urlsplit(self.arena.url)
             assert address.hostname is not None
             connection = http.client.HTTPConnection(address.hostname, address.port, timeout=15)

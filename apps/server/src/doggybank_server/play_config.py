@@ -23,7 +23,7 @@ from collections.abc import Mapping, Sequence
 
 import pyspiel
 
-from doggybank_server import child_servers, contract, loader, static
+from doggybank_server import app, child_servers, contract, loader
 
 LaunchError = child_servers.LaunchError
 
@@ -83,7 +83,7 @@ class Options:
     server_per_seat: bool = False
     host: str = "127.0.0.1"
     port: int = 8787
-    client_dir: str = str(static.DEFAULT_ROOT)
+    client_dir: str = str(app.CLIENT_ROOT)
     move_budget_seconds: float = BOT_MOVE_BUDGET_SECONDS
     bot_start_seconds: float = 900.0
     gui_flags: tuple[str, ...] = ()
@@ -264,7 +264,7 @@ def parse_args(argv: Sequence[str] | None = None) -> Options:
     )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787, help="The GUI's port; 0 picks one.")
-    parser.add_argument("--client-dir", default=str(static.DEFAULT_ROOT))
+    parser.add_argument("--client-dir", default=str(app.CLIENT_ROOT))
     parser.add_argument(
         "--move-budget-seconds",
         type=float,
