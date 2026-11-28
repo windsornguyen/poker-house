@@ -56,14 +56,14 @@ export function App(props: AppProps): JSX.Element {
     };
   }, []);
   if (route.page === 'missing') {
-    return <Page title="Page not found">{`Nothing is at ${route.path}.`}</Page>;
+    return <Page>{`Nothing is at ${route.path}.`}</Page>;
   }
   if (catalogue.status !== 'loaded') {
-    return <Page title="Heads-up Hold’em">{catalogueProblem(catalogue)}</Page>;
+    return <Page>{catalogueProblem(catalogue)}</Page>;
   }
   if (route.page === 'catalogue') {
     return (
-      <Page title={null}>
+      <Page>
         <PokerLobby
           entry={catalogue.catalogue.games.find(
             game => game.name === 'doggybank',
@@ -86,19 +86,17 @@ export function App(props: AppProps): JSX.Element {
     game => game.name === route.game,
   );
   if (entry === undefined) {
-    return (
-      <Page title={route.game}>{`There is no game "${route.game}".`}</Page>
-    );
+    return <Page>{`There is no game "${route.game}".`}</Page>;
   }
   if (!entry.loadable) {
     return (
-      <Page title={entry.long_name}>
+      <Page>
         {`${entry.long_name} cannot be played here: ${entry.unavailable_reason ?? 'the server cannot load it'}.`}
       </Page>
     );
   }
   return (
-    <Page title={entry.long_name}>
+    <Page>
       <GamePage
         key={entry.name}
         entry={entry}
@@ -118,36 +116,19 @@ function catalogueProblem(state: CatalogueState): string {
 }
 
 /**
- * The page's frame: the header, then `children`, a sentence or a page. The
- * header names the site and the page's `title`, or nothing when `title` is
- * null because the page shows its own title (the lobby). At the header's
- * right is an element the page fills with its own controls, then the settings.
+ * The page's frame: the header, then `children`, a sentence or a page. At the
+ * header's right is an element the page fills with its own controls, then the
+ * settings.
  */
-function Page({
-  title,
-  children,
-}: {
-  readonly title: string | null;
-  readonly children: ReactNode;
-}): JSX.Element {
+function Page({children}: {readonly children: ReactNode}): JSX.Element {
   const [actions, setActions] = useState<HTMLElement | null>(null);
   return (
     <div className="app">
       <header className="app__header">
-        <div className="app__brand">
-          {title !== null && (
-            <>
-              <a className="app__home" href="/">
-                <LogoMark className="app__logo" />
-                Doggybank
-              </a>
-              <span className="app__separator" aria-hidden="true">
-                •
-              </span>
-              <h1 className="app__title">{title}</h1>
-            </>
-          )}
-        </div>
+        <a className="app__home" href="/">
+          <LogoMark className="app__logo" />
+          Doggybank
+        </a>
         <div className="app__actions">
           <div className="app__page-actions" ref={setActions} />
           <a
