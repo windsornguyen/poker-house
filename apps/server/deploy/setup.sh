@@ -77,7 +77,7 @@ as_app() {
 as_app git -C "$APP_DIR" fetch -q origin "$COMMIT"
 as_app git -C "$APP_DIR" checkout -q --detach "$COMMIT"
 cd "$APP_DIR"
-as_app uv sync -q --frozen --package doggybank-server
+as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
 as_app pnpm install --frozen-lockfile --silent
 as_app pnpm build >/dev/null
 psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
@@ -101,6 +101,7 @@ User=$APP_USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$GAME_ENV_FILE
+Environment=PYTHONUNBUFFERED=1
 ExecStart=$APP_DIR/.venv/bin/python -m doggybank_server --host 0.0.0.0 --port 8787 ${allow_hosts[*]}
 Restart=on-failure
 
