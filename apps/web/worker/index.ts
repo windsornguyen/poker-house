@@ -182,8 +182,9 @@ function forward(
  * it is the app shell, which renders the lobby directly.
  */
 function home(request: Request, env: Env): Promise<Response> {
-  const page =
-    getSessionCookie(request) === null ? '/' : '/__spa-fallback.html';
+  // Extensionless: asking the assets for the .html name answers with a redirect
+  // to this one, which the browser would follow to a page that does not exist.
+  const page = getSessionCookie(request) === null ? '/' : '/__spa-fallback';
   return env.ASSETS.fetch(new Request(new URL(page, request.url), request));
 }
 
