@@ -79,12 +79,13 @@ hypothesis.settings.load_profile(os.environ.get("DOGGYBANK_HYPOTHESIS", "check")
 POSTGRES: cluster.Cluster
 CLIENT: testclient.TestClient
 READS: psycopg.Connection
+DATABASE: db.Database
 ACCOUNTS: dict[str, str] = {}
 
 
 def start() -> None:
     """Starts the cluster, its accounts and the API, once, for every example after."""
-    global POSTGRES, CLIENT, READS
+    global POSTGRES, CLIENT, READS, DATABASE
     if ACCOUNTS:
         return
 
@@ -96,12 +97,10 @@ def start() -> None:
             ACCOUNTS[name] = POSTGRES.add_account(f"{name}@test.poker.invalid", "test")
 
     READS = psycopg.connect(POSTGRES.url, autocommit=True)
-    database = db.Database(POSTGRES.url)
-    for name in ACCOUNTS:
-        ledger.Ledger(database).grant(f"{name}@test.poker.invalid", TOP_UP)
+    DATABASE = db.Database(POSTGRES.url)
     atexit.register(POSTGRES.stop)
     served = app.create_app(
-        store.SessionStore(journal=store.Journal(database)),
+        store.SessionStore(journal=store.Journal(DATABASE)),
         catalogue=loader.build_catalogue,
         health=health_report.build,
         player_key=harness.PLAYER_KEY,
@@ -112,6 +111,25 @@ def start() -> None:
     clients = contextlib.ExitStack()
     CLIENT = clients.enter_context(testclient.TestClient(served, base_url="http://localhost"))
     atexit.register(clients.close)
+
+
+def reset() -> None:
+    """Empties the tables and ledger, so every example starts from the same chips.
+
+    An example leaves chips in its rooms. Carried into the next one, they make a
+    failing example play differently when Hypothesis replays it alone.
+    """
+    with READS.transaction():
+        READS.execute(
+            "truncate poker.ply, poker.seat, poker.session, poker.room_seat, poker.room,"
+            " poker.transfer, poker.account cascade"
+        )
+        READS.execute(
+            "insert into poker.account (id, balance) values (%s, %s)",
+            (ledger.TREASURY, ledger.SUPPLY),
+        )
+    for name in ACCOUNTS:
+        ledger.Ledger(DATABASE).grant(f"{name}@test.poker.invalid", TOP_UP)
 
 
 def rows(sql: LiteralString, *params: object) -> list[tuple[Any, ...]]:
@@ -140,6 +158,7 @@ class Cheaters(stateful.RuleBasedStateMachine):
     def __init__(self) -> None:
         super().__init__()
         start()
+        reset()
         self.codes: list[str] = []
         self.seen: dict[str, list[tuple[int | None, int]]] = {}
         # The stack each player should hold at each room: their buy-in, plus
