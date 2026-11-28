@@ -1,3 +1,5 @@
+import {randomBytes} from 'node:crypto';
+
 import Dedalus from 'dedalus';
 import type {
   Execution,
@@ -102,9 +104,30 @@ export async function ensurePort(
       return existing;
     }
   }
-  return client.machines.ports.create({
-    machine_id: machineId,
-    port,
-    visibility: 'key_required',
+  // The API requires a sharing password for a key-protected port, which this SDK
+  // version does not type yet. Callers authenticate with a minted access key
+  // instead, so the password is random and never kept.
+  const password = randomBytes(6)
+    .toString('base64url')
+    .replace(/[-_]/g, '0')
+    .slice(0, 8);
+  return client.post<Port>(`/v1/machines/${machineId}/ports`, {
+    body: {port, visibility: 'key_required', password},
   });
+}
+
+// The longest lifetime the API allows, about 68 years: the Worker's keys never expire.
+const ACCESS_KEY_SECONDS = 2_147_483_647;
+
+/** Mints a key for `port` that the Worker sends as `X-Dedalus-Port-Key`. */
+export async function mintAccessKey(
+  machineId: string,
+  port: Port,
+): Promise<string> {
+  const minted = await client.machines.ports.accessKeys.mint({
+    machine_id: machineId,
+    port_id: port.port_id,
+    expires_in: ACCESS_KEY_SECONDS,
+  });
+  return minted.access_key;
 }

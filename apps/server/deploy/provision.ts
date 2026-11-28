@@ -1,8 +1,13 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
-import type {Port} from 'dedalus/resources/machines/index';
 import * as z from 'zod';
-import {ensureMachine, ensurePort, run, waitRunning} from './machine.ts';
+import {
+  ensureMachine,
+  ensurePort,
+  mintAccessKey,
+  run,
+  waitRunning,
+} from './machine.ts';
 
 const SERVER_PORT = 8787;
 const AUTH_PORT = 8788;
@@ -19,15 +24,6 @@ const DeployEnv = z.object({
 const SwitchEnv = z.object({
   DOGGYBANK_MACHINE_ID: z.string().min(1),
 });
-
-function announceKey(name: string, port: Port): void {
-  const key = port.initial_access_key;
-  if (key) {
-    console.log(
-      `${name}: ${key.access_key} (shown once, expires ${key.expires_at})`,
-    );
-  }
-}
 
 function git(...args: string[]): string {
   return execFileSync('git', args, {encoding: 'utf8'}).trim();
@@ -104,8 +100,12 @@ if (action === 'retire' || action === 'rollback') {
 
   const port = await ensurePort(machineId, SERVER_PORT);
   const authPort = await ensurePort(machineId, AUTH_PORT);
-  announceKey('Port key', port);
-  announceKey('Auth port key', authPort);
+  // Keys print only on a Machine's first deploy, for the Worker's PORT_KEY and
+  // AUTH_PORT_KEY secrets. Later deploys reuse the ports and mint nothing.
+  if (env.DOGGYBANK_MACHINE_ID === undefined) {
+    console.log(`Port key: ${await mintAccessKey(machineId, port)}`);
+    console.log(`Auth port key: ${await mintAccessKey(machineId, authPort)}`);
+  }
   const hosts = [
     ...new Set(
       [port.application_url, port.url]
