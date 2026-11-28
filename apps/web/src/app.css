@@ -63,6 +63,11 @@ body,
   font-weight: 700;
   letter-spacing: -0.01em;
   text-decoration: none;
+  cursor: grab;
+}
+
+.app__home:active {
+  cursor: grabbing;
 }
 
 .app__logo {

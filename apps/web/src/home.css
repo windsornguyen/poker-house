@@ -41,6 +41,11 @@
   font-weight: 650;
   letter-spacing: -0.02em;
   text-decoration: none;
+  cursor: grab;
+}
+
+.home__brand:active {
+  cursor: grabbing;
 }
 
 .home__brand-mark {
