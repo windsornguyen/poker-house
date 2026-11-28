@@ -53,7 +53,7 @@ try {
       registryBaseUrl: 'https://registry.scalar.com',
       token: '',
       previewServerPort: 7970,
-      logLevel: 'info',
+      logLevel: 'warn',
     }),
     stdio: ['pipe', 'inherit', 'inherit'],
   });

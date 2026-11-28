@@ -832,7 +832,7 @@ class PokerkitWrapperState(pyspiel.State):
                 # This decision to map to 2 is arbitrary! We could alternatively have
                 # mapped to any other (reasonably small) positive integer not in the
                 # reserved actions set.
-                logging.warning(
+                logging.debug(
                     "Mapping shove size 1 chip to action 2 in legal_actions to avoid"
                     " conflict with a 'reserved' action.",
                 )
@@ -1389,7 +1389,7 @@ class PokerkitWrapperState(pyspiel.State):
                 # Intended use case: catching *pokerkit's* ValueErrors. Since it throws
                 # them in many many cases, e.g. if players have no hole cards yet.
                 except ValueError as e:
-                    logging.warning(
+                    logging.debug(
                         "Failed to get ACPC state so leaving it set to default. Game"
                         " variant is %s, caught error is %s",
                         self.get_game().parameters.variant,
