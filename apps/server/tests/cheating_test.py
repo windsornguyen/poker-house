@@ -102,9 +102,12 @@ def start() -> None:
     # One pair of clients for every example, so each request reuses its event loop.
     clients = contextlib.ExitStack()
     built = []
+    databases: list[db.Database] = []
     for _ in range(2):
+        database = db.Database(POSTGRES.url)
+        databases.append(database)
         served = app.create_app(
-            store.SessionStore(journal=store.Journal(db.Database(POSTGRES.url))),
+            store.SessionStore(journal=store.Journal(database)),
             catalogue=loader.build_catalogue,
             health=health_report.build,
             player_key=harness.PLAYER_KEY,
@@ -115,6 +118,8 @@ def start() -> None:
             clients.enter_context(testclient.TestClient(served, base_url="http://localhost"))
         )
     CLIENTS = (built[0], built[1])
+    for database in databases:
+        atexit.register(database.close)
     atexit.register(clients.close)
 
 

@@ -2,7 +2,7 @@
 
 import dataclasses
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 import psycopg
 import pydantic
@@ -56,6 +56,7 @@ class Snapshot:
 
 BOT_OUTPUT = pydantic.TypeAdapter(contract.BotOutput)
 PARAMETERS = pydantic.TypeAdapter(dict[str, contract.ParameterValue])
+HAND_CHANNEL = "poker_hand"
 
 
 def dump_ply(session_id: str, index: int, ply: plies.Ply) -> tuple[object, ...]:
@@ -75,6 +76,34 @@ class Database:
         self.url = url
         self.connection = psycopg.connect(url, autocommit=True)
         self.lock = threading.Lock()
+        self.listeners: list[psycopg.Connection] = []
+
+    def listen(self, on_hand: Callable[[str], None]) -> None:
+        """Opens one LISTEN connection and calls `on_hand` when another process updates a hand."""
+        listener = psycopg.connect(self.url, autocommit=True)
+        listener.execute(f"listen {HAND_CHANNEL}")
+        self.listeners.append(listener)
+        own_pid = self.connection.info.backend_pid
+
+        def watch() -> None:
+            try:
+                for notice in listener.notifies():
+                    if notice.pid != own_pid:
+                        on_hand(notice.payload)
+            except psycopg.OperationalError, psycopg.InterfaceError:
+                return
+
+        threading.Thread(target=watch, name="poker-hand-listen", daemon=True).start()
+
+    def notify(self, session_id: str) -> None:
+        """Queues a wakeup on `HAND_CHANNEL` for delivery once the transaction commits."""
+        self.connection.execute("select pg_notify(%s, %s)", (HAND_CHANNEL, session_id))
+
+    def close(self) -> None:
+        """Closes every connection this database opened."""
+        for listener in self.listeners:
+            listener.close()
+        self.connection.close()
 
     def insert(
         self,
@@ -134,6 +163,8 @@ class Database:
                     added=played,
                     returns=returns,
                 )
+            if after is not None:
+                self.notify(after)
             return stored.id
 
     def lock_session(
@@ -260,6 +291,8 @@ class Database:
                     for index, seat in enumerate(seats)
                 ],
             )
+        if kept < expected or added or seats is not None or (returns is not None and open_before):
+            self.notify(session_id)
 
     def settle(self, session_id: str, returns: Sequence[float]) -> None:
         """Adds a finished hand's returns to its players' stacks, in the caller's transaction."""
@@ -382,11 +415,14 @@ class Database:
 
     def delete(self, session_id: str) -> bool:
         """Forgets a session, its seats and its plies; returns whether it existed."""
-        with self.lock:
+        with self.lock, self.connection.transaction():
             deleted = self.connection.execute(
                 "delete from poker.session where id = %s", (session_id,)
             )
-            return deleted.rowcount > 0
+            if deleted.rowcount > 0:
+                self.notify(session_id)
+                return True
+            return False
 
     def delete_unstarted(self, code: str, session_id: str) -> bool:
         """Deletes `session_id` while `code` locked has an open human seat and no second buy-in."""
@@ -403,4 +439,5 @@ class Database:
             if (seated is not None and seated[0] > 1) or open_seats == (0,):
                 return False
             self.connection.execute("delete from poker.session where id = %s", (session_id,))
+            self.notify(session_id)
             return True

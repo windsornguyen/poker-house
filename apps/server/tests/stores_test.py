@@ -1,14 +1,17 @@
 """Two servers sharing one Postgres linearize every move, rewind and deal on one table."""
 
+import json
 import threading
+from collections.abc import Iterator
 from concurrent import futures
 from typing import Any
 
 import cluster
 import harness
+import httpx
 from absl.testing import absltest
 
-from doggybank_server import contract, db, errors, ledger, loader, plies, store
+from doggybank_server import api, contract, db, errors, ledger, loader, plies, store
 
 BUY_IN = 40
 HANDS = 6
@@ -54,7 +57,7 @@ class StoresTest(absltest.TestCase):
         for listener in cls.servers:
             harness.stop(listener)
         for database in cls.databases:
-            database.connection.close()
+            database.close()
         cls.cluster.stop()
         super().tearDownClass()
 
@@ -267,6 +270,53 @@ class StoresTest(absltest.TestCase):
 
         _, on_zero = self.call(0, self.host, "GET", f"/api/sessions/{hand}?viewer=0")
         self.assertEqual(on_zero["history"], reset["history"])
+
+    def test_stream_on_one_server_sees_moves_and_next_hand_from_another(self) -> None:
+        status, created = self.call(0, self.host, "POST", "/api/sessions?viewer=0", TABLE)
+        self.assertEqual(status, 200, created)
+        code = created["session"]["code"]
+        first = created["session"]["id"]
+
+        headers = {api.PLAYER_HEADER: api.signed_player(self.host, harness.PLAYER_KEY)}
+        target = f"{self.servers[0].url.rstrip('/')}/api/sessions/{first}/events?viewer=0"
+        with (
+            httpx.Client(timeout=5.0) as client,
+            client.stream("GET", target, headers=headers) as stream,
+        ):
+            self.assertEqual(stream.status_code, 200)
+            frames = sse_frames(stream.iter_lines())
+
+            opening = next(frames)
+            self.assertEqual([seat["taken"] for seat in opening["seats"]], [True, False])
+
+            # Server 1 seats the guest, plays the hand out and deals the next hand.
+            status, _ = self.call(1, self.guest, "POST", f"/api/rooms/{code}/join", {})
+            self.assertEqual(status, 200)
+            joined = next(frames)
+            self.assertEqual([seat["taken"] for seat in joined["seats"]], [True, True])
+
+            status, _ = self.call(
+                1, self.guest, "POST", f"/api/sessions/{first}/moves?viewer=1", {"kind": "fold"}
+            )
+            self.assertEqual(status, 200)
+            finished = next(frames)
+            self.assertEqual((finished["status"], finished["returns"]), ("terminal", [1.0, -1.0]))
+
+            status, dealt = self.call(
+                1, self.host, "POST", f"/api/rooms/{code}/deal", {"after": first}
+            )
+            self.assertEqual(status, 200, dealt)
+            succeeded = next(frames)
+            self.assertEqual(succeeded["session"]["next"], dealt["session"]["id"])
+
+
+def sse_frames(lines: Iterator[str]) -> Iterator[dict[str, Any]]:
+    """Each JSON `data:` frame from an SSE line stream."""
+    for line in lines:
+        if line.startswith("data: "):
+            decoded = json.loads(line.removeprefix("data: "))
+            assert isinstance(decoded, dict)
+            yield decoded
 
 
 if __name__ == "__main__":

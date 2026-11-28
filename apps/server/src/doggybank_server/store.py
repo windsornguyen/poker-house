@@ -30,6 +30,8 @@ import secrets
 import threading
 from collections.abc import Generator, Mapping, Sequence
 
+import psycopg
+
 from doggybank_server import contract, db, errors, loader, plies, timeouts
 from doggybank_server import controllers as controllers_lib
 from doggybank_server import ledger as ledger_lib
@@ -215,6 +217,20 @@ class SessionStore:
         self._dealing = threading.Lock()
         self.turns = timeouts.TurnClock()
         self.hands = timeouts.HandClock(self.expire)
+        if self.journal is not None:
+            self.journal.database.listen(self.on_notice)
+
+    def on_notice(self, session_id: str) -> None:
+        """Reloads a held session when another process commits a change to it."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+        if session is None or self.journal is None:
+            return
+        try:
+            if not self.journal.refresh(session):
+                self.expire(session_id)
+        except psycopg.OperationalError, psycopg.InterfaceError:
+            return
 
     def create(
         self,
