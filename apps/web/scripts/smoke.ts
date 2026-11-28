@@ -62,6 +62,32 @@ async function smoke(base: string, paths: readonly string[]): Promise<void> {
         failures.push(`${path}:\n  ${errors.join('\n  ')}`);
       }
     }
+    // A session cookie changes what / serves: the app shell, not the landing
+    // page. A cookie the server does not accept must still end on a working page.
+    const signedIn = await browser.newContext();
+    await signedIn.addCookies([
+      {
+        name: '__Secure-better-auth.session_token',
+        value: 'smoke',
+        url: new URL('/', base).href,
+      },
+    ]);
+    const page = await signedIn.newPage();
+    const errors = await errorsOn(page, new URL('/', base).href);
+    await page
+      .getByRole('link', {name: 'Create an account'})
+      .first()
+      .waitFor({state: 'visible', timeout: 10_000})
+      .catch(() => {
+        errors.push(
+          'with a session cookie, / never showed "Create an account"',
+        );
+      });
+    if (errors.length === 0) {
+      console.log('ok / with a session cookie');
+    } else {
+      failures.push(`/ with a session cookie:\n  ${errors.join('\n  ')}`);
+    }
   } finally {
     await browser.close();
   }
