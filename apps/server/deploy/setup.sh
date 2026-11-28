@@ -137,7 +137,8 @@ SQL
   curl -LsSf "https://astral.sh/uv/$UV_VERSION/install.sh" | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh >/dev/null
   install -d /opt/node
   curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz" | tar -xJ -C /opt/node --strip-components=1
-  /opt/node/bin/npm install -g --silent "pnpm@$PNPM_VERSION"
+  # npm starts with `#!/usr/bin/env node`, so node must be on the path.
+  PATH="/opt/node/bin:$PATH" npm install -g --silent "pnpm@$PNPM_VERSION"
   local go_tmp
   go_tmp=$(mktemp -d)
   curl -fsSL "https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz" -o "$go_tmp/go.tar.gz"
