@@ -131,6 +131,11 @@ def has_body(headers: email.message.Message) -> bool:
 class _Handler(http.server.BaseHTTPRequestHandler):
     """Answers one connection's requests."""
 
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+        """Logs a request only when it failed, so the log is the requests worth reading."""
+        if isinstance(code, int) and code >= http.HTTPStatus.BAD_REQUEST:
+            super().log_request(code, size)
+
     @property
     def app(self) -> Server:
         """The server this handler answers for."""
