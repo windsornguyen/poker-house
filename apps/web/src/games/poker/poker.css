@@ -82,56 +82,48 @@
   gap: 2px;
 }
 
-.poker-seat__avatar {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 999px;
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  font-size: 18px;
-  font-weight: 650;
-}
-
-.poker-seat--active .poker-seat__avatar {
-  box-shadow: 0 0 0 2px var(--color-focus);
-}
-
 .poker-seat__dealer {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  display: grid;
+  display: inline-grid;
   place-items: center;
   width: 20px;
   height: 20px;
+  margin-left: 6px;
   border-radius: 999px;
   background: var(--color-text);
   color: var(--color-surface);
   font-size: 12px;
   font-weight: 700;
+  vertical-align: middle;
 }
 
 .poker-seat__name {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 13px;
+}
+
+.poker-seat--active .poker-seat__name,
+.poker-seat--active.poker-seat--viewer .poker-seat__plate {
+  color: var(--color-accent);
+}
+
+.poker-seat--active.poker-seat--viewer .poker-seat__plate {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 
 .poker-seat__stack {
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
 
 .poker-seat__note {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .poker-seat--winner .poker-seat__note {
   color: var(--color-success);
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .poker-seat--folded .poker-seat__plate {
@@ -140,12 +132,12 @@
 
 /* This street's bet: a small round chip under the seat. */
 .poker-seat__bet {
-  min-width: 26px;
-  padding: 3px 7px;
+  min-width: 28px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--color-surface-raised);
   color: var(--color-text);
-  font-size: 12px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -158,6 +150,7 @@
 .poker-table__opponents .poker-card {
   width: 34px;
   height: 48px;
+  border-radius: 8px;
 }
 
 .poker-table__opponents .poker-card__rank {
@@ -200,14 +193,16 @@
 
 .poker-seat--viewer .poker-seat__plate {
   justify-self: stretch;
-  padding: 14px;
-  border-radius: 16px;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 20px;
   background: var(--color-surface-raised);
 }
 
 .poker-seat--viewer .poker-seat__note {
-  color: var(--color-text);
-  font-size: 13px;
+  min-height: 1.2em;
+  color: var(--color-text-muted);
+  font-size: 15px;
 }
 
 .poker-seat--viewer .poker-seat__bet {
@@ -236,7 +231,8 @@
 
 .poker-pot {
   justify-self: end;
-  font-size: 18px;
+  font-size: 26px;
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
 
@@ -245,15 +241,15 @@
   display: grid;
   place-content: center;
   justify-items: center;
-  border-radius: 10px;
+  gap: 2px;
+  border-radius: 12px;
   background: var(--color-card-face);
   color: var(--color-suit-black);
   line-height: 1;
-  box-shadow: 0 1px 2px var(--color-shadow);
 }
 
 .poker-card__rank {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 500;
 }
 
@@ -269,16 +265,14 @@
 .poker-card--empty {
   background: repeating-linear-gradient(
     135deg,
-    var(--color-card-face) 0 4px,
-    var(--color-text-muted) 4px 6px
+    var(--color-card-face) 0 7px,
+    var(--color-accent) 7px 11px
   );
-  opacity: 0.35;
-  box-shadow: none;
 }
 
 /* One of the cards that make the winning hand at showdown. */
 .poker-card--plays {
-  box-shadow: 0 0 0 2px var(--color-focus);
+  box-shadow: 0 0 0 3px var(--color-success);
   transform: translateY(-4px);
 }
 
@@ -298,12 +292,12 @@
   min-height: 44px;
   padding: 0 16px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--color-surface-raised);
   color: var(--color-text);
   font: inherit;
   font-size: 15px;
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
   transition: background-color 120ms ease;
 }
@@ -319,14 +313,14 @@
 
 .poker-action:focus-visible,
 .poker-betbox__presets button:focus-visible {
-  outline: 2px solid var(--color-focus);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
 }
 
 /* Disabled stays legible: a dashed edge and the not-allowed cursor. */
 .poker-action:disabled,
 .poker-betbox__presets button:disabled {
-  border: 1px dashed var(--color-border-strong);
+  border: 1px dashed var(--color-text-muted);
   cursor: not-allowed;
 }
 
@@ -334,7 +328,7 @@
   display: grid;
   gap: 8px;
   padding: 12px;
-  border-radius: 14px;
+  border-radius: 18px;
   background: var(--color-surface-raised);
 }
 
@@ -354,8 +348,8 @@
 .poker-betbox input[type='number'] {
   width: 72px;
   padding: 0 8px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 8px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
@@ -364,7 +358,7 @@
 
 .poker-betbox__slider {
   width: 100%;
-  accent-color: var(--color-accent);
+  accent-color: var(--color-text);
 }
 
 .poker-betbox__hint {
@@ -418,12 +412,12 @@
 .poker-chip-flight {
   position: absolute;
   z-index: 5;
-  min-width: 26px;
-  padding: 3px 7px;
+  min-width: 28px;
+  padding: 3px 8px;
   border-radius: 999px;
   background: var(--color-surface-raised);
   color: var(--color-text);
-  font-size: 12px;
+  font-size: 13px;
   text-align: center;
   pointer-events: none;
   transform: translate(-50%, -50%);

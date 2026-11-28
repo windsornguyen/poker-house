@@ -257,13 +257,19 @@ export function SeatView(props: SeatViewProps): JSX.Element {
     >
       {isViewer && <HoleCards {...props} />}
       <div className="poker-seat__plate">
-        <span className="poker-seat__avatar" aria-hidden>
-          {seat.name.slice(0, 1).toUpperCase()}
-          {seat.isDealer && <span className="poker-seat__dealer">D</span>}
+        {isViewer && <span className="poker-seat__note">{note ?? ''}</span>}
+        <span className="poker-seat__name">
+          {isViewer ? 'You' : seat.name}
+          {seat.isDealer && (
+            <span className="poker-seat__dealer" aria-label="Dealer">
+              D
+            </span>
+          )}
         </span>
-        {!isViewer && <span className="poker-seat__name">{seat.name}</span>}
         <span className="poker-seat__stack">{formatChips(shown.stack)}</span>
-        {note !== undefined && <span className="poker-seat__note">{note}</span>}
+        {!isViewer && note !== undefined && (
+          <span className="poker-seat__note">{note}</span>
+        )}
       </div>
       {!isViewer && showsCards && <HoleCards {...props} />}
       {shown.bet > 0 && (
