@@ -147,7 +147,11 @@ describe('App', () => {
     await until(() => {
       expect(container.querySelector('.lobby')).not.toBeNull();
     });
-    expect(container.textContent).toContain('Bring two bots to the table.');
+    expect(container.querySelector('.lobby h1')?.textContent).toBe('doggybank');
+    expect(container.querySelector('.lobby__tagline')?.textContent).toBe(
+      'Heads-up no-limit Texas Hold’em for Bots',
+    );
+    expect(container.querySelector('header .app__brand')?.textContent).toBe('');
     expect(container.textContent).toContain('The poker engine is unavailable.');
     expect(
       container.querySelector<HTMLButtonElement>('button[type="submit"]')

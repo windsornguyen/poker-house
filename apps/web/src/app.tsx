@@ -62,7 +62,7 @@ export function App(props: AppProps): JSX.Element {
   }
   if (route.page === 'catalogue') {
     return (
-      <Page title="Heads-up Hold’em">
+      <Page title={null}>
         <PokerLobby
           entry={catalogue.catalogue.games.find(
             game => game.name === 'doggybank',
@@ -117,15 +117,16 @@ function catalogueProblem(state: CatalogueState): string {
 }
 
 /**
- * The page's frame: the header, then `children`, a sentence or a page. At
- * the header's right is an element the page fills with its own controls,
- * then the settings.
+ * The page's frame: the header, then `children`, a sentence or a page. The
+ * header names the site and the page's `title`, or nothing when `title` is
+ * null because the page shows its own title (the lobby). At the header's
+ * right is an element the page fills with its own controls, then the settings.
  */
 function Page({
   title,
   children,
 }: {
-  readonly title: string;
+  readonly title: string | null;
   readonly children: ReactNode;
 }): JSX.Element {
   const [actions, setActions] = useState<HTMLElement | null>(null);
@@ -133,13 +134,17 @@ function Page({
     <div className="app">
       <header className="app__header">
         <div className="app__brand">
-          <a className="app__home" href="/">
-            Doggybank
-          </a>
-          <span className="app__separator" aria-hidden="true">
-            •
-          </span>
-          <h1 className="app__title">{title}</h1>
+          {title !== null && (
+            <>
+              <a className="app__home" href="/">
+                Doggybank
+              </a>
+              <span className="app__separator" aria-hidden="true">
+                •
+              </span>
+              <h1 className="app__title">{title}</h1>
+            </>
+          )}
         </div>
         <div className="app__actions">
           <div className="app__page-actions" ref={setActions} />

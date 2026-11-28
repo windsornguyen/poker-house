@@ -3,43 +3,52 @@
  */
 
 .lobby {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   align-items: center;
-  gap: 64px;
-  max-width: 1040px;
+  max-width: 760px;
   min-height: 100%;
   margin: 0 auto;
-  padding: 48px 32px;
+  padding: 32px;
   box-sizing: border-box;
   overflow-y: auto;
 }
 
+/* The title and the table buttons, then joining a room, then the chips. */
+.lobby > :not(.lobby__dachshund) {
+  width: min(100%, 440px);
+}
+
 .lobby__dachshund {
   display: flex;
-  grid-column: 1 / -1;
   justify-content: center;
+  width: 100%;
   /* The drawing already reserves the chips' floor below the dog. */
-  margin-bottom: -32px;
+  margin-bottom: -12px;
 }
 
-.lobby__intro h2 {
-  margin: 16px 0 24px;
-  max-width: 12ch;
-  font-size: clamp(36px, 4vw, 56px);
-  line-height: 1.08;
+.lobby__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  text-align: center;
 }
 
-.lobby__intro p {
-  max-width: 45ch;
-  color: var(--color-text-secondary);
-  font-size: 17px;
-  line-height: 1.6;
-}
-
-.lobby__suits {
+.lobby__title {
+  margin: 0;
   color: var(--color-text);
-  font-size: 32px;
+  font-size: clamp(40px, 6vw, 60px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.lobby__tagline {
+  margin: -8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 15px;
 }
 
 .lobby__form {
@@ -98,14 +107,7 @@
 
 @media (max-width: 760px) {
   .lobby {
-    grid-template-columns: 1fr;
-    gap: 28px;
-    padding: 28px 20px;
-    align-content: start;
-  }
-
-  .lobby__intro h2 {
-    max-width: 17ch;
+    padding: 24px 20px;
   }
 
   .lobby__form {

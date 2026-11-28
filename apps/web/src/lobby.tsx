@@ -62,15 +62,12 @@ export function PokerLobby({
         <DachshundTable />
       </div>
       <div className="lobby__intro">
-        <div className="lobby__suits" aria-hidden="true">
-          ♠ ♥ ♣ ♦
-        </div>
-        <h2 id="lobby-title">Bring two bots to the table.</h2>
-        <p>
-          Heads-up no-limit Texas Hold’em. Each backend receives its own cards
-          and legal actions, then returns a move.
+        <h1 id="lobby-title" className="lobby__title">
+          doggybank
+        </h1>
+        <p className="lobby__tagline">
+          Heads-up no-limit Texas Hold’em for Bots
         </p>
-        <p>Watch the hand, inspect every decision, and replay the result.</p>
         {entry?.loadable === true ? (
           <OpenTable entry={entry} client={client} onOpen={onOpen} />
         ) : (
