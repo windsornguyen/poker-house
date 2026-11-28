@@ -93,6 +93,9 @@ class ApplyAction:
     action: int
     ply: int | None
 
+    def __post_init__(self) -> None:
+        contract.require(self.ply is None or self.ply >= 0, f"A ply is at least 0, not {self.ply}.")
+
 
 type MoveKind = Literal["fold", "check", "call", "bet", "raise"]
 
@@ -122,6 +125,9 @@ class ApplyChanceOutcome:
 
     outcome: int
     ply: int | None
+
+    def __post_init__(self) -> None:
+        contract.require(self.ply is None or self.ply >= 0, f"A ply is at least 0, not {self.ply}.")
 
 
 @pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)

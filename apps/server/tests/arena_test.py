@@ -167,14 +167,15 @@ class ArenaTest(absltest.TestCase):
         session_id = frame["session"]["id"]
         self.assertEqual(self.join(frame)[0], 200)
 
-        for seat, player, action, code in (
-            (1, "guest", 10_000, "illegal_action"),
-            (0, "host", 1, "not_your_turn"),
+        for seat, player, action, ply, code in (
+            (1, "guest", 10_000, None, "illegal_action"),
+            (0, "host", 1, None, "not_your_turn"),
+            (1, "guest", 1, -1, "bad_request"),
         ):
             status, error = self.request(
                 "POST",
                 f"/api/sessions/{session_id}/actions?viewer={seat}",
-                {"action": action, "ply": None},
+                {"action": action, "ply": ply},
                 player=player,
             )
             self.assertGreaterEqual(status, 400)
