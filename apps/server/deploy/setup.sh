@@ -355,12 +355,6 @@ ln -sfn "$release_dir" "$ETC_DIR/$idle.release"
 systemctl enable -q "postgresql@$PG_MAJOR-main.service" "doggybank@$idle.service" "doggybank-auth@$idle.service"
 systemctl restart "doggybank@$idle.service" "doggybank-auth@$idle.service"
 
-# The first deploy behind the proxies frees ports 8787 and 8788 from the single-copy units.
-for legacy in doggybank.service doggybank-auth.service; do
-  if systemctl is-active --quiet "$legacy"; then
-    systemctl disable --now -q "$legacy"
-  fi
-done
 systemctl enable --now -q kamal-proxy@game.service kamal-proxy@auth.service
 switch_to "$idle"
 
