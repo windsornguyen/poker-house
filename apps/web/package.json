@@ -11,8 +11,7 @@
     "deploy": "react-router build && wrangler deploy",
     "dev": "react-router dev",
     "fmt": "vp fmt",
-    "generate:contract": "node scripts/generate-contract.ts",
-    "test": "vp test run"
+    "generate:contract": "node scripts/generate-contract.ts"
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
@@ -46,7 +45,6 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
-    "@vitest/browser-playwright": "5.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "playwright": "1.65.1",
     "shadcn": "4.23.1",

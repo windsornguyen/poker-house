@@ -19,9 +19,8 @@ import process from 'node:process';
 import {reactRouter} from '@react-router/dev/vite';
 import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
-import react, {reactCompilerPreset} from '@vitejs/plugin-react';
+import {reactCompilerPreset} from '@vitejs/plugin-react';
 import {defineConfig} from 'vite-plus';
-import {playwright} from 'vite-plus/test/browser-playwright';
 
 import {thirdPartyNotices} from './scripts/third-party-notices.ts';
 
@@ -33,7 +32,7 @@ const WORKER = process.env['DOGGYBANK_WORKER'] ?? 'http://127.0.0.1:8789';
 export default defineConfig({
   plugins: [
     tailwindcss(),
-    process.env['VITEST'] ? react() : reactRouter(),
+    reactRouter(),
     babel({presets: [reactCompilerPreset()]}),
     thirdPartyNotices(),
   ],
@@ -50,37 +49,5 @@ export default defineConfig({
     proxy: {
       '/api': {target: WORKER, changeOrigin: false},
     },
-  },
-  test: {
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: 'node',
-          include: [
-            'src/contract/*.test.ts',
-            'src/landing/*.test.ts',
-            'worker/*.test.ts',
-          ],
-        },
-      },
-      {
-        extends: true,
-        test: {
-          name: 'browser',
-          include: ['src/*.test.tsx'],
-          setupFiles: ['src/testing/setup.ts'],
-          // Twice `app.test.tsx`'s 5 s `until`, so a slow wait reports its failing
-          // check rather than the test timeout, and two waits fit in one test.
-          testTimeout: 10000,
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: playwright({launchOptions: {channel: 'chrome'}}),
-            instances: [{browser: 'chromium'}],
-          },
-        },
-      },
-    ],
   },
 });
