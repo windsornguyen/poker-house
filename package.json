@@ -15,15 +15,17 @@
     "deploy:dm": "pnpm --filter @doggybank/deploy provision",
     "test:server": "uv run --all-packages --group test python -m unittest discover -s apps/server/tests -p '*_test.py'",
     "test:web": "pnpm --filter @doggybank/web test",
-    "test": "pnpm test:server && pnpm test:web",
+    "test": "pnpm test:server && pnpm test:web && pnpm test:docs",
     "check": "pnpm --filter @doggybank/web exec react-router typegen && vp check && pnpm --filter @doggybank/web check && pnpm check:server && pnpm test && pnpm build",
     "check:server": "uv run --all-packages --group check --group test ruff format --check && uv run --all-packages --group check --group test ruff check && uv run --all-packages --group check --group test ty check",
     "typecheck": "uv run --all-packages --group check ty check",
-    "docs:build": "node docs/build.ts"
+    "docs:build": "node docs/build.ts",
+    "test:docs": "vp test run docs/tea"
   },
   "devDependencies": {
     "@scalar/cli": "2.25.0",
     "@shadcn/lint": "0.2.5",
+    "esbuild": "0.28.2",
     "eslint-plugin-jsdoc": "65.5.7",
     "oxlint-plugin-eslint": "1.95.0",
     "vite-plus": "catalog:"

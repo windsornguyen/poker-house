@@ -1,0 +1,116 @@
+/* The tea corner: a pencil drawing fixed in the bottom-right corner of every docs page. */
+.tea-corner {
+  --tea-paper: var(--scalar-background-1, #fff);
+  position: fixed;
+  right: 16px;
+  bottom: 12px;
+  z-index: 1;
+  /* At most 160 px or 12% of the window's width: about 3% of a 1360 x 650 screen. */
+  width: min(160px, 12vw);
+  aspect-ratio: 130 / 98;
+  color: oklch(0.36 0 0);
+  pointer-events: none;
+}
+
+.dark-mode .tea-corner {
+  color: oklch(0.8 0 0);
+}
+
+/* Below this width the drawing would cover the text. */
+@media (max-width: 767px) {
+  .tea-corner {
+    display: none;
+  }
+}
+
+.tea-corner svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.tea-line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.62;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.88;
+}
+
+.tea-line--light {
+  stroke-width: 0.45;
+  opacity: 0.5;
+}
+
+.tea-second-pass {
+  opacity: 0.28;
+}
+
+.tea-dot {
+  fill: currentColor;
+  opacity: 0.85;
+}
+
+.tea-paper {
+  fill: var(--tea-paper);
+  stroke: none;
+}
+
+/* Colored-pencil washes: amber tea, a terracotta cloak, pink cheeks. */
+.tea-tea {
+  fill: oklch(0.66 0.1 65 / 0.65);
+}
+
+.tea-stream {
+  fill: none;
+  stroke: oklch(0.62 0.1 60 / 0.75);
+  stroke-width: 0.8;
+  stroke-linecap: butt;
+}
+
+.tea-cloak {
+  fill: oklch(0.64 0.14 35 / 0.42);
+}
+
+.tea-blush {
+  fill: oklch(0.75 0.09 15 / 0.35);
+}
+
+.tea-ghost__bob {
+  animation: tea-bob 3.2s ease-in-out infinite;
+}
+
+.tea-ghost__cape {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: tea-sway 4.4s ease-in-out infinite;
+}
+
+@keyframes tea-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.4px);
+  }
+}
+
+@keyframes tea-sway {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tea-ghost__bob,
+  .tea-ghost__cape {
+    animation: none;
+  }
+}

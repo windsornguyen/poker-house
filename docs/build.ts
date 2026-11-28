@@ -11,10 +11,24 @@ import {
 import {homedir} from 'node:os';
 import {join, resolve} from 'node:path';
 
+import {build as bundle} from 'esbuild';
+
 const docs = import.meta.dirname;
 const output = join(docs, 'dist');
 const cli = resolve(docs, '../node_modules/@scalar/cli/index.js');
 const isolate = join(homedir(), '.scalar/isolate');
+
+// The tea corner is TypeScript; the page loads the one bundled module that
+// scalar.config.json names under head.scripts.
+await bundle({
+  entryPoints: [join(docs, 'tea/corner.ts')],
+  outfile: join(docs, 'tea/dist/corner.js'),
+  bundle: true,
+  format: 'esm',
+  target: 'es2022',
+  minify: true,
+  logLevel: 'warning',
+});
 
 execFileSync(
   process.execPath,

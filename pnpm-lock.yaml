@@ -26,6 +26,9 @@ importers:
       '@shadcn/lint':
         specifier: 0.2.5
         version: 0.2.5(eslint@9.39.5(jiti@2.7.0))
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       eslint-plugin-jsdoc:
         specifier: 65.5.7
         version: 65.5.7(eslint@9.39.5(jiti@2.7.0))(typescript@7.0.2)

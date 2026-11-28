@@ -23,6 +23,16 @@
       "styles": [
         {
           "path": "theme.css"
+        },
+        {
+          "path": "tea/tea.css"
+        }
+      ],
+      "scripts": [
+        {
+          "path": "tea/dist/corner.js",
+          "type": "module",
+          "tagPosition": "bodyClose"
         }
       ]
     }
