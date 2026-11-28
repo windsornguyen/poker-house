@@ -133,7 +133,7 @@ CREATE ROLE doggybank LOGIN PASSWORD '$db_password';
 CREATE DATABASE doggybank OWNER doggybank;
 SQL
 
-  # uv, Node and pnpm build and run releases. Go builds kamal-proxy.
+  # uv and Node run releases, and pnpm installs their packages. Go builds kamal-proxy.
   curl -LsSf "https://astral.sh/uv/$UV_VERSION/install.sh" | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh >/dev/null
   install -d /opt/node
   curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz" | tar -xJ -C /opt/node --strip-components=1
@@ -275,8 +275,9 @@ deploy_release() {
   (
     cd "$release_dir"
     as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
-    as_app pnpm install --frozen-lockfile --silent
-    as_app pnpm build >/dev/null
+    # The Machine runs only the API and sign-in, so it installs sign-in's packages. The
+    # Worker serves the pages, so nothing here builds them.
+    as_app pnpm install --frozen-lockfile --silent --filter @doggybank/auth...
   )
 
   # Bring the database up to this release's schema and sign-in tables.
