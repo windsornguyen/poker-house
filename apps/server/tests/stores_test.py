@@ -12,6 +12,7 @@ import httpx
 from absl.testing import absltest
 
 from doggybank_server import api, contract, db, errors, ledger, loader, plies, store
+from doggybank_server import session as session_lib
 
 BUY_IN = 40
 HANDS = 6
@@ -308,6 +309,70 @@ class StoresTest(absltest.TestCase):
             self.assertEqual(status, 200, dealt)
             succeeded = next(frames)
             self.assertEqual(succeeded["session"]["next"], dealt["session"]["id"])
+
+    def test_two_turn_clocks_firing_together_act_only_once(self) -> None:
+        status, created = self.call(0, self.host, "POST", "/api/sessions?viewer=0", TABLE)
+        self.assertEqual(status, 200, created)
+        code = created["session"]["code"]
+        hand = created["session"]["id"]
+        self.assertEqual(self.call(1, self.guest, "POST", f"/api/rooms/{code}/join", {})[0], 200)
+
+        # Reach the flop so both seats can passively check, the sharpest case.
+        self.assertEqual(
+            self.call(
+                1, self.guest, "POST", f"/api/sessions/{hand}/moves?viewer=1", {"kind": "call"}
+            )[0],
+            200,
+        )
+        self.assertEqual(
+            self.call(
+                0, self.host, "POST", f"/api/sessions/{hand}/moves?viewer=0", {"kind": "check"}
+            )[0],
+            200,
+        )
+        _, flop_b = self.call(1, self.guest, "GET", f"/api/sessions/{hand}?viewer=1")
+        ply = flop_b["ply"]
+        session_a = self.stores[0].get(hand)
+        session_b = self.stores[1].get(hand)
+
+        barrier = threading.Barrier(2)
+
+        def fire(which: int, session: session_lib.Session) -> None:
+            barrier.wait()
+            self.stores[which].turns.expire(session, ply)
+
+        with futures.ThreadPoolExecutor(max_workers=2) as pool:
+            a = pool.submit(fire, 0, session_a)
+            b = pool.submit(fire, 1, session_b)
+            a.result()
+            b.result()
+
+        after = self.cluster.query(
+            "select seat from poker.ply where session_id = %s and ply >= %s order by ply",
+            hand,
+            ply,
+        )
+        self.assertEqual([s for (s,) in after if isinstance(s, int)], [0])
+
+        # Finish the hand on server 1; server 0's hand clock sees it finished and keeps it.
+        self.assertEqual(
+            self.call(
+                1,
+                self.guest,
+                "POST",
+                f"/api/sessions/{hand}/moves?viewer=1",
+                {"kind": "bet", "amount": 2},
+            )[0],
+            200,
+        )
+        self.assertEqual(
+            self.call(
+                1, self.host, "POST", f"/api/sessions/{hand}/moves?viewer=0", {"kind": "fold"}
+            )[0],
+            200,
+        )
+        self.stores[0].hands.end(session_a)
+        self.assertFalse(session_a.closed)
 
 
 def sse_frames(lines: Iterator[str]) -> Iterator[dict[str, Any]]:

@@ -3,7 +3,9 @@
 import threading
 from collections.abc import Callable
 
-from doggybank_server import contract
+import psycopg
+
+from doggybank_server import contract, errors
 from doggybank_server import session as session_lib
 
 TURN_SECONDS = 60.0
@@ -28,16 +30,25 @@ class TurnClock:
 
     def arm(self, session: session_lib.Session) -> None:
         """Restarts the clock for whoever is to act now."""
-        timer = threading.Timer(TURN_SECONDS, self.expire, (session, session.version))
+        active = self.human_to_act(session)
+        ply = len(session.played)
+        timer = threading.Timer(TURN_SECONDS, self.expire, (session, ply))
         timer.daemon = True
         with self.lock:
             previous = self.timers.pop(session.id, None)
             if previous is not None:
                 previous.cancel()
-            if self.human_to_act(session) is None:
+            if active is None or session.closed:
                 return
             self.timers[session.id] = timer
         timer.start()
+
+    def forget(self, session_id: str) -> None:
+        """Cancels any pending turn timer for `session_id`."""
+        with self.lock:
+            previous = self.timers.pop(session_id, None)
+        if previous is not None:
+            previous.cancel()
 
     def human_to_act(self, session: session_lib.Session) -> int | None:
         """The held human seat whose turn it is, or None.
@@ -53,10 +64,12 @@ class TurnClock:
             return None
         return seat if frame.seats[seat].controller == contract.HUMAN else None
 
-    def expire(self, session: session_lib.Session, version: int) -> None:
-        """Acts for a seat that let its turn run out, unless the hand moved on."""
+    def expire(self, session: session_lib.Session, ply: int) -> None:
+        """Acts for a seat that let its turn run out, unless the ply count moved on."""
+        if session.closed or len(session.played) != ply:
+            return
         seat = self.human_to_act(session)
-        if session.version != version or session.closed or seat is None:
+        if seat is None:
             return
         view = session.frame(contract.Viewer(contract.ViewerKind.SEAT, seat))
         observation = view.observation_struct
@@ -67,7 +80,10 @@ class TurnClock:
         for kind in PASSIVE_KINDS:
             action = by_kind.get(kind)
             if isinstance(action, int):
-                session.apply_action(ORACLE, action)
+                try:
+                    session.expire_turn(ply, action)
+                except errors.RequestError, psycopg.Error:
+                    return
                 return
 
 
@@ -76,14 +92,39 @@ class HandClock:
 
     def __init__(self, expire: Callable[[str], None]) -> None:
         self.expire = expire
+        self.timers: dict[str, threading.Timer] = {}
+        self.lock = threading.Lock()
 
     def follow(self, session: session_lib.Session) -> None:
         """Ends `session` once its time is up, unless it has finished."""
         timer = threading.Timer(HAND_SECONDS, self.end, (session,))
         timer.daemon = True
+        with self.lock:
+            previous = self.timers.pop(session.id, None)
+            if previous is not None:
+                previous.cancel()
+            if session.closed:
+                return
+            self.timers[session.id] = timer
         timer.start()
 
+    def forget(self, session_id: str) -> None:
+        """Cancels any pending hand timer for `session_id`."""
+        with self.lock:
+            previous = self.timers.pop(session_id, None)
+        if previous is not None:
+            previous.cancel()
+
     def end(self, session: session_lib.Session) -> None:
-        """Closes the session if its hand is still going."""
-        if not session.closed and session.returns is None:
+        """Closes the session if its hand is still going in the database."""
+        if session.closed:
+            return
+        try:
+            open_now = session.still_open()
+        except errors.NotFoundError:
+            self.expire(session.id)
+            return
+        except errors.RequestError, psycopg.Error:
+            return
+        if open_now:
             self.expire(session.id)

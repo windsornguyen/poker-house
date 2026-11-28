@@ -325,9 +325,15 @@ class SessionStore:
         """Drops the oldest sessions past `_capacity`; caller holds `_lock`."""
         while len(self._sessions) > self._capacity:
             evicted = self._sessions.popitem(last=False)[1]
-            evicted.guard = None
-            evicted.listeners.clear()
-            evicted.close()
+            self.drop(evicted)
+
+    def drop(self, session: session_lib.Session) -> None:
+        """Stops a session's clocks and closes its streams."""
+        self.turns.forget(session.id)
+        self.hands.forget(session.id)
+        session.guard = None
+        session.listeners.clear()
+        session.close()
 
     def get(self, session_id: str) -> session_lib.Session:
         """Returns the session with id `session_id`.
@@ -535,9 +541,7 @@ class SessionStore:
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
-            session.guard = None
-            session.listeners.clear()
-            session.close()
+            self.drop(session)
         if self.journal is not None:
             if not self.journal.forget(session_id):
                 raise errors.NotFoundError(f"There is no session {session_id!r}.")
@@ -549,9 +553,7 @@ class SessionStore:
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
-            session.guard = None
-            session.listeners.clear()
-            session.close()
+            self.drop(session)
 
     def __len__(self) -> int:
         with self._lock:

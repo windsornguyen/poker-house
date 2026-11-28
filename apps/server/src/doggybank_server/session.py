@@ -668,6 +668,22 @@ class Session:
             self.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
             self.touch()
 
+    def expire_turn(self, ply: int, action: int) -> bool:
+        """Plays `action` at `ply` for a timed-out human seat, unless the hand moved on."""
+        with self._lock, self._write():
+            if self._closed or len(self._plies) != ply:
+                return False
+            seat = plies.to_move(self._state).seat
+            if seat is None or not self._seats[seat].is_human or self._holders[seat] is None:
+                return False
+            self.play_from(self._state, list(self._plies), action)
+            return True
+
+    def still_open(self) -> bool:
+        """Whether the hand is still unfinished at its latest stored ply."""
+        with self._lock, self._write():
+            return not self._closed and not self._state.is_terminal()
+
     def position_to_play(
         self, viewer: contract.Viewer, ply: int | None
     ) -> tuple[pyspiel.State, list[plies.Ply]]:
