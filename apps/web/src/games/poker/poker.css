@@ -304,6 +304,7 @@
   font: inherit;
   font-size: 15px;
   font-weight: 550;
+  white-space: nowrap;
   transition: background-color 120ms ease;
 }
 

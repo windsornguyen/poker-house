@@ -59,7 +59,7 @@ function betWords(state: PokerUiState): BetWords {
   return {
     callText:
       callAmount > 0
-        ? `Call ${formatChips(callPaid)}${callAllIn ? ' all-in' : ''}`
+        ? `${callAllIn ? 'All in' : 'Call'} ${formatChips(callPaid)}`
         : 'Check',
     betVerb: state.streetLevel <= state.streetBase ? 'Bet' : 'Raise to',
     base: state.streetBase,
@@ -227,12 +227,12 @@ function PrimaryButtons({
   const {state, canAct, submitIfReady} = props;
   const {fold, call, bets} = state.actionGroups;
   const {selectedBet} = size;
+  const allIn =
+    selectedBet !== undefined &&
+    words.seatStack > 0 &&
+    selectedBet.amount >= words.seatStack;
   const betButtonLabel = selectedBet
-    ? `${words.betVerb} ${formatChips(selectedBet.amount - words.base)}${
-        words.seatStack > 0 && selectedBet.amount >= words.seatStack
-          ? ' all-in'
-          : ''
-      }`
+    ? `${allIn ? 'All in' : words.betVerb} ${formatChips(selectedBet.amount - words.base)}`
     : 'Choose size';
   return (
     <div className="poker-controls__primary">
