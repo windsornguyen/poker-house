@@ -2,11 +2,12 @@
   "$schema": "https://registry.scalar.com/@scalar/schemas/config",
   "scalar": "2.0.0",
   "info": {
-    "title": "Doggybank Docs",
+    "title": "Doggybank",
     "description": "Poker for people and agents."
   },
   "siteConfig": {
     "customDomain": "docs.doggybank.io",
+    "logo": "assets/logo.svg",
     "theme": "default",
     "layout": {
       "header": true,
@@ -20,6 +21,13 @@
       "showToggle": true
     },
     "head": {
+      "links": [
+        {
+          "rel": "icon",
+          "type": "image/svg+xml",
+          "href": "/logo.svg"
+        }
+      ],
       "styles": [
         {
           "path": "theme.css"
@@ -45,6 +53,7 @@
       {
         "type": "link",
         "title": "Play",
+        "style": "button",
         "to": "https://doggybank.io",
         "newTab": true
       }

@@ -1,33 +1,236 @@
-/* A dachshund's coat and a tomato-red chip, in light and dark. */
+/* Dachshund coat browns and a tomato-red collar, with cream kept barely there. */
 :root {
+  --doggy-espresso: #26120b;
+  --doggy-mahogany: #381b11;
+  --doggy-tomato: #d93829;
+  --doggy-tomato-bright: #f25a46;
+  --doggy-maroon: #8f1d24;
+  --doggy-cream: #fcfaf9;
   --scalar-font:
     'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, sans-serif;
-  --scalar-radius: 0.5rem;
-  --scalar-radius-lg: 0.75rem;
+  --scalar-radius: 5px;
 }
 
 .light-mode {
-  --scalar-background-1: #fdf8f3;
-  --scalar-background-2: #f6ece1;
-  --scalar-background-3: #ecdcc9;
-  --scalar-color-1: #2b1a10;
-  --scalar-color-2: #6b4f3a;
-  --scalar-color-3: #8c705b;
-  --scalar-color-accent: #d9412b;
-  --scalar-background-accent: #fbe3dc;
-  --scalar-border-color: #e6d4c0;
+  --scalar-background-1: var(--doggy-cream);
+  --scalar-background-2: #f5eeea;
+  --scalar-background-3: #eadfd9;
+  --scalar-color-1: var(--doggy-espresso);
+  --scalar-color-2: #5c3b2e;
+  --scalar-color-3: #866558;
+  --scalar-color-accent: var(--doggy-tomato);
+  --scalar-background-accent: rgba(217, 56, 41, 0.1);
+  --scalar-border-color: #e3d4cd;
+  --scalar-link-color: var(--doggy-maroon);
+  --scalar-link-color-hover: var(--doggy-tomato);
+  --scalar-button-1: var(--doggy-maroon);
+  --scalar-button-1-hover: var(--doggy-tomato);
+  --scalar-button-1-color: var(--doggy-cream);
+  --scalar-color-red: #c92a2a;
+  --scalar-color-orange: #c8511b;
+  --scalar-color-yellow: #b07419;
+  --scalar-color-green: #1f7a4c;
+  --scalar-color-blue: #235fa4;
+  --scalar-color-purple: var(--doggy-maroon);
+  --scalar-sidebar-background-1: #f6efeb;
+  --scalar-sidebar-border-color: #e2d2ca;
+  --scalar-sidebar-color-1: var(--doggy-espresso);
+  --scalar-sidebar-color-2: #543326;
+  --scalar-sidebar-item-hover-background: #ece0da;
+  --scalar-sidebar-item-hover-color: var(--doggy-maroon);
+  --scalar-sidebar-item-active-background: rgba(143, 29, 36, 0.1);
+  --scalar-sidebar-color-active: var(--doggy-maroon);
+  --scalar-sidebar-indent-border-active: var(--doggy-tomato);
 }
 
 .dark-mode {
-  --scalar-background-1: #1b120c;
-  --scalar-background-2: #261910;
-  --scalar-background-3: #342318;
-  --scalar-color-1: #f6ece1;
-  --scalar-color-2: #cdb39b;
-  --scalar-color-3: #a68b74;
-  --scalar-color-accent: #ff6347;
-  --scalar-background-accent: #3a1f17;
-  --scalar-border-color: #3b2a1e;
+  --scalar-background-1: #160c08;
+  --scalar-background-2: #21120c;
+  --scalar-background-3: #2f1a12;
+  --scalar-color-1: #f7efeb;
+  --scalar-color-2: #cbb2a6;
+  --scalar-color-3: #96786a;
+  --scalar-color-accent: var(--doggy-tomato-bright);
+  --scalar-background-accent: rgba(242, 90, 70, 0.15);
+  --scalar-border-color: #3b2219;
+  --scalar-link-color: #ff7b69;
+  --scalar-link-color-hover: #ffa092;
+  --scalar-button-1: var(--doggy-tomato);
+  --scalar-button-1-hover: var(--doggy-tomato-bright);
+  --scalar-button-1-color: var(--doggy-cream);
+  --scalar-color-red: var(--doggy-tomato-bright);
+  --scalar-color-orange: #f5884c;
+  --scalar-color-yellow: #eab84b;
+  --scalar-color-green: #42c27a;
+  --scalar-color-blue: #6cb2f5;
+  --scalar-color-purple: #e57a8e;
+  --scalar-sidebar-background-1: #1b0f0a;
+  --scalar-sidebar-border-color: #361f16;
+  --scalar-sidebar-color-1: #f7efeb;
+  --scalar-sidebar-color-2: #c6aba0;
+  --scalar-sidebar-item-hover-background: #291710;
+  --scalar-sidebar-item-hover-color: #ff8b7a;
+  --scalar-sidebar-item-active-background: rgba(242, 90, 70, 0.16);
+  --scalar-sidebar-color-active: #ff7b69;
+  --scalar-sidebar-indent-border-active: var(--doggy-tomato-bright);
+}
+
+.header.t-header {
+  --scalar-header-background-1: linear-gradient(
+    90deg,
+    var(--doggy-espresso),
+    var(--doggy-mahogany)
+  );
+  --scalar-header-border-color: var(--doggy-tomato);
+  --scalar-header-color-1: var(--doggy-cream);
+  --scalar-header-color-2: #dfc8bd;
+  --scalar-header-call-to-action-color: var(--doggy-tomato);
+  --scalar-button-1-color: var(--doggy-cream);
+  --scalar-sidebar-search-background: rgba(252, 250, 249, 0.1);
+  --scalar-sidebar-search-border-color: rgba(252, 250, 249, 0.18);
+  --scalar-sidebar-search-color: rgba(252, 250, 249, 0.72);
+  --scalar-sidebar-color-2: rgba(252, 250, 249, 0.72);
+  --scalar-border-color: rgba(252, 250, 249, 0.2);
+  border-bottom-width: 2px;
+  color: var(--scalar-header-color-1);
+}
+
+.dark-mode .header.t-header {
+  --scalar-header-background-1: linear-gradient(90deg, #1b0c07, #2c140c);
+}
+
+/* Scalar hides info.title when siteConfig.logo is set, so keep the name beside the mark. */
+.t-header__start > a:has(> .logo),
+.t-doc__sidebar-brand:has(> .logo) {
+  gap: 8px;
+  color: var(--scalar-header-color-1, var(--scalar-color-1));
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+}
+
+.t-header__start > a > .logo {
+  margin-right: 0;
+}
+
+.t-header__start > a:has(> .logo)::after,
+.t-doc__sidebar-brand:has(> .logo)::after {
+  content: 'Doggybank';
+}
+
+.t-doc__sidebar [aria-current='page']:not(:has(.scalar-sidebar-indent > *)),
+.t-doc__sidebar
+  .sidebar-item-selected
+  > button:not(:has(.scalar-sidebar-indent > *)),
+.t-doc__sidebar .active_page.sidebar-heading {
+  box-shadow: inset 3px 0 0 var(--scalar-color-accent);
+  font-weight: 600;
+}
+
+.page-header .page-breadcrumb {
+  color: var(--scalar-link-color);
+  font-size: var(--scalar-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+h1.t-editor__heading {
+  letter-spacing: -0.022em;
+}
+
+h2.t-editor__heading {
+  padding-bottom: 0.3em;
+  border-bottom: 2px solid
+    color-mix(in srgb, var(--scalar-link-color) 20%, var(--scalar-border-color));
+  letter-spacing: -0.015em;
+}
+
+.t-editor__inline-code,
+.markdown :not(pre) > code {
+  padding: 0.1em 0.38em;
+  border-radius: var(--scalar-radius-md);
+  background-color: color-mix(
+    in srgb,
+    var(--scalar-link-color) 9%,
+    var(--scalar-background-1)
+  );
+  color: var(--scalar-link-color);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--scalar-link-color) 18%, transparent);
+}
+
+.light-mode .t-editor__code-container,
+.light-mode .t-editor__code-container ~ .t-editor__language-picker {
+  --hljs-background: #f4eae5;
+}
+
+.dark-mode .t-editor__code-container,
+.dark-mode .t-editor__code-container ~ .t-editor__language-picker {
+  --hljs-background: #1f100b;
+}
+
+.t-editor__code,
+.t-code {
+  border-left: 3px solid var(--scalar-color-accent);
+}
+
+.t-editor__table-wrapper {
+  overflow: hidden auto;
+}
+
+.t-editor__table th {
+  background: var(--doggy-mahogany);
+  color: var(--doggy-cream);
+  border-bottom: 2px solid var(--doggy-tomato);
+}
+
+.dark-mode .t-editor__table th {
+  background: #2a140d;
+}
+
+.light-mode .t-editor__callout,
+.dark-mode .t-editor__callout {
+  --callout-info-primary: var(--scalar-link-color);
+  --callout-info-secondary: color-mix(
+    in srgb,
+    var(--scalar-link-color) 9%,
+    var(--scalar-background-1)
+  );
+  --callout-success-primary: var(--scalar-color-accent);
+  --callout-success-secondary: color-mix(
+    in srgb,
+    var(--scalar-color-accent) 9%,
+    var(--scalar-background-1)
+  );
+  --callout-warning-secondary: color-mix(
+    in srgb,
+    var(--scalar-color-yellow) 11%,
+    var(--scalar-background-1)
+  );
+  --callout-danger-secondary: color-mix(
+    in srgb,
+    var(--scalar-color-red) 11%,
+    var(--scalar-background-1)
+  );
+  border-left: 3.5px solid var(--callout-primary);
+}
+
+blockquote.t-editor__quote {
+  --scalar-border-left: 3px solid var(--scalar-color-accent);
+}
+
+.t-doc__toc .outline-marker {
+  width: 2px;
+  background-color: var(--scalar-color-accent);
+}
+
+.t-doc__toc .active .anchor {
+  color: var(--scalar-link-color);
+}
+
+::selection {
+  background: rgba(217, 56, 41, 0.2) !important;
 }
 
 /* The renderer is MIT-licensed and served from our own domain, without its badge. */
