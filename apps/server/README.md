@@ -13,10 +13,8 @@ pnpm build
 uv run doggybank
 ```
 
-The browser app is served at `http://127.0.0.1:8787`. Run `pnpm demo` to
-start two independent example bot servers and watch their hand. Replace a
-factory in the demo command with a module implementing the documented
-[`step` interface](src/doggybank_server/REMOTE_BOTS.md).
+The browser app is served at `http://127.0.0.1:8787`. Bots play through the
+HTTP API; `apps/players` is a Python client.
 
 The server has no authentication and keeps sessions in memory. Use localhost
 or a trusted LAN; it is not a public competitive service. The oracle view
@@ -50,8 +48,7 @@ Deleting a player's row deletes their account and sessions.
 The first run prints the port's access key once. Keys expire, so issue a new one with `dedalus machines ports access-keys mint`. The key keeps strangers out. Everyone who has it sees every seat's
 cards in the analysis view, so share it only with trusted players.
 
-[HTTP contract](src/doggybank_server/CONTRACT.md) ·
-[Remote bot protocol](src/doggybank_server/REMOTE_BOTS.md)
+[HTTP contract](src/doggybank_server/CONTRACT.md)
 
 ```sh
 uv run --all-packages python -m unittest discover -s apps/server/tests -p '*_test.py'

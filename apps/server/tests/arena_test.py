@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""The HTTP arena runs private bots and preserves poker's public boundaries."""
+"""The HTTP arena preserves poker's public boundaries."""
 
 import http.client
-import threading
 import urllib.parse
 from typing import Any
 
@@ -29,24 +28,8 @@ from doggybank_server import (
     contract,
     db,
     loader,
-    poker_bot,
-    remote_bot_server,
     store,
 )
-
-
-class RecordingBot:
-    """Keeps the JSON received at the bot's own HTTP boundary."""
-
-    def __init__(self, strategy: poker_bot.PokerBot) -> None:
-        self.strategy = strategy
-        self.requests: list[dict[str, contract.JsonValue]] = []
-
-    def move(self, request: dict[str, contract.JsonValue]) -> int:
-        """Records the server's observation and returns a strategy's legal move."""
-        self.requests.append(request)
-        return self.strategy.move(request)
-
 
 PLAYER_KEY = harness.PLAYER_KEY
 
@@ -73,13 +56,6 @@ class ArenaTest(absltest.TestCase):
         super().setUp()
         self.addCleanup(builds.set_wait_seconds, builds.wait_seconds())
         builds.set_wait_seconds(10)
-
-    def serve(self, listener: remote_bot_server.Server) -> None:
-        """Starts an isolated HTTP listener and closes it after the test."""
-        thread = threading.Thread(target=listener.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(listener.server_close)
-        self.addCleanup(listener.shutdown)
 
     def request(
         self,

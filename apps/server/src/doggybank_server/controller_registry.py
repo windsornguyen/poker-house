@@ -16,7 +16,7 @@
 
 A controller is registered by name with `register`, and `kinds` lists every
 registered controller in the order registered, `human` first. `controllers`
-registers `human`, `random` and `remote`, and builds and asks controllers for
+registers `human` and `random`, and builds and asks controllers for
 moves; a program that serves the GUI may register its own before it starts
 serving, since the catalogue and the health report read the registry once.
 """
@@ -205,7 +205,7 @@ class Kind:
         particular parsed settings, or None; checked when a seat is given it.
       config_reads_full_state: Whether the controller, with particular parsed
         settings, reads the full state, for a controller that reads it or not
-        as its settings say (a remote bot). Such a seat is subject to
+        as its settings say. Such a seat is subject to
         `full_state_refusal`; `reads_full_state` stays False for its kind.
     """
 

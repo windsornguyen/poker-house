@@ -23,8 +23,7 @@ lists only those that can), `create` builds one for a seat, and `choose` asks
 it for a move.
 
 Controllers are registered by name with `register` (`controller_registry`);
-`human`, `random` and `remote` (a bot server, `remote_bot`) are registered
-here.
+`human` and `random` are registered here.
 
 No controller stands in for another. When one raises, returns anything but
 a legal action, or takes longer than the move budget (`set_move_budget`,
@@ -50,13 +49,11 @@ from doggybank_server import (
     controller_registry,
     controller_settings,
     errors,
-    remote_bot,
 )
 from doggybank_server import move_budget as move_budget_lib
 
 HUMAN = contract.HUMAN
 RANDOM = "random"
-REMOTE = remote_bot.NAME
 
 # A controller's settings, as a client sends them.
 Config = controller_settings.Config
@@ -117,8 +114,8 @@ class Spec:
     """A request for a controller.
 
     Attributes:
-      kind: The name the controller is registered under, such as `HUMAN`,
-        `RANDOM` or `REMOTE`.
+      kind: The name the controller is registered under, such as `HUMAN` or
+        `RANDOM`.
       config: The controller's settings, satisfying its `config_schema`. A
         setting left out takes its default.
     """

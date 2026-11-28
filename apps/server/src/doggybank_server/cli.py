@@ -34,7 +34,6 @@ from doggybank_server import (
     db,
     health_report,
     loader,
-    remote_bot,
     store,
 )
 from doggybank_server import app as app_lib
@@ -73,7 +72,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         prog="python -m doggybank_server",
-        description="Host poker games and remote bots in a browser.",
+        description="Host poker games in a browser.",
         epilog=DISCLAIMER,
     )
     parser.add_argument(
@@ -129,51 +128,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "session paused. Default: %(default)g."
         ),
     )
-    parser.add_argument(
-        "--remote-bot-host",
-        action="append",
-        default=[],
-        metavar="NAME",
-        help=(
-            "A host, beyond this machine, that a Remote bot seat's URL may "
-            "name; '*' admits any host. Repeatable. Without it the server "
-            "posts positions only to bot servers on this machine."
-        ),
-    )
-    parser.add_argument(
-        "--remote-bot-token-env",
-        action="append",
-        default=[],
-        metavar="HOST[:PORT]=VAR",
-        help=(
-            "Send the token held in the environment variable VAR as "
-            "'Authorization: Bearer <token>' to the remote bot server at HOST "
-            "(and PORT, if given), and to no other. Repeatable. A token is "
-            "never part of a seat's settings, which every viewer sees."
-        ),
-    )
     return parser.parse_args(argv)
-
-
-def remote_bot_tokens(values: Sequence[str]) -> dict[str, str]:
-    """Returns the tokens `--remote-bot-token-env` names, by host[:port].
-
-    Raises:
-      SystemExit: If a value is not HOST[:PORT]=VAR, or VAR is not set or is
-        blank.
-    """
-    tokens = {}
-    for value in values:
-        where, sep, variable = value.partition("=")
-        if not sep or not where.strip() or not variable.strip():
-            raise SystemExit(f"--remote-bot-token-env {value!r} is not HOST[:PORT]=VAR.")
-        token = os.environ.get(variable.strip(), "").strip()
-        if not token:
-            raise SystemExit(
-                f"--remote-bot-token-env names {variable.strip()}, which is not set or blank."
-            )
-        tokens[where.strip()] = token
-    return tokens
 
 
 def allowed_hosts(host: str, extra: Sequence[str]) -> frozenset[str]:
@@ -258,15 +213,6 @@ def main(argv: Sequence[str] | None = None) -> None:
     log_disclaimer(args.host)
     controllers.set_move_budget(args.move_budget_seconds)
     builds.set_budget_seconds(args.build_budget_seconds)
-    remote_bot.configure(
-        hosts=args.remote_bot_host,
-        tokens=remote_bot_tokens(args.remote_bot_token_env),
-    )
-    if args.remote_bot_host:
-        logging.info(
-            "Remote bot seats may post to this machine and to %s.",
-            ", ".join(args.remote_bot_host),
-        )
     database_url = os.environ.get("DATABASE_URL", "")
     journal = store.Journal(db.Database(database_url)) if database_url else None
     logging.info("Sessions are kept in %s.", "Postgres" if journal is not None else "memory only")

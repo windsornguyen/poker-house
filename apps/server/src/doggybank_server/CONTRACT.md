@@ -304,14 +304,13 @@ applied stand. Play resumes after an undo, a reset, or a change of that
 seat's controller.
 
 A controller may give a **notice** with a move: a line of plain text, at most
-200 characters, such as a remote bot reporting a fallback it took. The seat
-shows it in `notice` until the seat moves again, or an undo, a reset or a
-change of controller clears it. It reaches only that seat's viewer and
-omniscient viewers, and it has no effect on play. A notice that is not
-non-blank text of at most 200 characters fails the seat (`InvalidNotice`).
-A notice is text the controller writes, so a controller that reads the full
-state (a `remote` seat sent `full_state`, say) can put hidden information in
-it, which then reaches that seat's viewer. Every notice is passed on, as
+200 characters, such as a fallback it took. The seat shows it in `notice`
+until the seat moves again, or an undo, a reset or a change of controller
+clears it. It reaches only that seat's viewer and omniscient viewers, and it
+has no effect on play. A notice that is not non-blank text of at most 200
+characters fails the seat (`InvalidNotice`). A notice is text the controller
+writes, so a controller that reads the full state can put hidden information
+in it, which then reaches that seat's viewer. Every notice is passed on, as
 that seat's `config` says what it reads; the server's state policy
 (`controller_registry.full_state_notice`) is the place to drop or limit such
 a seat's notices.
@@ -327,11 +326,8 @@ output whose policy names an action that is not legal fails the seat
 hidden information makes good, as a notice can carry it;
 `controller_registry.full_state_output` is the place to drop such outputs.
 
-The server registers three controllers: `human`, `random` (a uniformly random
-legal action), and `remote`, a bot server the seat's `url` names, sent the
-seat's private observation ([REMOTE_BOTS.md](REMOTE_BOTS.md) gives the
-protocol). The server posts to bot servers on its own machine only, unless
-started with `--remote-bot-host`.
+The server registers two controllers: `human` and `random` (a uniformly
+random legal action). Bots play a `human` seat through the API, as people do.
 
 ### Building a controller
 

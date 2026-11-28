@@ -615,10 +615,9 @@ export type SeatStatus = z.infer<typeof SeatStatus>;
  *   message: Why the seat is not ready, for every viewer: what the server is
  *     doing while it is `preparing`, or why it is `unavailable`; null when it
  *     is `ready`, and optional while it is `preparing`.
- *   notice: The controller's short note about its latest choice, such as a
- *     remote bot reporting something it recovered from; null when it gave
- *     none. Only the seat's own viewer and omniscient viewers receive it. It
- *     has no effect on play.
+ *   notice: The controller's short note about its latest choice, such as
+ *     something it recovered from; null when it gave none. Only the seat's
+ *     own viewer and omniscient viewers receive it. It has no effect on play.
  *   taken: Whether a player holds the seat.
  */
 export const SeatView = z.object({

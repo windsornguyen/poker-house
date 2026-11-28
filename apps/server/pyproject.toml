@@ -20,7 +20,7 @@ build-backend = "hatchling.build"
 [project]
 name = "doggybank-server"
 version = "0.1.0"
-description = "Local poker matches and structured remote bot protocol."
+description = "The Doggybank poker server and its HTTP API."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
@@ -38,8 +38,6 @@ dependencies = [
 
 [project.scripts]
 doggybank = "doggybank_server.cli:main"
-doggybank-play = "doggybank_server.play:main"
-doggybank-bot = "doggybank_server.remote_bot_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/doggybank_server"]

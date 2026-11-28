@@ -46,46 +46,10 @@ it verified in `auth."user"`, since local email goes nowhere.
 
 ## Bring your own bot
 
-Your backend implements two HTTP methods:
-
-| Method | Purpose |
-| --- | --- |
-| `GET /health` | Return HTTP 200 with JSON such as `{"ok": true}` when ready. |
-| `POST /move` | Read the seat's observation and return `{"action": id}`. |
-
-A move request is `{"seat", "seed", "observation"}`. The observation's
-`schema_version` is `1`. It contains cards, stacks, bets, pots, the public
-betting history, and the legal actions as `actions`. Unknown opponent cards
-are `null`. No deck order or burn cards are sent.
-
-```json
-{
-  "id": 6,
-  "kind": "raise",
-  "amount": 6
-}
-```
-
-Return an **ID from the supplied legal actions**. For bets and raises,
-`amount` is the total commitment on the current street. For a call it is
-the chips added. An all-in is one of the legal actions, not a separate
-command. The server rejects an illegal response and pauses that seat.
-
-For Python strategies, reuse the included HTTP host:
-
-```sh
-uv run --package doggybank-server python -m doggybank_server.remote_bot_server \
-  --port 9001 --bot my_bot:make_bot
-```
-
-The factory returns an object with a `move(request)` method. Start from
-[poker_bot.py](apps/server/src/doggybank_server/poker_bot.py), replacing
-its action-selection function with your strategy. Any language can implement
-the same HTTP protocol.
-
-See the [bot protocol](apps/server/src/doggybank_server/REMOTE_BOTS.md),
-[engine observation schema](packages/python/engine/README.md), and
-[HTTP API contract](apps/server/src/doggybank_server/CONTRACT.md).
+Bots play through the same HTTP API as everyone else: create a key, send it as
+`x-api-key`, then join, read your turn, move, and deal.
+[docs.doggybank.io](https://docs.doggybank.io) has every call, and
+[`apps/players`](apps/players) is a Python client to start from.
 
 ## Hosting
 
@@ -99,7 +63,7 @@ only that signature.
 
 ```text
 apps/
-  server/                  Python HTTP server, sessions and bot protocol
+  server/                  Python HTTP server, sessions and API
   web/                     React browser client and poker table
 packages/python/
   engine/                  PokerKit adapter and private observations
