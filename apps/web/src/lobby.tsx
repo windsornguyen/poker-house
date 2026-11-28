@@ -35,7 +35,7 @@ import type {
 import {BUY_IN, defaultSession, tableSession} from './game/game-defaults.ts';
 import {sessionPath} from './app/route.ts';
 import {openRoom} from './game/game-page.tsx';
-import {DachshundTable} from './landing/dachshund-table.tsx';
+import {DachshundHero} from './landing/dachshund-hero.tsx';
 import type {SessionClient} from './session/client.ts';
 import {ContractError} from './session/errors.ts';
 
@@ -58,16 +58,7 @@ export function PokerLobby({
 }): JSX.Element {
   return (
     <section className="lobby" aria-labelledby="lobby-title">
-      <div className="lobby__dachshund">
-        <DachshundTable />
-      </div>
-      <div className="lobby__intro">
-        <h1 id="lobby-title" className="lobby__title">
-          doggybank
-        </h1>
-        <p className="lobby__tagline">
-          Heads-up no-limit Texas Hold’em for Bots
-        </p>
+      <DachshundHero>
         {entry?.loadable === true ? (
           <OpenTable entry={entry} client={client} onOpen={onOpen} />
         ) : (
@@ -75,7 +66,7 @@ export function PokerLobby({
             The poker engine is unavailable. {entry?.unavailable_reason}
           </p>
         )}
-      </div>
+      </DachshundHero>
       <JoinRoom client={client} onOpen={onOpen} />
       <Chips client={client} />
     </section>

@@ -18,6 +18,7 @@ import {Link} from 'react-router';
 import {Button} from '@/components/ui/button';
 
 import {CopyButton} from './controls/copy-button.tsx';
+import {DachshundHero} from './landing/dachshund-hero.tsx';
 import {LogoMark} from './logo.tsx';
 
 import './home.css';
@@ -37,49 +38,25 @@ curl -X POST \\
   -H "content-type: application/json" \\
   -d '{"kind": "call"}'`;
 
-const STEPS = [
-  {
-    number: '01',
-    title: 'Sign up and get 1,000 chips',
-    body: 'Every new account receives 1,000 welcome chips. Chips are never created mid-hand, only moved across the felt.',
-  },
-  {
-    number: '02',
-    title: 'Open a table and share the code',
-    body: 'Buy in for 200 chips in the browser and send the 6-letter room code to an opponent. Stacks carry over until you leave.',
-  },
-  {
-    number: '03',
-    title: 'Or connect an agent with an API key',
-    body: 'Create an x-api-key for your bot. It joins the same 6-letter rooms, reads its own turn, and posts moves over HTTP.',
-  },
-] as const;
-
-const FACTS = [
-  {
-    term: '1,000 welcome chips',
-    detail: 'Fixed starting bankroll for every account, person or bot.',
-  },
-  {
-    term: 'Private observations',
-    detail: 'Each seat sees only its own hole cards, the board, and the pot.',
-  },
-  {
-    term: 'Five HTTP calls',
-    detail: 'Join a room, read your turn, send a move, deal, and cash out.',
-  },
-] as const;
-
 /** Renders the public landing page shown to signed-out visitors at `/`. */
 export function HomePage(): JSX.Element {
   return (
     <div className="home">
       <HomeHeader />
       <main className="home__main">
-        <HomeHero />
-        <HomeSteps />
+        <section className="lobby" aria-labelledby="lobby-title">
+          <DachshundHero>
+            <div className="home__cta-row">
+              <Button asChild>
+                <Link to="/auth/sign-up">Create an account</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/auth/sign-in">Sign in</Link>
+              </Button>
+            </div>
+          </DachshundHero>
+        </section>
         <HomeAgentSection />
-        <HomeClosing />
       </main>
       <HomeFooter />
     </div>
@@ -110,60 +87,6 @@ function HomeHeader(): JSX.Element {
   );
 }
 
-function HomeHero(): JSX.Element {
-  return (
-    <section className="home__hero" aria-labelledby="home-title">
-      <div className="home__inner">
-        <LogoMark className="home__hero-mark" />
-        <h1 id="home-title">Poker for people and agents.</h1>
-        <p className="home__pitch">
-          Heads-up no-limit hold’em with a finite chip economy, played live in
-          the browser or over a five-call HTTP API.
-        </p>
-        <div className="home__cta-row">
-          <Button asChild size="lg">
-            <Link to="/auth/sign-up">Create an account</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href={DOCS_URL}>Read the docs</a>
-          </Button>
-        </div>
-        <dl className="home__facts">
-          {FACTS.map(fact => (
-            <div key={fact.term} className="home__fact">
-              <dt>{fact.term}</dt>
-              <dd>{fact.detail}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
-  );
-}
-
-function HomeSteps(): JSX.Element {
-  return (
-    <section className="home__section" aria-labelledby="how-title">
-      <div className="home__inner">
-        <div className="home__label">
-          <span>01 / How it works</span>
-          <span>Same tables for people and bots.</span>
-        </div>
-        <h2 id="how-title">Sit down in three steps.</h2>
-        <ol className="home__steps">
-          {STEPS.map(step => (
-            <li key={step.number} className="home__step">
-              <span className="home__step-index">{step.number}</span>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
 function HomeAgentSection(): JSX.Element {
   return (
     <section
@@ -172,7 +95,7 @@ function HomeAgentSection(): JSX.Element {
     >
       <div className="home__inner">
         <div className="home__label">
-          <span>02 / HTTP API</span>
+          <span>HTTP API</span>
           <span>Structured observations and legal moves.</span>
         </div>
         <div className="home__api-grid">
@@ -196,30 +119,6 @@ function HomeAgentSection(): JSX.Element {
               <code>{AGENT_TURN_SNIPPET}</code>
             </pre>
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HomeClosing(): JSX.Element {
-  return (
-    <section className="home__closing" aria-labelledby="closing-title">
-      <div className="home__inner home__closing-box">
-        <div>
-          <h2 id="closing-title">Claim your 1,000 chips.</h2>
-          <p>
-            Open a table in the browser, join a friend’s room code, or put your
-            own strategy on the felt.
-          </p>
-        </div>
-        <div className="home__cta-row">
-          <Button asChild size="lg">
-            <Link to="/auth/sign-up">Create an account</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a href={DOCS_URL}>Read the docs</a>
-          </Button>
         </div>
       </div>
     </section>
