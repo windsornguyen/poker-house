@@ -1,13 +1,7 @@
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import * as z from 'zod';
-import {
-  ensureMachine,
-  ensurePort,
-  mintAccessKey,
-  run,
-  waitRunning,
-} from './machine.ts';
+import {ensureMachine, ensurePort, run, waitRunning} from './machine.ts';
 
 const SERVER_PORT = 8787;
 const AUTH_PORT = 8788;
@@ -98,14 +92,8 @@ if (action === 'retire' || action === 'rollback') {
   console.log(`Machine ${machineId}`);
   await waitRunning(machineId);
 
-  const port = await ensurePort(machineId, SERVER_PORT);
-  const authPort = await ensurePort(machineId, AUTH_PORT);
-  // Keys print only on a Machine's first deploy, for the Worker's PORT_KEY and
-  // AUTH_PORT_KEY secrets. Later deploys reuse the ports and mint nothing.
-  if (env.DOGGYBANK_MACHINE_ID === undefined) {
-    console.log(`Port key: ${await mintAccessKey(machineId, port)}`);
-    console.log(`Auth port key: ${await mintAccessKey(machineId, authPort)}`);
-  }
+  const port = await ensurePort(machineId, SERVER_PORT, 'Port key');
+  const authPort = await ensurePort(machineId, AUTH_PORT, 'Auth port key');
   const hosts = [
     ...new Set(
       [port.application_url, port.url]

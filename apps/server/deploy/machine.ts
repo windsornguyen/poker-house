@@ -92,10 +92,14 @@ export async function run(
   return {execution, output};
 }
 
-/** Returns the Machine's port for `port`, creating it with a required access key. */
+/**
+ * Returns the Machine's port for `port`. A port it creates gets a minted access key,
+ * printed once as `name` for the Worker's secret.
+ */
 export async function ensurePort(
   machineId: string,
   port: number,
+  name: string,
 ): Promise<Port> {
   for await (const existing of client.machines.ports.list({
     machine_id: machineId,
@@ -111,19 +115,18 @@ export async function ensurePort(
     .toString('base64url')
     .replace(/[-_]/g, '0')
     .slice(0, 8);
-  return client.post<Port>(`/v1/machines/${machineId}/ports`, {
+  const created = await client.post<Port>(`/v1/machines/${machineId}/ports`, {
     body: {port, visibility: 'key_required', password},
   });
+  console.log(`${name}: ${await mintAccessKey(machineId, created)}`);
+  return created;
 }
 
 // The longest lifetime the API allows, about 68 years: the Worker's keys never expire.
 const ACCESS_KEY_SECONDS = 2_147_483_647;
 
 /** Mints a key for `port` that the Worker sends as `X-Dedalus-Port-Key`. */
-export async function mintAccessKey(
-  machineId: string,
-  port: Port,
-): Promise<string> {
+async function mintAccessKey(machineId: string, port: Port): Promise<string> {
   const minted = await client.machines.ports.accessKeys.mint({
     machine_id: machineId,
     port_id: port.port_id,
