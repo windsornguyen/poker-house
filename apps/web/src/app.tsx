@@ -17,7 +17,7 @@
 import {type JSX, type ReactNode, useEffect, useState} from 'react';
 
 import {routeOf, sessionPath} from './app/route.ts';
-import {type CatalogueState, useCatalogue} from './app/use-catalogue.ts';
+import {useCatalogue} from './app/use-catalogue.ts';
 import {SettingsMenu} from './controls/settings-menu.tsx';
 import {HeaderActionsContext} from './app/header-actions.ts';
 import {GamePage} from './game/game-page.tsx';
@@ -58,8 +58,15 @@ export function App(props: AppProps): JSX.Element {
   if (route.page === 'missing') {
     return <Page>{`Nothing is at ${route.path}.`}</Page>;
   }
+  // While the catalogue loads, which takes one request, the page stays empty: a
+  // sentence there flashed before every lobby and table.
+  if (catalogue.status === 'failed') {
+    return (
+      <Page>{`The poker table could not be loaded. ${catalogue.error.message}`}</Page>
+    );
+  }
   if (catalogue.status !== 'loaded') {
-    return <Page>{catalogueProblem(catalogue)}</Page>;
+    return <Page>{null}</Page>;
   }
   if (route.page === 'catalogue') {
     return (
@@ -107,12 +114,6 @@ export function App(props: AppProps): JSX.Element {
       />
     </Page>
   );
-}
-
-function catalogueProblem(state: CatalogueState): string {
-  return state.status === 'failed'
-    ? `The poker table could not be loaded. ${state.error.message}`
-    : 'Loading the poker table.';
 }
 
 /**
