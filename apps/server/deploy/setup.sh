@@ -280,6 +280,11 @@ deploy_release() {
     as_app pnpm install --frozen-lockfile --silent --filter @doggybank/auth...
   )
 
+  # Import the server once before systemd starts it. A fresh release reads cold from
+  # disk, and its first import can outlast the start timeout. A release that cannot
+  # import fails here, before it is started.
+  as_app "$release_dir/.venv/bin/python" -c 'import doggybank_server.cli'
+
   # Bring the database up to this release's schema and sign-in tables.
   local db_url
   db_url=$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")
