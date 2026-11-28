@@ -35,6 +35,7 @@ import type {
 import {BUY_IN, defaultSession, tableSession} from './game/game-defaults.ts';
 import {sessionPath} from './app/route.ts';
 import {openRoom} from './game/game-page.tsx';
+import {DachshundTable} from './landing/dachshund-table.tsx';
 import type {SessionClient} from './session/client.ts';
 import {ContractError} from './session/errors.ts';
 
@@ -57,6 +58,9 @@ export function PokerLobby({
 }): JSX.Element {
   return (
     <section className="lobby" aria-labelledby="lobby-title">
+      <div className="lobby__dachshund">
+        <DachshundTable />
+      </div>
       <div className="lobby__intro">
         <div className="lobby__suits" aria-hidden="true">
           ♠ ♥ ♣ ♦

@@ -53,6 +53,23 @@ afterEach(() => {
   rendered = undefined;
 });
 
+it('shows the dachshund with its two red chip towers above the tables', () => {
+  const client = new SessionClient({fetch: server(frame())});
+  rendered = render(
+    <PokerLobby entry={ENTRY} client={client} onOpen={vi.fn()} />,
+  );
+  const {container} = rendered;
+
+  const dog = container.querySelector('.lobby__dachshund img[alt]');
+  const chips = container.querySelectorAll(
+    '.lobby__dachshund .dachshund__chip',
+  );
+  expect(dog?.getAttribute('alt')).toBe(
+    'A very long dachshund carrying poker chips on its back',
+  );
+  expect(chips).toHaveLength(5);
+});
+
 describe('opening a table', () => {
   it.each([
     ['Open a table · 200 chips', {controller: 'human', autoplay: false}],

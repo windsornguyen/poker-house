@@ -50,7 +50,6 @@ export function createChipController(stage: ChipStage): ChipController {
   let frame: number | null = null;
   let fade: number | null = null;
   let lastFrameMs: number | null = null;
-  let lastScrollY = window.scrollY;
   const draw = (): void => drawChips(stage, tumble);
   const tick = (nowMs: number): void => {
     tumble = stepTumble(tumble, lastFrameMs === null ? 0 : nowMs - lastFrameMs);
@@ -77,11 +76,11 @@ export function createChipController(stage: ChipStage): ChipController {
     frame = null;
     fade = null;
   };
-  const listeners = disturbanceListeners(window, trigger, () => {
-    const scrolledDown = window.scrollY > lastScrollY;
-    lastScrollY = window.scrollY;
-    return scrolledDown;
-  });
+  const listeners = disturbanceListeners(
+    window,
+    trigger,
+    downwardScrolls(window),
+  );
   const resize = new ResizeObserver(draw);
   resize.observe(stage.layer);
   return {
@@ -100,19 +99,19 @@ export function createChipController(stage: ChipStage): ChipController {
   };
 }
 
-// A click or tap, a key, or scrolling down disturbs the chips. Every listener is
+// A click or tap, a key, or scrolling down (the page or any element in it) disturbs the chips. Every listener is
 // passive and none prevents the default, so the page scrolls, types and clicks as usual.
 function disturbanceListeners(
   window: Window,
   trigger: () => void,
-  scrolledDown: () => boolean,
+  scrolledDown: (target: EventTarget) => boolean,
 ): () => void {
   const options = {capture: true, passive: true};
   const onWheel = (event: WheelEvent): void => {
     if (event.deltaY > 0) trigger();
   };
-  const onScroll = (): void => {
-    if (scrolledDown()) trigger();
+  const onScroll = (event: Event): void => {
+    if (event.target !== null && scrolledDown(event.target)) trigger();
   };
   window.addEventListener('pointerdown', trigger, options);
   window.addEventListener('keydown', trigger, options);
@@ -123,6 +122,18 @@ function disturbanceListeners(
     window.removeEventListener('keydown', trigger, options);
     window.removeEventListener('wheel', onWheel, options);
     window.removeEventListener('scroll', onScroll, options);
+  };
+}
+
+// The page scrolls the window; the lobby scrolls its own element. A capturing
+// listener on the window hears both, and the target says which one moved.
+function downwardScrolls(window: Window): (target: EventTarget) => boolean {
+  const lastTops = new WeakMap<EventTarget, number>();
+  return target => {
+    const top = target instanceof Element ? target.scrollTop : window.scrollY;
+    const down = top > (lastTops.get(target) ?? 0);
+    lastTops.set(target, top);
+    return down;
   };
 }
 

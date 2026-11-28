@@ -4,8 +4,6 @@ import {useParams} from 'react-router';
 
 import {Auth} from '@/components/auth/auth';
 
-import {DachshundTable} from '../landing/dachshund-table.tsx';
-
 const PATHS = new Set<string>(Object.values(viewPaths.auth));
 
 /** The sign-in pages' title. */
@@ -30,8 +28,7 @@ export function HydrateFallback(): JSX.Element {
 export default function AuthPage(): JSX.Element {
   const {path = ''} = useParams();
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-4 p-6">
-      <DachshundTable />
+    <main className="flex min-h-svh items-center justify-center p-6">
       <Auth path={path} />
     </main>
   );

@@ -15,6 +15,14 @@
   overflow-y: auto;
 }
 
+.lobby__dachshund {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: center;
+  /* The drawing already reserves the chips' floor below the dog. */
+  margin-bottom: -32px;
+}
+
 .lobby__intro h2 {
   margin: 16px 0 24px;
   max-width: 12ch;
