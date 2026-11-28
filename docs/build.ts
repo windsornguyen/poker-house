@@ -1,6 +1,6 @@
 // Renders the docs into docs/dist as a static site, with the Scalar CLI's own renderer:
 // the same pages Scalar would host, served from our own domain at no cost.
-import {execFileSync} from 'node:child_process';
+import {type ExecFileSyncOptions, execFileSync} from 'node:child_process';
 import {
   cpSync,
   mkdtempSync,
@@ -12,6 +12,25 @@ import {homedir} from 'node:os';
 import {join, resolve} from 'node:path';
 
 import {build as bundle} from 'esbuild';
+
+/**
+ * Runs a Scalar CLI step with node, printing nothing unless it fails. Its progress and its
+ * errors both go to stdout, so the output is kept and shown only when the step fails.
+ */
+function quietly(args: readonly string[], options: ExecFileSyncOptions): void {
+  try {
+    execFileSync(process.execPath, args, {
+      ...options,
+      stdio: 'pipe',
+      maxBuffer: 1 << 26,
+    });
+  } catch (error) {
+    const {stdout, stderr} = error as {stdout?: Buffer; stderr?: Buffer};
+    process.stderr.write(stdout ?? '');
+    process.stderr.write(stderr ?? '');
+    throw error;
+  }
+}
 
 const docs = import.meta.dirname;
 const output = join(docs, 'dist');
@@ -30,17 +49,12 @@ await bundle({
   logLevel: 'warning',
 });
 
-// Progress goes to stdout and failures to stderr, so only failures reach the log.
-execFileSync(
-  process.execPath,
-  [cli, 'project', 'download-isolate', '--no-input'],
-  {stdio: ['ignore', 'ignore', 'inherit']},
-);
+quietly([cli, 'project', 'download-isolate', '--no-input'], {});
 
 // The renderer resolves its bundled packages from ancestors of the build directory.
 const build = mkdtempSync(join(isolate, 'doggybank-docs-'));
 try {
-  execFileSync(process.execPath, [join(isolate, 'dist/isolate-entry.js')], {
+  quietly([join(isolate, 'dist/isolate-entry.js')], {
     cwd: isolate,
     input: JSON.stringify({
       configPath: 'scalar.config.json',
@@ -54,7 +68,6 @@ try {
       previewServerPort: 7970,
       logLevel: 'info',
     }),
-    stdio: ['pipe', 'ignore', 'inherit'],
   });
   rmSync(output, {recursive: true, force: true});
   cpSync(join(build, 'dist'), output, {recursive: true});
