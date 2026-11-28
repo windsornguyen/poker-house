@@ -85,8 +85,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm --filter @doggybank/web exec wrangler deploy --config ../../docs/wrangler.jsonc
         shell: bash
-      - name: Smoke the page
-        run: curl -fsS -o /dev/null https://doggybank.io/
+      - id: pages
+        name: Smoke the pages
+        run: node apps/web/scripts/smoke.ts https://doggybank.io
+        shell: bash
+      - name: Roll back the site
+        if: ${{ failure() && steps.pages.outcome == 'failure' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm --filter @doggybank/web exec wrangler rollback --yes --message 'The pages failed in the browser.'
         shell: bash
       - name: Smoke the site
         run: curl -fsS -o /dev/null https://doggybank.io/api/auth/get-session

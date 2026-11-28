@@ -1,6 +1,9 @@
 import {
+  and,
   command,
   eq,
+  expr,
+  failure,
   format,
   github,
   job,
@@ -132,9 +135,25 @@ export const release = workflow({
             '../../docs/wrangler.jsonc',
           ),
         },
+        // A page that loads but throws in the browser passes curl, so the pages are loaded
+        // in Chrome and fail on any script error.
         {
-          name: 'Smoke the page',
-          run: run('curl', '-fsS', '-o', '/dev/null', `${site}/`),
+          id: 'pages',
+          name: 'Smoke the pages',
+          run: run('node', 'apps/web/scripts/smoke.ts', site),
+        },
+        {
+          name: 'Roll back the site',
+          if: and(failure(), eq(expr('steps.pages.outcome'), 'failure')),
+          env: cloudflare,
+          run: web(
+            'exec',
+            'wrangler',
+            'rollback',
+            '--yes',
+            '--message',
+            'The pages failed in the browser.',
+          ),
         },
         {
           name: 'Smoke the site',
