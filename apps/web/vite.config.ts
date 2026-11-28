@@ -47,7 +47,10 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: {name: 'node', include: ['src/contract/*.test.ts']},
+        test: {
+          name: 'node',
+          include: ['src/contract/*.test.ts', 'worker/*.test.ts'],
+        },
       },
       {
         extends: true,

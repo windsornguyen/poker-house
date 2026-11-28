@@ -1,6 +1,8 @@
 import {getCookieCache} from 'better-auth/cookies';
 import * as z from 'zod';
 
+import {type SignOff, renderMail} from './mail.ts';
+
 interface Env {
   readonly API_ORIGIN: string;
   readonly AUTH_ORIGIN: string;
@@ -14,20 +16,29 @@ interface Env {
   readonly SITE_URL: string;
 }
 
-/** An email the Machine may ask for: the site page its link must open. */
+/** An email the Machine may ask for: the site page its link must open, and how it ends. */
 interface MailKind {
   readonly page: string;
   readonly action: string;
+  readonly signOff: SignOff;
 }
 
 const MAILS = new Map<string, MailKind>([
   [
     '/mail/verify',
-    {page: '/api/auth/verify-email?', action: 'Confirm your email'},
+    {
+      page: '/api/auth/verify-email?',
+      action: 'Confirm your email',
+      signOff: 'dog',
+    },
   ],
   [
     '/mail/reset',
-    {page: '/api/auth/reset-password/', action: 'Reset your password'},
+    {
+      page: '/api/auth/reset-password/',
+      action: 'Reset your password',
+      signOff: 'none',
+    },
   ],
 ]);
 
@@ -37,12 +48,6 @@ const RESEND_EMAILS = 'https://api.resend.com/emails';
 const API_KEY_HEADER = 'x-api-key';
 const API_KEY_PATH = '/internal/api-key';
 const KeyOwner = z.object({player: z.string()});
-const ENTITIES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-};
 
 function notFound(): Response {
   return new Response('Not found', {status: 404});
@@ -79,12 +84,15 @@ async function sendMail(
     return notFound();
   }
   const body: unknown = await request.json().catch(() => null);
-  const link = linkOf(body, new URL(request.url).origin + kind.page);
+  const origin = new URL(request.url).origin;
+  const link = linkOf(body, origin + kind.page);
   if (link === null) return notFound();
-  const href = Object.entries(ENTITIES).reduce(
-    (text, [char, entity]) => text.replaceAll(char, entity),
-    link.url,
-  );
+  const {text, html} = renderMail({
+    action: kind.action,
+    url: link.url,
+    origin,
+    signOff: kind.signOff,
+  });
   const sent = await fetch(RESEND_EMAILS, {
     method: 'POST',
     headers: {
@@ -95,8 +103,8 @@ async function sendMail(
       from: `Doggybank <${env.MAIL_FROM}>`,
       to: [link.to],
       subject: kind.action,
-      text: `${kind.action}: ${link.url}`,
-      html: `<p><a href="${href}">${kind.action}</a></p>`,
+      text,
+      html,
     }),
   });
   if (!sent.ok) return new Response(await sent.text(), {status: 502});
