@@ -8,7 +8,7 @@ import psycopg
 import pydantic
 from psycopg.types.json import Jsonb
 
-from doggybank_server import contract, controllers, plies
+from doggybank_server import contract, controllers, errors, plies
 
 
 @dataclasses.dataclass(frozen=True)
@@ -42,22 +42,62 @@ class StoredSession:
     seats: tuple[StoredSeat, ...]
     plies: tuple[StoredPly, ...]
     staked: bool
+    next: str | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class Snapshot:
+    """The mutable fields of a stored session, read in one query to spot stale copies."""
+
+    actions: tuple[int, ...]
+    seats: tuple[StoredSeat, ...]
+    next: str | None
 
 
 BOT_OUTPUT = pydantic.TypeAdapter(contract.BotOutput)
 PARAMETERS = pydantic.TypeAdapter(dict[str, contract.ParameterValue])
 
 
+def dump_ply(session_id: str, index: int, ply: plies.Ply) -> tuple[object, ...]:
+    """A ply row ready for `poker.ply`."""
+    output = (
+        None
+        if ply.bot_output is None
+        else Jsonb(BOT_OUTPUT.dump_python(ply.bot_output, mode="json"))
+    )
+    return (session_id, index, ply.seat, ply.action, output)
+
+
 class Database:
     """One connection, shared by the server's request threads."""
 
     def __init__(self, url: str) -> None:
+        self.url = url
         self.connection = psycopg.connect(url, autocommit=True)
         self.lock = threading.Lock()
 
-    def insert(self, stored: StoredSession) -> None:
-        """Records a new session and its seats."""
+    def insert(
+        self,
+        stored: StoredSession,
+        played: Sequence[plies.Ply] = (),
+        returns: Sequence[float] | None = None,
+        *,
+        after: str | None = None,
+    ) -> str:
+        """Records a new session, its seats and its initial plies.
+
+        When `after` is given, locks the room and inserts `stored` only while
+        `after` is still its latest hand, returning the id of the hand after
+        `after` either way.
+        """
         with self.lock, self.connection.transaction():
+            if after is not None:
+                self.connection.execute(
+                    "select 1 from poker.room where code = %s for update", (stored.code,)
+                )
+                latest = self._latest(stored.code)
+                if latest is not None and latest != after:
+                    return latest
             self.connection.execute(
                 "insert into poker.session (id, code, game, parameters, seed, chance_policy)"
                 " values (%s, %s, %s, %s, %s, %s)",
@@ -85,44 +125,113 @@ class Database:
                     for index, seat in enumerate(stored.seats)
                 ],
             )
+            if played or returns is not None:
+                self.write_plies(
+                    stored.id,
+                    open_before=True,
+                    expected=0,
+                    kept=0,
+                    added=played,
+                    returns=returns,
+                )
+            return stored.id
+
+    def lock_session(
+        self,
+        session_id: str,
+        expected: int,
+        actions: Sequence[int],
+        seats: Sequence[StoredSeat],
+    ) -> tuple[bool, StoredSession | None]:
+        """Locks `session_id` in the caller's transaction and checks its ply count.
+
+        Returns whether the hand was still open, and the stored session when the
+        caller's copy is stale (its ply count, history or seats differ), else None.
+
+        Raises:
+          errors.NotFoundError: If `session_id` is not in the database.
+        """
+        row = self.connection.execute(
+            "select finished_at is null,"
+            " (select count(*) from poker.ply where session_id = %s)"
+            " from poker.session where id = %s for update",
+            (session_id, session_id),
+        ).fetchone()
+        if row is None:
+            raise errors.NotFoundError(f"There is no session {session_id!r}.")
+        open_before, count = row
+        if count != expected:
+            return open_before, self._load(session_id)
+        snap = self._snapshot(session_id)
+        assert snap is not None
+        if snap.actions != tuple(actions) or snap.seats != tuple(seats):
+            return open_before, self._load(session_id)
+        return open_before, None
 
     def record(
         self,
         session_id: str,
+        expected: int,
         kept: int,
         added: Sequence[plies.Ply],
         returns: Sequence[float] | None,
+    ) -> StoredSession | None:
+        """Compares the stored ply count with `expected` and writes the change if current.
+
+        Returns None when the write committed, or the fresh `StoredSession` when
+        the stored ply count differed from `expected` and nothing was written.
+        """
+        with self.lock, self.connection.transaction():
+            row = self.connection.execute(
+                "select finished_at is null,"
+                " (select count(*) from poker.ply where session_id = %s)"
+                " from poker.session where id = %s for update",
+                (session_id, session_id),
+            ).fetchone()
+            if row is None:
+                raise errors.NotFoundError(f"There is no session {session_id!r}.")
+            open_before, count = row
+            if count != expected:
+                return self._load(session_id)
+            self.write_plies(
+                session_id,
+                open_before=open_before,
+                expected=expected,
+                kept=kept,
+                added=added,
+                returns=returns,
+            )
+            return None
+
+    def write_plies(
+        self,
+        session_id: str,
+        *,
+        open_before: bool,
+        expected: int,
+        kept: int,
+        added: Sequence[plies.Ply],
+        returns: Sequence[float] | None,
+        seats: Sequence[StoredSeat] | None = None,
     ) -> None:
-        """Keeps the first `kept` plies, appends `added`, and marks a finished hand.
+        """Writes a locked session's changed plies, seats and result in the caller's transaction.
 
         The moment a hand finishes, each seated player's stack at the room takes
         the seat's return, in the same transaction, and a stack left empty frees
         its seat. A hand played for nothing has no stacks, so nothing changes.
         """
-        with self.lock, self.connection.transaction():
-            open_before = self.connection.execute(
-                "select finished_at is null from poker.session where id = %s for update",
-                (session_id,),
-            ).fetchone()
+        if kept < expected:
             self.connection.execute(
-                "delete from poker.ply where session_id = %s and ply >= %s", (session_id, kept)
+                "delete from poker.ply where session_id = %s and ply >= %s",
+                (session_id, kept),
             )
+        if added:
             self.connection.cursor().executemany(
                 "insert into poker.ply (session_id, ply, seat, action, bot_output)"
                 " values (%s, %s, %s, %s, %s)",
-                [
-                    (
-                        session_id,
-                        kept + offset,
-                        ply.seat,
-                        ply.action,
-                        None
-                        if ply.bot_output is None
-                        else Jsonb(BOT_OUTPUT.dump_python(ply.bot_output, mode="json")),
-                    )
-                    for offset, ply in enumerate(added)
-                ],
+                [dump_ply(session_id, kept + offset, ply) for offset, ply in enumerate(added)],
             )
+        if kept < expected or added or (returns is not None and open_before):
             self.connection.execute(
                 "update poker.session set returns = %s,"
                 " finished_at = case when %s::float8[] is null then null"
@@ -133,8 +242,24 @@ class Database:
                     session_id,
                 ),
             )
-            if returns is not None and open_before == (True,):
+            if returns is not None and open_before:
                 self.settle(session_id, returns)
+        if seats is not None:
+            self.connection.cursor().executemany(
+                "update poker.seat set controller = %s, config = %s, autoplay = %s, player = %s"
+                " where session_id = %s and seat = %s",
+                [
+                    (
+                        seat.spec.kind,
+                        Jsonb(dict(seat.spec.config)),
+                        seat.autoplay,
+                        seat.player,
+                        session_id,
+                        index,
+                    )
+                    for index, seat in enumerate(seats)
+                ],
+            )
 
     def settle(self, session_id: str, returns: Sequence[float]) -> None:
         """Adds a finished hand's returns to its players' stacks, in the caller's transaction."""
@@ -151,26 +276,66 @@ class Database:
             (session_id,),
         )
 
+    def snapshot(self, session_id: str) -> Snapshot | None:
+        """Returns the mutable fields of `session_id`, or None if there is none."""
+        with self.lock:
+            return self._snapshot(session_id)
+
+    def _snapshot(self, session_id: str) -> Snapshot | None:
+        row = self.connection.execute(
+            "select coalesce("
+            "  (select array_agg(action order by ply) from poker.ply where session_id = s.id),"
+            "  '{}'"
+            "),"
+            " (select n.id from poker.session n where n.code = s.code"
+            "  and n.created_at > s.created_at order by n.created_at limit 1)"
+            " from poker.session s where s.id = %s",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        seats = self.connection.execute(
+            "select controller, config, autoplay, player from poker.seat"
+            " where session_id = %s order by seat",
+            (session_id,),
+        ).fetchall()
+        actions, next_id = row
+        return Snapshot(
+            actions=tuple(actions),
+            seats=tuple(
+                StoredSeat(
+                    controllers.Spec(kind, PARAMETERS.validate_python(config)), autoplay, player
+                )
+                for kind, config, autoplay, player in seats
+            ),
+            next=next_id,
+        )
+
     def load(self, session_id: str) -> StoredSession | None:
         """Returns the stored session, or None if there is none."""
         with self.lock:
-            row = self.connection.execute(
-                "select s.code, s.game, s.parameters, s.seed, s.chance_policy, r.buy_in is not null"
-                " from poker.session s join poker.room r on r.code = s.code where s.id = %s",
-                (session_id,),
-            ).fetchone()
-            if row is None:
-                return None
-            seats = self.connection.execute(
-                "select controller, config, autoplay, player from poker.seat"
-                " where session_id = %s order by seat",
-                (session_id,),
-            ).fetchall()
-            played = self.connection.execute(
-                "select seat, action, bot_output from poker.ply where session_id = %s order by ply",
-                (session_id,),
-            ).fetchall()
-        code, game, parameters, seed, chance_policy, staked = row
+            return self._load(session_id)
+
+    def _load(self, session_id: str) -> StoredSession | None:
+        row = self.connection.execute(
+            "select s.code, s.game, s.parameters, s.seed, s.chance_policy, r.buy_in is not null,"
+            " (select n.id from poker.session n where n.code = s.code"
+            "  and n.created_at > s.created_at order by n.created_at limit 1)"
+            " from poker.session s join poker.room r on r.code = s.code where s.id = %s",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        seats = self.connection.execute(
+            "select controller, config, autoplay, player from poker.seat"
+            " where session_id = %s order by seat",
+            (session_id,),
+        ).fetchall()
+        played = self.connection.execute(
+            "select seat, action, bot_output from poker.ply where session_id = %s order by ply",
+            (session_id,),
+        ).fetchall()
+        code, game, parameters, seed, chance_policy, staked, next_id = row
         return StoredSession(
             id=session_id,
             code=code,
@@ -191,6 +356,7 @@ class Database:
                 for seat, action, output in played
             ),
             staked=staked,
+            next=next_id,
         )
 
     def problem(self) -> str | None:
@@ -202,24 +368,39 @@ class Database:
             return str(error)
         return None
 
-    def claim(self, session_id: str, seat: int, player: str) -> None:
-        """Records `player` holding `seat`."""
-        with self.lock:
-            self.connection.execute(
-                "update poker.seat set player = %s where session_id = %s and seat = %s",
-                (player, session_id, seat),
-            )
-
     def find(self, code: str) -> str | None:
         """Returns the id of the latest hand of room `code`, or None."""
         with self.lock:
-            row = self.connection.execute(
-                "select id from poker.session where code = %s order by created_at desc limit 1",
-                (code,),
-            ).fetchone()
+            return self._latest(code)
+
+    def _latest(self, code: str) -> str | None:
+        row = self.connection.execute(
+            "select id from poker.session where code = %s order by created_at desc limit 1",
+            (code,),
+        ).fetchone()
         return None if row is None else row[0]
 
-    def delete(self, session_id: str) -> None:
-        """Forgets a session, its seats and its plies."""
+    def delete(self, session_id: str) -> bool:
+        """Forgets a session, its seats and its plies; returns whether it existed."""
         with self.lock:
+            deleted = self.connection.execute(
+                "delete from poker.session where id = %s", (session_id,)
+            )
+            return deleted.rowcount > 0
+
+    def delete_unstarted(self, code: str, session_id: str) -> bool:
+        """Deletes `session_id` while `code` locked has an open human seat and no second buy-in."""
+        with self.lock, self.connection.transaction():
+            self.connection.execute("select 1 from poker.room where code = %s for update", (code,))
+            seated = self.connection.execute(
+                "select count(*) from poker.room_seat where code = %s", (code,)
+            ).fetchone()
+            open_seats = self.connection.execute(
+                "select count(*) from poker.seat"
+                " where session_id = %s and controller = 'human' and player is null",
+                (session_id,),
+            ).fetchone()
+            if (seated is not None and seated[0] > 1) or open_seats == (0,):
+                return False
             self.connection.execute("delete from poker.session where id = %s", (session_id,))
+            return True

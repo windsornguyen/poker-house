@@ -25,9 +25,10 @@ new session displaces the one used least recently.
 """
 
 import collections
+import contextlib
 import secrets
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 
 from doggybank_server import contract, db, errors, loader, plies, timeouts
 from doggybank_server import controllers as controllers_lib
@@ -39,16 +40,33 @@ from doggybank_server import session as session_lib
 DEFAULT_CAPACITY = 256
 
 
+def common_prefix(before: Sequence[plies.Ply], current: Sequence[plies.Ply]) -> int:
+    """How many leading plies of `before` and `current` match."""
+    kept = 0
+    for old, new in zip(before, current, strict=False):
+        if (old.seat, old.action, old.bot_output) != (new.seat, new.action, new.bot_output):
+            break
+        kept += 1
+    return kept
+
+
 class Journal:
-    """Writes each session's changes to the database as they happen."""
+    """Linearizes each session's changes in Postgres."""
 
     def __init__(self, database: db.Database) -> None:
         self.database = database
         self.saved: dict[str, tuple[plies.Ply, ...]] = {}
+        self.saved_seats: dict[str, tuple[db.StoredSeat, ...]] = {}
 
-    def follow(self, session: session_lib.Session, seats: Sequence[db.StoredSeat]) -> None:
-        """Records a new session and every change to it from now on."""
-        self.database.insert(
+    def follow(
+        self,
+        session: session_lib.Session,
+        seats: Sequence[db.StoredSeat],
+        *,
+        after: str | None = None,
+    ) -> str:
+        """Records a new session, or returns the id already dealt after `after`."""
+        chosen = self.database.insert(
             db.StoredSession(
                 id=session.id,
                 code=session.code,
@@ -59,33 +77,97 @@ class Journal:
                 seats=tuple(seats),
                 plies=(),
                 staked=session.staked,
-            )
+            ),
+            session.played,
+            session.returns,
+            after=after,
         )
-        self.resume(session, ())
+        if chosen == session.id:
+            self.resume(session)
+        return chosen
 
-    def resume(self, session: session_lib.Session, saved: tuple[plies.Ply, ...]) -> None:
-        """Records every change to a session whose first `saved` plies are stored."""
-        self.saved[session.id] = saved
-        session.listeners.append(self.sync)
-        self.sync(session)
+    def resume(self, session: session_lib.Session) -> None:
+        """Guards every future change to `session` against its stored plies."""
+        self.saved[session.id] = session.played
+        self.saved_seats[session.id] = session.stored_seats()
+        session.guard = self.guard
 
-    def sync(self, session: session_lib.Session) -> None:
-        """Writes the plies that differ from those stored, and the hand's result."""
-        current = session.played
+    @contextlib.contextmanager
+    def guard(self, session: session_lib.Session) -> Generator[bool]:
+        """Runs one change to `session` under its row lock in one transaction.
+
+        If the stored ply count, history or seats moved on another server,
+        `session` is rebuilt from Postgres in the same transaction before the
+        change is tried.
+        """
         before = self.saved.get(session.id, ())
-        kept = 0
-        for old, new in zip(before, current, strict=False):
-            if (old.seat, old.action, old.bot_output) != (new.seat, new.action, new.bot_output):
-                break
-            kept += 1
-        self.database.record(session.id, kept, current[kept:], session.returns)
+        before_seats = self.saved_seats.get(session.id, ())
+        failed_controller: errors.ControllerFailedError | None = None
+        with self.database.lock, self.database.connection.transaction():
+            open_before, stale = self.database.lock_session(
+                session.id,
+                len(before),
+                [ply.action for ply in before],
+                before_seats,
+            )
+            if stale is not None:
+                session.reload(stale)
+                before = session.played
+                before_seats = session.stored_seats()
+                self.saved[session.id] = before
+                self.saved_seats[session.id] = before_seats
+            try:
+                yield stale is not None
+            except errors.ControllerFailedError as error:
+                failed_controller = error
+            except errors.RequestError:
+                raise
+            except BaseException:
+                self.saved.pop(session.id, None)
+                self.saved_seats.pop(session.id, None)
+                raise
+            current = session.played
+            seats_now = session.stored_seats()
+            kept = common_prefix(before, current)
+            self.database.write_plies(
+                session.id,
+                open_before=open_before,
+                expected=len(before),
+                kept=kept,
+                added=current[kept:],
+                returns=session.returns,
+                seats=None if seats_now == before_seats else seats_now,
+            )
         self.saved[session.id] = current
+        self.saved_seats[session.id] = seats_now
+        if failed_controller is not None:
+            raise failed_controller
 
-    def claim(self, session: session_lib.Session, seat: int) -> None:
-        """Records who holds `seat` of `session`."""
-        player = session.holders[seat]
-        if player is not None:
-            self.database.claim(session.id, seat, player)
+    def refresh(self, session: session_lib.Session) -> bool:
+        """Reloads `session` if Postgres moved ahead of it; False if deleted."""
+        with session._lock:
+            snap = self.database.snapshot(session.id)
+            if snap is None:
+                self.saved.pop(session.id, None)
+                self.saved_seats.pop(session.id, None)
+                return False
+            before = self.saved.get(session.id, ())
+            before_seats = self.saved_seats.get(session.id, ())
+            if (
+                snap.actions == tuple(ply.action for ply in before)
+                and snap.seats == before_seats
+                and snap.next == session.next_id
+            ):
+                return True
+            stored = self.database.load(session.id)
+            if stored is None:
+                self.saved.pop(session.id, None)
+                self.saved_seats.pop(session.id, None)
+                return False
+            session.reload(stored)
+            self.saved[session.id] = session.played
+            self.saved_seats[session.id] = session.stored_seats()
+            return True
 
     def load(self, session_id: str) -> session_lib.Session | None:
         """Rebuilds a stored session, or returns None if there is none."""
@@ -93,13 +175,22 @@ class Journal:
         if stored is None:
             return None
         session = session_lib.Session.restore(stored)
-        self.resume(session, session.played)
+        self.resume(session)
         return session
 
-    def forget(self, session_id: str) -> None:
-        """Deletes a session from the database."""
+    def forget(self, session_id: str) -> bool:
+        """Deletes a session from the database; returns whether it existed."""
         self.saved.pop(session_id, None)
-        self.database.delete(session_id)
+        self.saved_seats.pop(session_id, None)
+        return self.database.delete(session_id)
+
+    def forget_unstarted(self, code: str, session_id: str) -> bool:
+        """Deletes `session_id` if `code` still waits for its second player."""
+        if not self.database.delete_unstarted(code, session_id):
+            return False
+        self.saved.pop(session_id, None)
+        self.saved_seats.pop(session_id, None)
+        return True
 
 
 class SessionStore:
@@ -187,10 +278,12 @@ class SessionStore:
         session: session_lib.Session,
         controllers: Sequence[controllers_lib.Spec],
         autoplay: Sequence[bool],
+        *,
+        after: str | None = None,
     ) -> session_lib.Session:
         """Stores a new hand, and keeps its clocks."""
         if self.journal is not None:
-            self.journal.follow(
+            chosen = self.journal.follow(
                 session,
                 [
                     db.StoredSeat(spec, play, holder)
@@ -201,16 +294,24 @@ class SessionStore:
                         strict=True,
                     )
                 ],
+                after=after,
             )
+            if chosen != session.id:
+                return self.get(chosen)
         self.turns.follow(session)
         self.hands.follow(session)
         with self._lock:
             self._sessions[session.id] = session
-            while len(self._sessions) > self._capacity:
-                evicted = self._sessions.popitem(last=False)[1]
-                evicted.listeners.clear()
-                evicted.close()
+            self.evict_locked()
         return session
+
+    def evict_locked(self) -> None:
+        """Drops the oldest sessions past `_capacity`; caller holds `_lock`."""
+        while len(self._sessions) > self._capacity:
+            evicted = self._sessions.popitem(last=False)[1]
+            evicted.guard = None
+            evicted.listeners.clear()
+            evicted.close()
 
     def get(self, session_id: str) -> session_lib.Session:
         """Returns the session with id `session_id`.
@@ -226,13 +327,28 @@ class SessionStore:
             session = self._sessions.get(session_id)
             if session is not None:
                 self._sessions.move_to_end(session_id)
+        if session is not None and self.journal is not None:
+            if not self.journal.refresh(session):
+                self.expire(session_id)
+                raise errors.NotFoundError(f"There is no session {session_id!r}.")
+            return session
         if session is None and self.journal is not None:
-            session = self.journal.load(session_id)
-            if session is not None:
-                self.turns.follow(session)
-                self.hands.follow(session)
+            loaded = self.journal.load(session_id)
+            if loaded is not None:
                 with self._lock:
-                    session = self._sessions.setdefault(session_id, session)
+                    existing = self._sessions.get(session_id)
+                    if existing is None:
+                        self._sessions[session_id] = loaded
+                        self.evict_locked()
+                        session = loaded
+                    else:
+                        session = existing
+                if session is loaded:
+                    self.turns.follow(session)
+                    self.hands.follow(session)
+                elif not self.journal.refresh(session):
+                    self.expire(session_id)
+                    raise errors.NotFoundError(f"There is no session {session_id!r}.")
         if session is None:
             raise errors.NotFoundError(f"There is no session {session_id!r}.")
         return session
@@ -272,12 +388,18 @@ class SessionStore:
         session = self.get(room.latest)
         if room.buy_in is not None:
             self.rooms().sit(code, player, session.num_seats)
+            if self.rooms().find(code).latest is None:
+                self.rooms().leave(code, player)
+                raise errors.NotFoundError(f"The room {code!r} has closed.")
 
-        seat = session.claim(player) if session.returns is None else None
+        try:
+            seat = session.claim(player)
+        except errors.NotFoundError:
+            if room.buy_in is not None:
+                self.rooms().leave(code, player)
+            raise errors.NotFoundError(f"The room {code!r} has closed.") from None
         if seat is None and room.buy_in is None:
             raise errors.RoomFullError("Every seat at this table is taken.")
-        if seat is not None and self.journal is not None:
-            self.journal.claim(session, seat)
         return session, seat
 
     def deal(self, code: str, after: str, player: str) -> tuple[session_lib.Session, int | None]:
@@ -333,9 +455,9 @@ class SessionStore:
             code=room.code,
             staked=True,
         )
-        self.keep(session, controllers, ())
-        latest.succeed(session.id)
-        return session
+        dealt = self.keep(session, controllers, (), after=latest.id)
+        latest.succeed(dealt.id)
+        return dealt
 
     def leave(self, code: str, player: str) -> rooms_lib.Room:
         """Gets up from room `code`, moving `player`'s stack back to their account.
@@ -351,9 +473,13 @@ class SessionStore:
             room = self.rooms().find(code)
             latest = None if room.latest is None else self.get(room.latest)
             if latest is not None and latest.returns is None and player in latest.holders:
-                if None not in latest.holders:
+                if None not in latest.holders or (
+                    self.journal is not None and not self.journal.forget_unstarted(code, latest.id)
+                ):
                     raise errors.TableNotReadyError("Finish the hand before you leave.")
-                self.delete(latest.id)
+                self.expire(latest.id)
+                if self.journal is None:
+                    self.delete(latest.id)
 
             self.rooms().leave(code, player)
             return self.rooms().find(code)
@@ -392,17 +518,22 @@ class SessionStore:
         """
         with self._lock:
             session = self._sessions.pop(session_id, None)
-        if session is None:
-            raise errors.NotFoundError(f"There is no session {session_id!r}.")
-        session.close()
+        if session is not None:
+            session.guard = None
+            session.listeners.clear()
+            session.close()
         if self.journal is not None:
-            self.journal.forget(session_id)
+            if not self.journal.forget(session_id):
+                raise errors.NotFoundError(f"There is no session {session_id!r}.")
+        elif session is None:
+            raise errors.NotFoundError(f"There is no session {session_id!r}.")
 
     def expire(self, session_id: str) -> None:
         """Drops a session from memory and ends its streams; its record stays."""
         with self._lock:
             session = self._sessions.pop(session_id, None)
         if session is not None:
+            session.guard = None
             session.listeners.clear()
             session.close()
 

@@ -77,15 +77,15 @@ hypothesis.settings.register_profile(
 hypothesis.settings.load_profile(os.environ.get("DOGGYBANK_HYPOTHESIS", "check"))
 
 POSTGRES: cluster.Cluster
-CLIENT: testclient.TestClient
+CLIENTS: tuple[testclient.TestClient, testclient.TestClient]
 READS: psycopg.Connection
 DATABASE: db.Database
 ACCOUNTS: dict[str, str] = {}
 
 
 def start() -> None:
-    """Starts the cluster, its accounts and the API, once, for every example after."""
-    global POSTGRES, CLIENT, READS, DATABASE
+    """Starts the cluster, its accounts and two API stores, once, for every example after."""
+    global POSTGRES, CLIENTS, READS, DATABASE
     if ACCOUNTS:
         return
 
@@ -99,17 +99,22 @@ def start() -> None:
     READS = psycopg.connect(POSTGRES.url, autocommit=True)
     DATABASE = db.Database(POSTGRES.url)
     atexit.register(POSTGRES.stop)
-    served = app.create_app(
-        store.SessionStore(journal=store.Journal(DATABASE)),
-        catalogue=loader.build_catalogue,
-        health=health_report.build,
-        player_key=harness.PLAYER_KEY,
-        client=app.CLIENT_ROOT,
-        allowed_hosts=app.LOOPBACK_HOSTS,
-    )
-    # One client for every example, so each request reuses its event loop.
+    # One pair of clients for every example, so each request reuses its event loop.
     clients = contextlib.ExitStack()
-    CLIENT = clients.enter_context(testclient.TestClient(served, base_url="http://localhost"))
+    built = []
+    for _ in range(2):
+        served = app.create_app(
+            store.SessionStore(journal=store.Journal(db.Database(POSTGRES.url))),
+            catalogue=loader.build_catalogue,
+            health=health_report.build,
+            player_key=harness.PLAYER_KEY,
+            client=app.CLIENT_ROOT,
+            allowed_hosts=app.LOOPBACK_HOSTS,
+        )
+        built.append(
+            clients.enter_context(testclient.TestClient(served, base_url="http://localhost"))
+        )
+    CLIENTS = (built[0], built[1])
     atexit.register(clients.close)
 
 
@@ -165,6 +170,8 @@ class Cheaters(stateful.RuleBasedStateMachine):
         # the returns of every hand that has finished since they sat.
         self.stacks: dict[str, dict[str, int]] = {}
         self.settled: set[str] = set()
+        self.which = 0
+        self.alternating = False
         frame = body(self.call("host", "POST", "/api/sessions?viewer=0", TABLE))
         self.codes.append(frame["session"]["code"])
         self.call("guest", "POST", f"/api/rooms/{self.codes[0]}/join", {})
@@ -188,7 +195,10 @@ class Cheaters(stateful.RuleBasedStateMachine):
     ) -> httpx2.Response:
         """Sends one request as `who`, and checks invariants 1, 2, 3 and 5 on its answer."""
         encoded = b"" if body is None else json.dumps(body).encode()
-        response = CLIENT.request(method, target, content=encoded, headers=headers(who))
+        client = CLIENTS[self.which]
+        if self.alternating:
+            self.which = 1 - self.which
+        response = client.request(method, target, content=encoded, headers=headers(who))
 
         answer = response.json()
         assert response.status_code < 500, (target, answer)
@@ -472,12 +482,18 @@ class Cheaters(stateful.RuleBasedStateMachine):
     def look(self, who: str | None, viewer: str, read: str, older: int) -> None:
         self.call(who, "GET", f"/api/sessions/{self.target(older)}{read}?viewer={viewer}")
 
+    @stateful.rule()
+    def alternate_stores(self) -> None:
+        """Switches the active store and alternates every request after between the two."""
+        self.which = 1 - self.which
+        self.alternating = not self.alternating
+
     @stateful.rule(who=st.sampled_from(PLAYERS), viewer=st.sampled_from(VIEWERS))
     def watch(self, who: str | None, viewer: str) -> None:
         """An event stream opens only for a view its player may take."""
         hand = self.target(0)
         target = f"/api/sessions/{hand}/events?viewer={viewer}"
-        with CLIENT.stream("GET", target, headers=headers(who)) as response:
+        with CLIENTS[self.which].stream("GET", target, headers=headers(who)) as response:
             if response.status_code != 200:
                 response.read()
                 assert response.status_code < 500, (target, response.text)

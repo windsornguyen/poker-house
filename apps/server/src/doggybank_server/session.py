@@ -23,12 +23,14 @@ what each viewer may see; controllers play the seats the client does not.
 A session is safe to share between threads: every method holds its lock.
 """
 
+import contextlib
 import dataclasses
 import random
 import secrets
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import AbstractContextManager
 
 import pyspiel
 
@@ -73,6 +75,7 @@ class Session:
         code: str,
         holders: Sequence[str | None],
         staked: bool,
+        next_id: str | None = None,
     ) -> None:
         """Starts a session with every seat human; use `create` or `restore`."""
         self.id = session_id
@@ -101,7 +104,7 @@ class Session:
             ),
             code=code,
             staked=staked,
-            next=None,
+            next=next_id,
         )
         self._seats = seats.Seats(loaded.num_seats, loaded.game, seed=seed, on_built=self.built)
         self._state = loaded.game.new_initial_state()
@@ -110,6 +113,9 @@ class Session:
         self._draws = 0
         self._lock = threading.RLock()
         self.listeners: list[Callable[[Session], None]] = []
+        self.guard: Callable[[Session], AbstractContextManager[bool]] | None = None
+        self._writing = False
+        self._touched = False
         self._changed = threading.Condition(self._lock)
         self._version = 0
         self.changed_at = time.monotonic()
@@ -175,6 +181,28 @@ class Session:
             session.settle(request.MAX_ADVANCE_PLIES, autoplay_only=True)
         return session
 
+    @contextlib.contextmanager
+    def _write(self) -> Generator[None]:
+        """Runs one change under `guard`, notifying waiters once it commits."""
+        if self._writing:
+            yield
+            return
+        self._writing = True
+        self._touched = False
+        reloaded = [False]
+        try:
+            if self.guard is None:
+                yield
+            else:
+                with self.guard(self) as was_reloaded:
+                    reloaded[0] = was_reloaded
+                    yield
+        finally:
+            self._writing = False
+            if reloaded[0] or self._touched:
+                self._touched = False
+                self._notify()
+
     @property
     def history(self) -> tuple[int, ...]:
         """Every action of the live game, chance outcomes included."""
@@ -232,13 +260,29 @@ class Session:
         with self._lock:
             return tuple(self._holders)
 
+    @property
+    def next_id(self) -> str | None:
+        """The id of the room's next hand, once dealt."""
+        with self._lock:
+            return self._info.next
+
+    def stored_seats(self) -> tuple[db.StoredSeat, ...]:
+        """Every seat's stored controller, autoplay flag and holder."""
+        with self._lock:
+            return tuple(
+                db.StoredSeat(self._seats[i].spec, self._seats[i].autoplay, self._holders[i])
+                for i in range(len(self._seats))
+            )
+
     def claim(self, player: str) -> int | None:
         """Seats `player` at the lowest open human seat.
 
         Returns:
           The seat `player` holds, or None when no human seat is open to them.
         """
-        with self._lock:
+        with self._lock, self._write():
+            if self._state.is_terminal():
+                return None
             if player in self._holders:
                 return self._holders.index(player)
 
@@ -277,15 +321,23 @@ class Session:
     def succeed(self, session_id: str) -> None:
         """Records the room's next hand, so every viewer of this one learns of it."""
         with self._lock:
+            if self._info.next == session_id:
+                return
             self._info = dataclasses.replace(self._info, next=session_id)
             self.touch()
 
     def touch(self) -> None:
         """Records a change, wakes every `wait`, and tells every listener."""
+        if self._writing:
+            self._touched = True
+            return
+        self._notify()
+
+    def _notify(self) -> None:
         self._version += 1
         self.changed_at = time.monotonic()
         self._changed.notify_all()
-        for listener in self.listeners:
+        for listener in list(self.listeners):
             listener(self)
 
     @property
@@ -334,6 +386,7 @@ class Session:
             code=stored.code,
             holders=[seat.player for seat in stored.seats],
             staked=stored.staked,
+            next_id=stored.next,
         )
         with session._lock:
             session._seats.assign(
@@ -344,6 +397,31 @@ class Session:
                 session._plies.append(dataclasses.replace(played, bot_output=ply.bot_output))
             session._draws = sum(ply.seat is None for ply in stored.plies)
         return session
+
+    def reload(self, stored: db.StoredSession) -> None:
+        """Replaces the live state in place from `stored`, waking waiters when outside a write."""
+        with self._lock:
+            changed_seats = {
+                index: (seat.spec, seat.autoplay)
+                for index, seat in enumerate(stored.seats)
+                if (self._seats[index].spec, self._seats[index].autoplay)
+                != (seat.spec, seat.autoplay)
+            }
+            if changed_seats:
+                self._seats.assign(changed_seats)
+            state, rebuilt = plies.rebuild(self._loaded.game, [ply.action for ply in stored.plies])
+            new_plies = [
+                dataclasses.replace(played, bot_output=saved.bot_output)
+                for played, saved in zip(rebuilt, stored.plies, strict=True)
+            ]
+            if [ply.action for ply in new_plies] != [ply.action for ply in self._plies]:
+                self._seats.clear_failures()
+            self._state = state
+            self._plies = new_plies
+            self._draws = max(self._draws, sum(ply.seat is None for ply in stored.plies))
+            self._holders = [seat.player for seat in stored.seats]
+            self._info = dataclasses.replace(self._info, next=stored.next)
+            self.touch()
 
     def replay_frame(self, viewer: contract.Viewer, step: int) -> frame_lib.Frame:
         """Returns the position after `step` plies, as `viewer` may see it.
@@ -390,7 +468,7 @@ class Session:
           NotYourTurnError: If `viewer` may not choose the next action there.
           IllegalActionError: If `action` is not legal there; nothing changes.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             state, played = self.position_to_play(viewer, ply)
             seat = plies.to_move(state).seat
@@ -424,7 +502,7 @@ class Session:
           IllegalActionError: If `outcome` is not possible there; nothing changes.
           ControllerFailedError: If an autoplaying seat's controller then fails.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             if self._chance_policy != contract.ChancePolicy.EXPOSE:
                 raise errors.NotYourTurnError("The server resolves chance nodes.")
@@ -455,7 +533,7 @@ class Session:
           ControllerFailedError: If the session is paused, or a controller
             fails; the actions applied stand.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             self.check_not_paused()
             self.settle(max_plies, autoplay_only=False)
@@ -481,7 +559,7 @@ class Session:
           NothingToUndoError: If `viewer` has no action to take back; a
             spectator never has.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             self.check_unstaked("taken back")
             step = self.last_action(viewer)
@@ -513,7 +591,7 @@ class Session:
           NotYourTurnError: If `viewer` is a spectator.
           IllegalActionError: If an action of `history` is illegal; nothing changes.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             self.check_participant(viewer, "resets the game")
             self.check_unstaked("reset")
@@ -553,7 +631,7 @@ class Session:
           ControllerUnavailableError: If the controller cannot play the game, or
             a human seat is asked to autoplay.
         """
-        with self._lock:
+        with self._lock, self._write():
             self.check_viewer(viewer)
             self.check_participant(viewer, "changes who plays a seat")
             self.check_unstaked("given to another player")
@@ -582,7 +660,7 @@ class Session:
 
     def built(self, index: int, build: builds.Build[controllers_lib.Controller]) -> None:
         """Finishes the seat `build` prepares, if it still does, and plays on."""
-        with self._lock:
+        with self._lock, self._write():
             seat = self._seats[index]
             if seat.build is not build:
                 return  # Finished in its request, or superseded.
