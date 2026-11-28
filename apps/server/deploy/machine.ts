@@ -29,7 +29,8 @@ export async function createMachine(): Promise<string> {
     vcpu: 1,
     memory_mib: 2048,
     storage_gib: 10,
-    autosleep: '300s',
+    // A sleeping Machine wakes on the next request, and a wake that fails takes the site down.
+    autosleep: 'never',
   });
   return machine.machine_id;
 }
