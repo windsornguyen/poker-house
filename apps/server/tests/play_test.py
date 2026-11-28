@@ -18,13 +18,10 @@ import io
 import os
 import re
 import sys
-import tempfile
-from pathlib import Path
-from unittest import mock
 
 from absl.testing import absltest
 
-from doggybank_server import child_servers, play
+from doggybank_server import child_servers
 
 _SLOW_BOT = """
 import time
@@ -55,33 +52,6 @@ class LauncherTest(absltest.TestCase):
             child.stop()
         assert child.process.stdout is not None
         self.assertTrue(child.process.stdout.closed)
-
-    def test_creation_waits_for_legal_bot_moves_beyond_the_health_timeout(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            Path(directory, "slow_poker_bot.py").write_text(_SLOW_BOT)
-            environment = {
-                "PYTHONPATH": os.pathsep.join([directory, os.environ.get("PYTHONPATH", "")])
-            }
-            options = play.Options(
-                game="doggybank(blinds=1 2,stack_sizes=20 20)",
-                bot="slow_poker_bot:make_bot",
-                spectate=True,
-                server_per_seat=True,
-                port=0,
-                move_budget_seconds=1,
-            )
-            with (
-                mock.patch.dict(os.environ, environment),
-                mock.patch.object(play, "_REQUEST_SECONDS", 0.05),
-            ):
-                running = play.launch(options, out=io.StringIO())
-                try:
-                    self.assertIn("viewer=spectator", running.play_url)
-                    self.assertEqual(len(set(running.bot_urls.values())), 2)
-                finally:
-                    running.stop()
 
 
 if __name__ == "__main__":

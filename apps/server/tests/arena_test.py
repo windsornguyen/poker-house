@@ -130,44 +130,28 @@ class ArenaTest(absltest.TestCase):
         with self.assertRaises(loader.UnknownGameError):
             loader.load("tic_tac_toe", {})
 
-    def test_two_independent_bot_servers_finish_a_hand_with_private_inputs(
-        self,
-    ) -> None:
-        bots = [
-            RecordingBot(poker_bot.make_call_bot()),
-            RecordingBot(poker_bot.make_raise_bot()),
-        ]
-        seats: list[contract.JsonValue] = []
-        for bot in bots:
-            listener = remote_bot_server.Server(("127.0.0.1", 0), bot, name="test")
-            self.serve(listener)
-            seats.append(
-                {
-                    "controller": "remote",
-                    "autoplay": True,
-                    "config": {"url": listener.url},
-                }
-            )
-        result = self.create(seats, viewer="oracle")
-        self.assertEqual(result["status"], "terminal")
-        self.assertEqual(sum(result["returns"]), 0)
-        self.assertEqual([seat["failure"] for seat in result["seats"]], [None, None])
-        for seat, bot in enumerate(bots):
-            self.assertTrue(bot.requests)
-            for request in bot.requests:
-                self.assertEqual(set(request), {"seat", "seed", "observation"})
-                self.assertEqual(request["seat"], seat)
-                structured = request["observation"]
-                assert isinstance(structured, dict)
-                self.assertEqual(structured["observing_player"], seat)
-                hands = structured["hole_cards"]
-                assert isinstance(hands, list)
-                self.assertEqual(hands[1 - seat], [None, None])
-                own = hands[seat]
-                assert isinstance(own, list)
-                self.assertTrue(all(isinstance(card, str) for card in own))
-                self.assertNotIn("deck", structured)
-                self.assertNotIn("burn_cards", structured)
+    def test_a_seat_never_sends_the_game_to_an_address(self) -> None:
+        # A seat that posts positions to a chosen URL would let anyone aim this
+        # server at its own private ports. Agents play through the API instead.
+        status, refused = self.request(
+            "POST",
+            "/api/sessions?viewer=0",
+            {
+                "game": "doggybank",
+                "parameters": {"blinds": "1 2", "stack_sizes": "40 40"},
+                "chance_policy": "auto",
+                "seed": 17,
+                "seats": [
+                    {
+                        "controller": "remote",
+                        "autoplay": True,
+                        "config": {"url": "http://127.0.0.1:8788"},
+                    },
+                    {"controller": "human", "config": {}, "autoplay": False},
+                ],
+            },
+        )
+        self.assertEqual((status, refused["code"]), (409, "controller_unavailable"))
 
     def join(self, frame: dict[str, Any], player: str = "guest") -> tuple[int, Any]:
         """Joins the room `frame` shows as `player`."""

@@ -196,7 +196,6 @@ register(
     RANDOM,
     Kind("Random", (), reads_full_state=False, build=build_random),
 )
-register(REMOTE, remote_bot.kind())
 
 
 def describe(name: str, kind: Kind) -> contract.Controller:
