@@ -1,30 +1,160 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly COMMIT=$1
-shift
-readonly HOSTS=("$@")
+readonly ACTION=${1:-deploy}
+shift || true
+
 readonly PG_MAJOR=19
 readonly NODE_VERSION=v26.13.1
 readonly UV_VERSION=0.12.1
 readonly PNPM_VERSION=10.30.3
-readonly REPO=https://github.com/windsornguyen/doggybank.git
+readonly CADDY_VERSION=2.11.9
+readonly CADDY_SHA512=0e85544340290a16ce4bfb76fe7d65e9de1bf3a6e67f5ccfff30b30d27ea4c73e078077b7bf3e58ae60b6b12e44327705287059c775bca5782e8ee85ea7edd75
+
 readonly APP_USER=doggybank
 readonly APP_DIR=/opt/doggybank
-readonly ENV_FILE=/etc/doggybank/db.env
-readonly AUTH_ENV_FILE=/etc/doggybank/auth.env
-readonly GAME_ENV_FILE=/etc/doggybank/game.env
+readonly RELEASES_DIR=$APP_DIR/releases
+readonly ETC_DIR=/etc/doggybank
+readonly ENV_FILE=$ETC_DIR/db.env
+readonly AUTH_ENV_FILE=$ETC_DIR/auth.env
+readonly GAME_ENV_FILE=$ETC_DIR/game.env
+readonly HOSTS_ENV_FILE=$ETC_DIR/hosts.env
+readonly LIVE_COLOR_FILE=$ETC_DIR/live.color
+readonly PREVIOUS_COLOR_FILE=$ETC_DIR/previous.color
+readonly AUTH_LISTEN_SCRIPT=$ETC_DIR/auth-listen.mjs
+readonly CADDYFILE=/etc/caddy/Caddyfile
+
+game_port() {
+  case $1 in
+    blue) echo 8801 ;;
+    green) echo 8802 ;;
+    *) exit 1 ;;
+  esac
+}
+
+auth_port() {
+  case $1 in
+    blue) echo 8811 ;;
+    green) echo 8812 ;;
+    *) exit 1 ;;
+  esac
+}
+
+other_color() {
+  case $1 in
+    blue) echo green ;;
+    green) echo blue ;;
+    *) echo blue ;;
+  esac
+}
+
+write_if_changed() {
+  local mode=$1
+  local target=$2
+  local tmp
+  tmp=$(mktemp)
+  cat >"$tmp"
+  if [[ -f $target ]] && cmp -s "$tmp" "$target"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  install -d -m 755 "$(dirname "$target")"
+  install -m "$mode" "$tmp" "$target"
+  rm -f "$tmp"
+  return 0
+}
+
+write_caddyfile() {
+  local color=$1
+  write_if_changed 644 "$CADDYFILE" <<CADDY || true
+{
+	admin 127.0.0.1:2019
+	auto_https off
+}
+
+:8787 {
+	reverse_proxy 127.0.0.1:$(game_port "$color")
+}
+
+:8788 {
+	reverse_proxy 127.0.0.1:$(auth_port "$color")
+}
+CADDY
+}
+
+if [[ $ACTION == retire ]]; then
+  live=$(cat "$LIVE_COLOR_FILE")
+  if [[ -f $PREVIOUS_COLOR_FILE ]]; then
+    old=$(cat "$PREVIOUS_COLOR_FILE")
+    if [[ -n $old && $old != "$live" ]]; then
+      systemctl stop "doggybank@$old.service" "doggybank-auth@$old.service"
+    fi
+    rm -f "$PREVIOUS_COLOR_FILE"
+  fi
+  keep_blue=$(readlink -f "$ETC_DIR/blue.release" 2>/dev/null || true)
+  keep_green=$(readlink -f "$ETC_DIR/green.release" 2>/dev/null || true)
+  for dir in "$RELEASES_DIR"/*; do
+    [[ -d $dir ]] || continue
+    real=$(readlink -f "$dir")
+    if [[ $real != "$keep_blue" && $real != "$keep_green" ]]; then
+      rm -rf "$dir"
+    fi
+  done
+  echo "Retired old color. $live is serving."
+  exit 0
+fi
+
+if [[ $ACTION == rollback ]]; then
+  if [[ ! -f $PREVIOUS_COLOR_FILE ]]; then
+    echo "No previous color to roll back to." >&2
+    exit 1
+  fi
+  old=$(cat "$PREVIOUS_COLOR_FILE")
+  bad=$(cat "$LIVE_COLOR_FILE" 2>/dev/null || true)
+  systemctl enable -q "doggybank@$old.service" "doggybank-auth@$old.service"
+  systemctl start "doggybank@$old.service" "doggybank-auth@$old.service"
+  curl -fsS -o /dev/null "http://127.0.0.1:$(game_port "$old")/readyz"
+  curl -fsS -o /dev/null "http://127.0.0.1:$(auth_port "$old")/readyz"
+  write_caddyfile "$old"
+  /usr/local/bin/caddy reload --config "$CADDYFILE"
+  printf '%s\n' "$old" >"$LIVE_COLOR_FILE"
+  rm -f "$PREVIOUS_COLOR_FILE"
+  if [[ -n $bad && $bad != "$old" ]]; then
+    systemctl disable -q "doggybank@$bad.service" "doggybank-auth@$bad.service" || true
+    systemctl stop "doggybank@$bad.service" "doggybank-auth@$bad.service"
+  fi
+  curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
+  curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
+  echo "Rolled back to $old."
+  exit 0
+fi
+
+if [[ $ACTION != deploy ]]; then
+  echo "Unknown action: $ACTION" >&2
+  exit 1
+fi
+
+readonly COMMIT=$1
+readonly ARCHIVE=$2
+shift 2
+readonly HOSTS=("$@")
 
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/opt/node/bin:$PATH"
 
-apt-get update -qq
-apt-get install -y -qq postgresql-common git curl xz-utils ca-certificates >/dev/null
-/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
-apt-get install -y -qq "postgresql-$PG_MAJOR" >/dev/null
+if ! dpkg -s "postgresql-$PG_MAJOR" curl xz-utils ca-certificates >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq postgresql-common curl xz-utils ca-certificates >/dev/null
+  if ! dpkg -s "postgresql-$PG_MAJOR" >/dev/null 2>&1; then
+    /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+    apt-get install -y -qq "postgresql-$PG_MAJOR" >/dev/null
+  fi
+fi
+
+install -d -m 755 "$ETC_DIR"
+chmod 755 "$ETC_DIR"
 
 if [[ ! -f $ENV_FILE ]]; then
-  install -d -m 700 "$(dirname "$ENV_FILE")"
   password=$(openssl rand -hex 24)
   printf 'DATABASE_URL=postgresql://doggybank:%s@localhost/doggybank\n' "$password" >"$ENV_FILE"
   chmod 600 "$ENV_FILE"
@@ -40,8 +170,10 @@ fi
 grep -q '^MAIL_KEY=' "$AUTH_ENV_FILE" || printf 'MAIL_KEY=%s\n' "$(openssl rand -hex 32)" >>"$AUTH_ENV_FILE"
 sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
 printf 'BETTER_AUTH_URL=%s\n' "$SITE_URL" >>"$AUTH_ENV_FILE"
+chmod 600 "$ENV_FILE" "$AUTH_ENV_FILE" "$GAME_ENV_FILE"
+
 password=$(sed -n 's|^DATABASE_URL=postgresql://doggybank:\([^@]*\)@.*|\1|p' "$ENV_FILE")
-cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/doggybank.conf" <<CONF
+if write_if_changed 644 "/etc/postgresql/$PG_MAJOR/main/conf.d/doggybank.conf" <<CONF; then
 shared_buffers = 512MB
 effective_cache_size = 1GB
 synchronous_commit = off
@@ -52,7 +184,11 @@ random_page_cost = 1.1
 jit = off
 max_connections = 20
 CONF
-systemctl restart "postgresql@$PG_MAJOR-main"
+  systemctl restart "postgresql@$PG_MAJOR-main"
+elif ! systemctl is-active --quiet "postgresql@$PG_MAJOR-main"; then
+  systemctl start "postgresql@$PG_MAJOR-main"
+fi
+
 runuser -u postgres -- psql -v ON_ERROR_STOP=1 -q <<SQL
 SELECT 'CREATE ROLE doggybank LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'doggybank')\gexec
 ALTER ROLE doggybank PASSWORD '$password';
@@ -68,29 +204,73 @@ if [[ ! -x /opt/node/bin/node ]]; then
 fi
 [[ -x /opt/node/bin/pnpm ]] || /opt/node/bin/npm install -g --silent "pnpm@$PNPM_VERSION"
 
+if [[ ! -x /usr/local/bin/caddy ]] || [[ $(/usr/local/bin/caddy version | awk '{print $1}') != "v$CADDY_VERSION" ]]; then
+  caddy_tmp=$(mktemp -d)
+  curl -fsSL "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_amd64.tar.gz" -o "$caddy_tmp/caddy.tar.gz"
+  printf '%s  %s/caddy.tar.gz\n' "$CADDY_SHA512" "$caddy_tmp" | sha512sum -c - >/dev/null
+  tar -xzf "$caddy_tmp/caddy.tar.gz" -C "$caddy_tmp" caddy
+  install -m 755 "$caddy_tmp/caddy" /usr/local/bin/caddy
+  rm -rf "$caddy_tmp"
+fi
+
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/var/lib/$APP_USER" "$APP_USER"
-install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR"
+install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR" "$RELEASES_DIR"
 as_app() {
   runuser -u "$APP_USER" -- env HOME="/var/lib/$APP_USER" PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin" "$@"
 }
-[[ -d $APP_DIR/.git ]] || as_app git clone -q "$REPO" "$APP_DIR"
-as_app git -C "$APP_DIR" fetch -q origin "$COMMIT"
-as_app git -C "$APP_DIR" checkout -q --detach "$COMMIT"
-cd "$APP_DIR"
-as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
-as_app pnpm install --frozen-lockfile --silent
-as_app pnpm build >/dev/null
-psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/server/schema.sql"
-(set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$APP_DIR/apps/auth" && as_app node migrate.ts)
-psql "$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")" -v ON_ERROR_STOP=1 -q -f "$APP_DIR/apps/auth/players.sql"
+
+release_dir=$RELEASES_DIR/$COMMIT
+if [[ ! -f $release_dir/.ready ]]; then
+  rm -rf "$release_dir"
+  install -d -o "$APP_USER" -g "$APP_USER" "$release_dir"
+  tar -xzf "$ARCHIVE" -C "$release_dir"
+  chown -R "$APP_USER:$APP_USER" "$release_dir"
+  (
+    cd "$release_dir"
+    as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
+    as_app pnpm install --frozen-lockfile --silent
+    as_app pnpm build >/dev/null
+  )
+  touch "$release_dir/.ready"
+fi
+rm -f "$ARCHIVE"
+
+db_url=$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")
+psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/server/schema.sql"
+(set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$release_dir/apps/auth" && as_app node migrate.ts)
+psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/auth/players.sql"
+
+write_if_changed 644 "$ETC_DIR/blue.env" <<'ENV' || true
+GAME_PORT=8801
+PORT=8811
+ENV
+write_if_changed 644 "$ETC_DIR/green.env" <<'ENV' || true
+GAME_PORT=8802
+PORT=8812
+ENV
 
 allow_hosts=()
 for host in "${HOSTS[@]}"; do
   allow_hosts+=(--allow-host "$host")
 done
-cat >/etc/systemd/system/doggybank.service <<UNIT
+write_if_changed 644 "$HOSTS_ENV_FILE" <<ENV || true
+ALLOW_HOSTS=${allow_hosts[*]}
+ENV
+
+# Binds apps/auth/server.ts to 127.0.0.1:$PORT without altering apps/auth.
+write_if_changed 644 "$AUTH_LISTEN_SCRIPT" <<'MJS' || true
+import net from 'node:net';
+
+const listen = net.Server.prototype.listen;
+net.Server.prototype.listen = function (_port, _host, callback) {
+  return listen.call(this, Number(process.env.PORT), '127.0.0.1', callback);
+};
+MJS
+
+units_changed=0
+write_if_changed 644 /etc/systemd/system/doggybank@.service <<UNIT && units_changed=1 || true
 [Unit]
-Description=Doggybank
+Description=Doggybank (%i)
 Requires=postgresql@$PG_MAJOR-main.service
 After=network-online.target postgresql@$PG_MAJOR-main.service
 
@@ -98,19 +278,22 @@ After=network-online.target postgresql@$PG_MAJOR-main.service
 Type=notify
 NotifyAccess=all
 User=$APP_USER
-WorkingDirectory=$APP_DIR
+WorkingDirectory=$ETC_DIR/%i.release
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$GAME_ENV_FILE
+EnvironmentFile=$ETC_DIR/%i.env
+EnvironmentFile=$HOSTS_ENV_FILE
 Environment=PYTHONUNBUFFERED=1
-ExecStart=$APP_DIR/.venv/bin/python -m doggybank_server --host 0.0.0.0 --port 8787 ${allow_hosts[*]}
+ExecStart=$ETC_DIR/%i.release/.venv/bin/python -m doggybank_server --host 127.0.0.1 --port \$GAME_PORT \$ALLOW_HOSTS
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 UNIT
-cat >/etc/systemd/system/doggybank-auth.service <<UNIT
+
+write_if_changed 644 /etc/systemd/system/doggybank-auth@.service <<UNIT && units_changed=1 || true
 [Unit]
-Description=Doggybank sign-in
+Description=Doggybank sign-in (%i)
 Requires=postgresql@$PG_MAJOR-main.service
 After=network-online.target postgresql@$PG_MAJOR-main.service
 
@@ -118,19 +301,66 @@ After=network-online.target postgresql@$PG_MAJOR-main.service
 Type=notify
 NotifyAccess=all
 User=$APP_USER
-WorkingDirectory=$APP_DIR/apps/auth
+WorkingDirectory=$ETC_DIR/%i.release/apps/auth
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$AUTH_ENV_FILE
-ExecStart=/opt/node/bin/node server.ts
+EnvironmentFile=$ETC_DIR/%i.env
+ExecStart=/opt/node/bin/node --import $AUTH_LISTEN_SCRIPT server.ts
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 UNIT
-systemctl daemon-reload
-systemctl enable -q "postgresql@$PG_MAJOR-main.service" doggybank.service doggybank-auth.service
-systemctl restart doggybank.service doggybank-auth.service
+
+write_if_changed 644 /etc/systemd/system/caddy.service <<UNIT && units_changed=1 || true
+[Unit]
+Description=Caddy
+After=network.target network-online.target
+Requires=network-online.target
+
+[Service]
+Type=notify
+User=$APP_USER
+Environment=HOME=/var/lib/$APP_USER XDG_DATA_HOME=/var/lib/$APP_USER/.local/share XDG_CONFIG_HOME=/var/lib/$APP_USER/.config
+ExecStart=/usr/local/bin/caddy run --environ --config $CADDYFILE
+ExecReload=/usr/local/bin/caddy reload --config $CADDYFILE --force
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+(( units_changed )) && systemctl daemon-reload
+
+live=$(cat "$LIVE_COLOR_FILE" 2>/dev/null || true)
+idle=$(other_color "$live")
+ln -sfn "$release_dir" "$ETC_DIR/$idle.release"
+
+systemctl enable -q "postgresql@$PG_MAJOR-main.service" "doggybank@$idle.service" "doggybank-auth@$idle.service"
+systemctl restart "doggybank@$idle.service" "doggybank-auth@$idle.service"
+curl -fsS -o /dev/null "http://127.0.0.1:$(game_port "$idle")/readyz"
+curl -fsS -o /dev/null "http://127.0.0.1:$(auth_port "$idle")/readyz"
+
+write_caddyfile "$idle"
+if systemctl is-active --quiet caddy.service; then
+  /usr/local/bin/caddy reload --config "$CADDYFILE"
+else
+  for legacy in doggybank.service doggybank-auth.service; do
+    if systemctl is-active --quiet "$legacy"; then
+      systemctl disable --now -q "$legacy"
+    fi
+  done
+  systemctl enable --now -q caddy.service
+fi
+
+if [[ -n $live && $live != "$idle" ]]; then
+  printf '%s\n' "$live" >"$PREVIOUS_COLOR_FILE"
+  systemctl disable -q "doggybank@$live.service" "doggybank-auth@$live.service" || true
+fi
+printf '%s\n' "$idle" >"$LIVE_COLOR_FILE"
 
 curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
 curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
-echo "Doggybank $COMMIT is serving on port 8787, sign-in on 8788, with Postgres $PG_MAJOR."
+echo "Doggybank $COMMIT is live on $idle (ports $(game_port "$idle") and $(auth_port "$idle") behind Caddy 8787 and 8788), with Postgres $PG_MAJOR."
