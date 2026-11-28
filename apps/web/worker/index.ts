@@ -1,4 +1,4 @@
-import {getCookieCache} from 'better-auth/cookies';
+import {getCookieCache, getSessionCookie} from 'better-auth/cookies';
 import * as z from 'zod';
 
 import {type SignOff, renderMail} from './mail.ts';
@@ -14,6 +14,7 @@ interface Env {
   readonly RESEND_API_KEY: string;
   readonly PLAYER_KEY: string;
   readonly SITE_URL: string;
+  readonly ASSETS: Fetcher;
 }
 
 /** An email the Machine may ask for: the site page its link must open, and how it ends. */
@@ -175,6 +176,17 @@ function forward(
   return fetch(upstream);
 }
 
+/**
+ * The home page. Prerendered, it is the landing page, which a signed-in player
+ * would see until the session check swapped in the lobby. With a session cookie
+ * it is the app shell, which renders the lobby directly.
+ */
+function home(request: Request, env: Env): Promise<Response> {
+  const page =
+    getSessionCookie(request) === null ? '/' : '/__spa-fallback.html';
+  return env.ASSETS.fetch(new Request(new URL(page, request.url), request));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -182,6 +194,7 @@ export default {
     if (url.hostname.endsWith('.workers.dev')) {
       return Response.redirect(env.SITE_URL + url.pathname + url.search, 301);
     }
+    if (url.pathname === '/') return home(request, env);
     const mail = MAILS.get(url.pathname);
     if (mail !== undefined) return sendMail(request, env, mail);
     if (!url.pathname.startsWith('/api/')) return notFound();
