@@ -7,9 +7,9 @@ interface Env {
   readonly PORT_KEY: string;
   readonly AUTH_PORT_KEY: string;
   readonly BETTER_AUTH_SECRET: string;
-  readonly EMAIL: SendEmail;
   readonly MAIL_KEY: string;
   readonly MAIL_FROM: string;
+  readonly RESEND_API_KEY: string;
   readonly PLAYER_KEY: string;
   readonly SITE_URL: string;
 }
@@ -32,6 +32,7 @@ const MAILS = new Map<string, MailKind>([
 ]);
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
+const RESEND_EMAILS = 'https://api.resend.com/emails';
 // An agent signs its requests with an API key in this header instead of a cookie.
 const API_KEY_HEADER = 'x-api-key';
 const API_KEY_PATH = '/internal/api-key';
@@ -84,19 +85,21 @@ async function sendMail(
     (text, [char, entity]) => text.replaceAll(char, entity),
     link.url,
   );
-  try {
-    await env.EMAIL.send({
-      from: {email: env.MAIL_FROM, name: 'Doggybank'},
-      to: link.to,
+  const sent = await fetch(RESEND_EMAILS, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: `Doggybank <${env.MAIL_FROM}>`,
+      to: [link.to],
       subject: kind.action,
       text: `${kind.action}: ${link.url}`,
       html: `<p><a href="${href}">${kind.action}</a></p>`,
-    });
-  } catch (e) {
-    return new Response(e instanceof Error ? e.message : String(e), {
-      status: 502,
-    });
-  }
+    }),
+  });
+  if (!sent.ok) return new Response(await sent.text(), {status: 502});
   return new Response(null, {status: 204});
 }
 
