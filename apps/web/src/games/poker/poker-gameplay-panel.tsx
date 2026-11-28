@@ -21,30 +21,26 @@
 
 import {
   type JSX,
+  type ReactNode,
   type RefObject,
   useCallback,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 
-import {useStickToBottom} from '../../actions/use-stick-to-bottom.ts';
 import {PokerControls} from './poker-controls.tsx';
 import {type SessionPayload, usePokerSession} from './poker-session.ts';
 import {
+  type PokerSeat,
   type PokerUiState,
   derivePokerState,
-  historyEntryText,
   roundName,
 } from './poker-state.ts';
 import {
   CardView,
   ChipFlightView,
   SeatView,
-  clamp,
-  formatBlindText,
   formatChips,
-  formatStackText,
   terminalSummary,
   winningCards,
 } from './poker-table-parts.tsx';
@@ -59,62 +55,6 @@ import {
 import './poker.css';
 
 // The seat counts the hand bar offers.
-const SEAT_COUNTS = [2, 3, 4, 5, 6];
-
-function HandBar({
-  state,
-  title,
-  seatCount,
-  fixedSeats,
-  setSeatCount,
-  isBusy,
-  startNewHand,
-}: {
-  readonly state: PokerUiState;
-  readonly title: string;
-  readonly seatCount: number;
-  readonly fixedSeats: number | undefined;
-  readonly setSeatCount: (count: number) => void;
-  readonly isBusy: boolean;
-  readonly startNewHand: () => void;
-}): JSX.Element {
-  const stacks = formatStackText(state.seats.map(seat => seat.startingStack));
-  return (
-    <div className="poker-handbar">
-      <div className="poker-handbar__title">
-        <strong>{title}</strong>
-        <span className="poker-handbar__street">{state.currentStreet}</span>
-      </div>
-      <div className="poker-handbar__meta">
-        <span>{formatBlindText(state.blinds, state.ante)}</span>
-        {stacks !== null && <span>{stacks}</span>}
-      </div>
-      <div className="poker-new-hand" aria-label="New hand setup">
-        <label htmlFor="poker-seat-count">Seats</label>
-        <select
-          id="poker-seat-count"
-          disabled={isBusy || fixedSeats !== undefined}
-          onChange={event => {
-            setSeatCount(Number(event.target.value));
-          }}
-          value={seatCount}
-        >
-          {(fixedSeats === undefined ? SEAT_COUNTS : [fixedSeats]).map(
-            count => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ),
-          )}
-        </select>
-        <button disabled={isBusy} onClick={startNewHand} type="button">
-          New hand
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function BoardCards({
   state,
   motion,
@@ -196,6 +136,7 @@ function Table({
   tableRef,
   potRef,
   viewerSeat,
+  actions,
 }: {
   readonly state: PokerUiState;
   readonly session: SessionPayload;
@@ -203,99 +144,66 @@ function Table({
   readonly tableRef: RefObject<HTMLDivElement | null>;
   readonly potRef: RefObject<HTMLDivElement | null>;
   readonly viewerSeat: number | null;
+  readonly actions: ReactNode;
 }): JSX.Element {
   const {motion, chipLanded, boardLanded, revealLanded} = motionState;
-  // The pot, Stack and In as shown: a chip in the air has not reached the
-  // pot yet. Controls use the state's numbers.
   const shown = shownNumbers(state, motion);
   const playing = winningCards(state.seats, state.ending);
   const slots = session.game.boardSizes.reduce((sum, size) => sum + size, 0);
-  const hasStacks = state.seats.some(seat => seat.startingStack > 0);
+  const seatView = (seat: PokerSeat): JSX.Element => (
+    <SeatView
+      key={seat.slot}
+      motion={motion}
+      revealLanded={revealLanded}
+      seat={seat}
+      holeCards={session.game.holeCards}
+      shown={{
+        stack: shown.stack(seat.slot, seat.stack),
+        bet: Math.max(
+          0,
+          shown.contribution(seat.slot, seat.contribution) - state.streetBase,
+        ),
+      }}
+      playing={playing}
+      isViewer={seat.slot === viewerSeat}
+    />
+  );
+  const viewer = state.seats.find(seat => seat.slot === viewerSeat);
   return (
     <section
-      className={`poker-table-stage poker-table-stage--${String(state.seats.length)}`}
+      className={`poker-table${state.isTerminal ? ' poker-table--terminal' : ''}`}
       aria-label="Poker table"
+      ref={tableRef}
     >
-      <div
-        className={`poker-table poker-table--${String(state.seats.length)}${
-          state.isTerminal ? ' poker-table--terminal' : ''
-        }`}
-        ref={tableRef}
-      >
-        <div className="poker-board">
-          <BoardCards
-            state={state}
-            motion={motion}
-            boardLanded={boardLanded}
-            playing={playing}
-            slots={slots}
-          />
-          <div className="poker-pot" ref={potRef}>
-            <span>Pot</span>
-            <strong>{formatChips(shown.pot)}</strong>
-          </div>
-        </div>
-        {state.seats.map(seat => (
-          <SeatView
-            key={seat.slot}
-            motion={motion}
-            revealLanded={revealLanded}
-            seat={seat}
-            holeCards={session.game.holeCards}
-            hasStacks={hasStacks}
-            shown={{
-              stack: shown.stack(seat.slot, seat.stack),
-              contribution: shown.contribution(seat.slot, seat.contribution),
-            }}
-            totalSeats={state.seats.length}
-            playing={playing}
-            isViewer={seat.slot === viewerSeat}
-          />
-        ))}
-        {motion.chips.map(chip => (
-          <ChipFlightView
-            chip={chip}
-            motion={motion}
-            key={chip.key}
-            onLanded={chipLanded}
-          />
-        ))}
+      <div className="poker-table__opponents">
+        {state.seats.filter(seat => seat.slot !== viewerSeat).map(seatView)}
       </div>
+      <div className="poker-board">
+        <BoardCards
+          state={state}
+          motion={motion}
+          boardLanded={boardLanded}
+          playing={playing}
+          slots={slots}
+        />
+        <div className="poker-pot" ref={potRef} aria-label="Pot">
+          {formatChips(shown.pot)}
+        </div>
+      </div>
+      {actions}
+      {viewer !== undefined && seatView(viewer)}
+      {motion.chips.map(chip => (
+        <ChipFlightView
+          chip={chip}
+          motion={motion}
+          key={chip.key}
+          onLanded={chipLanded}
+        />
+      ))}
     </section>
   );
 }
 
-function History({state}: {readonly state: PokerUiState}): JSX.Element {
-  // Keyed by session in the parent, so a new hand starts pinned.
-  const {ref, onScroll} = useStickToBottom<HTMLElement>(state.history.length);
-  return (
-    <section
-      className="poker-history"
-      aria-label="Action history"
-      ref={ref}
-      onScroll={onScroll}
-    >
-      <h3>Action History</h3>
-      {state.history.length === 0 ? (
-        <p>No actions yet.</p>
-      ) : (
-        <ol>
-          {state.history.map((entry, index) => {
-            const row = historyEntryText(entry, state.seats);
-            return (
-              <li key={`${entry.label}-${String(index)}`}>
-                <span title={row.who}>{row.who}</span>
-                <span>{row.what}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-    </section>
-  );
-}
-
-/** The derived table, or the reason the hand's record cannot be drawn. */
 function useDerived(session: SessionPayload): {
   state: PokerUiState | null;
   error: string | null;
@@ -338,8 +246,6 @@ export function PokerGameplay(): JSX.Element {
   const potRef = useRef<HTMLDivElement>(null);
   const motionState = usePokerMotion(pokerState, tableRef, potRef);
   const viewerSeat = seatOf(viewer);
-  const [chosenSeats, setSeatCount] = useState<number | null>(null);
-  const seatCount = chosenSeats ?? pokerState?.seats.length ?? 2;
   const submitIfReady = useCallback(
     (action: number | undefined) => {
       if (typeof action !== 'number' || isBusy) return;
@@ -348,11 +254,10 @@ export function PokerGameplay(): JSX.Element {
     [isBusy, submitAction],
   );
   const startNewHand = useCallback(() => {
-    setSeatCount(null);
     createSession({
-      seats: session.game.fixedSeats ?? clamp(Math.round(seatCount), 2, 6),
+      seats: session.game.fixedSeats ?? pokerState?.seats.length ?? 2,
     });
-  }, [createSession, seatCount, session.game.fixedSeats]);
+  }, [createSession, pokerState?.seats.length, session.game.fixedSeats]);
   if (!pokerState) {
     return (
       <div className="ogs-panel poker-error">
@@ -379,15 +284,6 @@ export function PokerGameplay(): JSX.Element {
           {error}
         </div>
       )}
-      <HandBar
-        state={shownState}
-        title={session.game.title}
-        seatCount={seatCount}
-        fixedSeats={session.game.fixedSeats}
-        setSeatCount={setSeatCount}
-        isBusy={isBusy || !canChangeTable}
-        startNewHand={startNewHand}
-      />
       <Table
         state={shownState}
         session={session}
@@ -395,17 +291,18 @@ export function PokerGameplay(): JSX.Element {
         tableRef={tableRef}
         potRef={potRef}
         viewerSeat={viewerSeat}
+        actions={
+          <PokerControls
+            state={pokerState}
+            canAct={canAct}
+            isBusy={isBusy || !canChangeTable}
+            fixedLimit={session.game.betting === 'limit'}
+            showdownText={showdownLine(shownState, viewerSeat)}
+            submitIfReady={submitIfReady}
+            startNewHand={startNewHand}
+          />
+        }
       />
-      <PokerControls
-        state={pokerState}
-        canAct={canAct}
-        isBusy={isBusy || !canChangeTable}
-        fixedLimit={session.game.betting === 'limit'}
-        showdownText={showdownLine(shownState, viewerSeat)}
-        submitIfReady={submitIfReady}
-        startNewHand={startNewHand}
-      />
-      <History key={session.sessionId} state={pokerState} />
     </div>
   );
 }

@@ -217,10 +217,12 @@ function PrimaryButtons({
   props,
   size,
   words,
+  sizing,
 }: {
   readonly props: PokerControlsProps;
   readonly size: ReturnType<typeof useBetSize>;
   readonly words: BetWords;
+  readonly sizing: {open: boolean; toggle: () => void} | null;
 }): JSX.Element {
   const {state, canAct, submitIfReady} = props;
   const {fold, call, bets} = state.actionGroups;
@@ -270,6 +272,18 @@ function PrimaryButtons({
           {betButtonLabel}
         </button>
       )}
+      {sizing !== null && (
+        <button
+          aria-expanded={sizing.open}
+          aria-label="Bet size"
+          className="poker-action poker-action--size"
+          disabled={!canAct}
+          onClick={sizing.toggle}
+          type="button"
+        >
+          ↑
+        </button>
+      )}
     </div>
   );
 }
@@ -279,6 +293,8 @@ export function PokerControls(props: PokerControlsProps): JSX.Element {
   const {state, canAct, isBusy, fixedLimit, showdownText, startNewHand} = props;
   const size = useBetSize(state);
   const words = betWords(state);
+  const [sizingOpen, setSizingOpen] = useState(false);
+  const sizes = state.actionGroups.bets.length > 0 && !fixedLimit;
   return (
     <section
       className={`poker-controls${
@@ -290,20 +306,34 @@ export function PokerControls(props: PokerControlsProps): JSX.Element {
         <div className="poker-terminal">
           <strong>{showdownText}</strong>
           <button
-            className="poker-action poker-action--bet"
+            className="poker-action"
             disabled={isBusy}
             onClick={startNewHand}
             type="button"
           >
-            New hand
+            Next hand
           </button>
         </div>
       ) : (
         <>
-          <PrimaryButtons props={props} size={size} words={words} />
-          {state.actionGroups.bets.length > 0 && !fixedLimit && (
+          {sizes && sizingOpen && (
             <BetBox size={size} words={words} canAct={canAct} />
           )}
+          <PrimaryButtons
+            props={props}
+            size={size}
+            words={words}
+            sizing={
+              sizes
+                ? {
+                    open: sizingOpen,
+                    toggle: () => {
+                      setSizingOpen(open => !open);
+                    },
+                  }
+                : null
+            }
+          />
         </>
       )}
     </section>

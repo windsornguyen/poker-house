@@ -47,43 +47,6 @@ const suitSymbols: Record<PokerCard['suit'], string> = {
   s: '♠',
 };
 
-/** The hand bar's blinds, or the ante at a table without blinds. */
-export function formatBlindText(blinds: number[], ante = 0): string {
-  const active = blinds.filter(blind => blind > 0);
-  if (active.length === 0) {
-    return ante > 0 ? `Ante ${formatChips(ante)}` : 'Blinds 0/0';
-  }
-  if (active.length === 1) {
-    return `Blind ${formatChips(active[0] ?? 0)}`;
-  }
-  const ordered = [...active].sort((left, right) => left - right);
-  return `Blinds ${formatChips(ordered[0] ?? 0)}/${formatChips(
-    ordered[ordered.length - 1] ?? 0,
-  )}`;
-}
-
-/** The hand bar's stacks; null at a table without stacks. */
-export function formatStackText(stacks: number[]): string | null {
-  const unique = Array.from(new Set(stacks.filter(stack => stack > 0)));
-  if (unique.length === 0) {
-    return null;
-  }
-  if (unique.length === 1) {
-    return `Stack ${formatChips(unique[0] ?? 0)}`;
-  }
-  return 'Variable stacks';
-}
-
-function seatCoordinates(totalSeats: number, slot: number): [number, number] {
-  // Heads-up seats sit left and right; three or more sit at the rail top
-  // to bottom, so a plate at the top or bottom clears the board.
-  const radiusX = totalSeats >= 3 ? 39 : 37;
-  const radiusY = totalSeats >= 3 ? 49 : 39;
-  const startAngle = totalSeats === 2 ? 0 : -90;
-  const angle = ((startAngle + (360 / totalSeats) * slot) * Math.PI) / 180;
-  return [50 + Math.cos(angle) * radiusX, 50 + Math.sin(angle) * radiusY];
-}
-
 /** A signed chip count: "+18,201", "-18,201". */
 export function formatSignedChips(value: number): string {
   if (value > 0) {
@@ -193,15 +156,10 @@ export function CardView({
       onAnimationEnd={motion?.onLanded}
       style={motion ? cardMotionStyle(motion) : undefined}
     >
-      <span className="poker-card__corner">
-        <span>{card.rank}</span>
-        <span>{suitSymbols[card.suit]}</span>
+      <span className="poker-card__rank">
+        {card.rank === 'T' ? '10' : card.rank}
       </span>
-      <span className="poker-card__pip">{suitSymbols[card.suit]}</span>
-      <span className="poker-card__corner poker-card__corner--bottom">
-        <span>{card.rank}</span>
-        <span>{suitSymbols[card.suit]}</span>
-      </span>
+      <span className="poker-card__suit">{suitSymbols[card.suit]}</span>
     </span>
   );
 }
@@ -226,116 +184,91 @@ function holeMotion(
       };
 }
 
-function seatBadges(seat: PokerSeat): string[] {
-  return [
-    seat.isDealer ? 'D' : null,
-    seat.isSmallBlind ? 'SB' : null,
-    seat.isBigBlind ? 'BB' : null,
-  ].filter((badge): badge is string => badge !== null);
-}
-
-/** What a seat's plate is drawn from. */
+/** What a seat is drawn from. */
 export interface SeatViewProps {
   readonly seat: PokerSeat;
-  readonly totalSeats: number;
   /** The hole cards each seat holds. */
   readonly holeCards: number;
   readonly motion: PokerMotion;
   readonly revealLanded: (key: string) => void;
-  /** Stack and In as shown: before any chip of this seat still in flight. */
-  readonly shown: {stack: number; contribution: number};
-  /** Whether the table has stacks to show. */
-  readonly hasStacks: boolean;
+  /** Stack and this street's bet as shown: before any chip still in flight. */
+  readonly shown: {stack: number; bet: number};
   /** Codes of the cards that make a winning hand (empty before showdown). */
   readonly playing: ReadonlySet<string>;
-  /** Whether this is the viewer's own seat. */
+  /** Whether this is the viewer's own seat, drawn large at the bottom. */
   readonly isViewer: boolean;
 }
 
-function SeatBody({
+function HoleCards({
   seat,
-  shown,
-  hasStacks,
-  isViewer,
-}: Pick<
-  SeatViewProps,
-  'seat' | 'shown' | 'hasStacks' | 'isViewer'
->): JSX.Element {
+  holeCards,
+  motion,
+  revealLanded,
+  playing,
+}: SeatViewProps): JSX.Element {
   return (
-    <div className="poker-seat__body">
-      <div className="poker-seat__name-row">
-        <span className="poker-seat__name">{seat.name}</span>
-        {isViewer && (
-          <span className="poker-seat__badge poker-seat__you">You</span>
-        )}
-        {seatBadges(seat).map(badge => (
-          <span className="poker-seat__badge" key={badge}>
-            {badge}
-          </span>
-        ))}
-      </div>
-      <div className="poker-seat__metrics">
-        {hasStacks && <span>Stack {formatChips(shown.stack)}</span>}
-        <span>In {formatChips(shown.contribution)}</span>
-      </div>
-      {seat.hasFolded ? (
-        <div className="poker-seat__folded">Folded</div>
-      ) : (
-        seat.bestHand && <div className="poker-seat__best">{seat.bestHand}</div>
-      )}
-      {typeof seat.returnValue === 'number' && (
-        <div
-          className={`poker-seat__return${
-            seat.returnValue > 0 ? ' poker-seat__return--positive' : ''
-          }`}
-        >
-          {formatSignedChips(seat.returnValue)}
-        </div>
-      )}
+    <div className="poker-seat__cards">
+      {Array.from({length: holeCards}, (_, index) => {
+        const card = seat.cards[index];
+        return (
+          <CardView
+            card={card}
+            key={card?.code ?? `hidden-${String(index)}`}
+            motion={
+              card
+                ? holeMotion(motion, seat.slot, index, revealLanded)
+                : undefined
+            }
+            plays={seat.isWinner && playing.has(card?.code ?? '')}
+          />
+        );
+      })}
     </div>
   );
 }
 
-/** A seat's plate at the rail: its cards, name, badges and chips. */
+/** The seat's line under its stack: folded, its best hand, or what it won. */
+function seatNote(seat: PokerSeat): string | undefined {
+  if (typeof seat.returnValue === 'number' && seat.returnValue !== 0) {
+    return formatSignedChips(seat.returnValue);
+  }
+  return seat.hasFolded ? 'Folded' : seat.bestHand;
+}
+
+/**
+ * A seat: an opponent's avatar, name and stack in the top row, or the viewer's
+ * hand and plate at the bottom. Its bet this street sits on a chip under it.
+ */
 export function SeatView(props: SeatViewProps): JSX.Element {
-  const {seat, totalSeats, holeCards, motion, revealLanded, playing} = props;
-  const name = props.isViewer ? `${seat.name} (you)` : seat.name;
-  const [x, y] = seatCoordinates(totalSeats, seat.slot);
-  const seatStyle: CSSProperties & Record<string, string> = {
-    '--seat-x': `${String(x)}%`,
-    '--seat-y': `${String(y)}%`,
-  };
+  const {seat, shown, isViewer} = props;
+  const name = isViewer ? `${seat.name} (you)` : seat.name;
+  const showsCards = isViewer || seat.cards.length > 0;
+  const note = seatNote(seat);
   return (
     <div
       className={`poker-seat poker-seat--${String(seat.slot)}${
         seat.isActive ? ' poker-seat--active' : ''
       }${seat.hasFolded ? ' poker-seat--folded' : ''}${seat.isWinner ? ' poker-seat--winner' : ''}${
-        props.isViewer ? ' poker-seat--viewer' : ''
+        isViewer ? ' poker-seat--viewer' : ''
       }`}
-      style={seatStyle}
       aria-current={seat.isActive ? 'true' : undefined}
       aria-label={seat.isActive ? `${name}, to act` : name}
       role="group"
     >
-      <div className="poker-seat__cards">
-        {Array.from({length: holeCards}, (_, index) => {
-          const card = seat.cards[index];
-          return (
-            <CardView
-              card={card}
-              compact={totalSeats >= 5}
-              key={card?.code ?? `hidden-${String(index)}`}
-              motion={
-                card
-                  ? holeMotion(motion, seat.slot, index, revealLanded)
-                  : undefined
-              }
-              plays={seat.isWinner && playing.has(card?.code ?? '')}
-            />
-          );
-        })}
+      {isViewer && <HoleCards {...props} />}
+      <div className="poker-seat__plate">
+        <span className="poker-seat__avatar" aria-hidden>
+          {seat.name.slice(0, 1).toUpperCase()}
+          {seat.isDealer && <span className="poker-seat__dealer">D</span>}
+        </span>
+        {!isViewer && <span className="poker-seat__name">{seat.name}</span>}
+        <span className="poker-seat__stack">{formatChips(shown.stack)}</span>
+        {note !== undefined && <span className="poker-seat__note">{note}</span>}
       </div>
-      <SeatBody {...props} />
+      {!isViewer && showsCards && <HoleCards {...props} />}
+      {shown.bet > 0 && (
+        <span className="poker-seat__bet">{formatChips(shown.bet)}</span>
+      )}
     </div>
   );
 }
