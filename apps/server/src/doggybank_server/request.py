@@ -194,3 +194,19 @@ class Deal:
     """
 
     after: str
+
+
+@pydantic.dataclasses.dataclass(frozen=True, config=contract.CONFIG)
+class SetBalance:
+    """Sets a player's chips to an exact amount, moving the difference to or from the treasury.
+
+    Attributes:
+      email: The player's email.
+      balance: The chips the player holds after, at least 0.
+    """
+
+    email: str
+    balance: int
+
+    def __post_init__(self) -> None:
+        contract.require(self.balance >= 0, f"A balance is at least 0, not {self.balance}.")

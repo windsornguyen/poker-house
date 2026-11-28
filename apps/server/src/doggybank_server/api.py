@@ -323,6 +323,14 @@ class Api:
         chips.grant(body.email, body.amount)
         return ok(chips.holdings())
 
+    def set_balance(self, req: _Request) -> Response:
+        """Sets a player's chips exactly, for an admin, and answers with every account."""
+        chips = self.admin(req)
+        body = req.decode(request.SetBalance)
+
+        chips.set_balance(body.email, body.balance)
+        return ok(chips.holdings())
+
     def seated(self, req: _Request) -> tuple[session_lib.Session, contract.Viewer]:
         """The session the request concerns, and the viewer its player may take there."""
         viewer, player = req.viewer(), req.signed_in()
@@ -450,6 +458,7 @@ class Api:
         route("GET", "me", me),
         route("GET", "admin/accounts", list_accounts),
         route("POST", "admin/grants", grant),
+        route("POST", "admin/balances", set_balance),
         route("POST", "sessions", create),
         route("GET", "rooms/{code}", room),
         route("POST", "rooms/{code}/join", join),

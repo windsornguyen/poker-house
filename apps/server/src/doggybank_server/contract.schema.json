@@ -1498,6 +1498,23 @@
       ],
       "type": "string"
     },
+    "SetBalance": {
+      "additionalProperties": false,
+      "description": "Sets a player's chips to an exact amount, moving the difference to or from the treasury.\n\nAttributes:\n  email: The player's email.\n  balance: The chips the player holds after, at least 0.",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "email",
+        "balance"
+      ],
+      "type": "object"
+    },
     "TableSeat": {
       "additionalProperties": false,
       "description": "A table a player sits at, and the chips in front of them there.\n\nAttributes:\n  code: The room's code.\n  stack: The player's chips at its table.",

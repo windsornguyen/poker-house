@@ -81,6 +81,32 @@ class LedgerTest(absltest.TestCase):
         self.assertIn("The house has", refused["message"])
         self.assert_supply_kept()
 
+    def test_an_admin_sets_a_balance_exactly_without_breaking_the_supply(self) -> None:
+        for balance in (1_500, 300, 300):
+            body: dict[str, contract.JsonValue] = {
+                "email": "person@test.poker.invalid",
+                "balance": balance,
+            }
+            status, listing = self.call("POST", "/api/admin/balances", body, self.admin)
+            self.assertEqual(status, 200, listing)
+            balances = {account["id"]: account["balance"] for account in listing["accounts"]}
+            self.assertEqual(balances[self.person], balance)
+            self.assert_supply_kept()
+
+        reasons = self.cluster.query(
+            "select reason from poker.transfer where %s in (from_account, to_account)",
+            self.person,
+        )
+        self.assertIn(("reclaim",), reasons)
+
+        status, refused = self.call(
+            "POST",
+            "/api/admin/balances",
+            {"email": "person@test.poker.invalid", "balance": 0},
+            self.person,
+        )
+        self.assertEqual((status, refused["code"]), (403, "forbidden"))
+
     def test_only_an_internal_account_manages_chips(self) -> None:
         grant: dict[str, contract.JsonValue] = {"email": "person@test.poker.invalid", "amount": 1}
         requests: tuple[tuple[str, str, dict[str, contract.JsonValue] | None], ...] = (

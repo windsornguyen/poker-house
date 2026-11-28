@@ -24,6 +24,7 @@ class Reason(enum.StrEnum):
     BUY_IN = "buy_in"
     CASH_OUT = "cash_out"
     PURCHASE = "purchase"
+    RECLAIM = "reclaim"
 
 
 def room_account(code: str) -> str:
@@ -82,6 +83,20 @@ def open_account(connection: psycopg.Connection, player: str) -> None:
         transfer(connection, TREASURY, player, WELCOME_GRANT, Reason.GRANT)
 
 
+def player_of(connection: psycopg.Connection, email: str) -> str:
+    """The id of the account with `email`.
+
+    Raises:
+      NotFoundError: If no account has the email.
+    """
+    row = connection.execute(
+        'select id from auth."user" where email = %s', (email.lower(),)
+    ).fetchone()
+    if row is None:
+        raise errors.NotFoundError(f"No account has the email {email!r}.")
+    return row[0]
+
+
 class Ledger:
     """The accounts in the database the sessions are kept in."""
 
@@ -124,13 +139,24 @@ class Ledger:
         """
         with self.database.lock, self.database.connection.transaction():
             connection = self.database.connection
-            row = connection.execute(
-                'select id from auth."user" where email = %s', (email.lower(),)
-            ).fetchone()
-            if row is None:
-                raise errors.NotFoundError(f"No account has the email {email!r}.")
-
-            player = row[0]
+            player = player_of(connection, email)
             open_account(connection, player)
             transfer(connection, TREASURY, player, amount, Reason.GRANT)
             return balance_of(connection, player)
+
+    def set_balance(self, email: str, balance: int) -> None:
+        """Sets `email`'s balance to exactly `balance`, by a grant or a reclaim to the treasury.
+
+        Raises:
+          NotFoundError: If no account has the email.
+          InsufficientChipsError: If the treasury cannot cover the difference.
+        """
+        with self.database.lock, self.database.connection.transaction():
+            connection = self.database.connection
+            player = player_of(connection, email)
+            open_account(connection, player)
+            difference = balance - balance_of(connection, player)
+            if difference > 0:
+                transfer(connection, TREASURY, player, difference, Reason.GRANT)
+            elif difference < 0:
+                transfer(connection, player, TREASURY, -difference, Reason.RECLAIM)

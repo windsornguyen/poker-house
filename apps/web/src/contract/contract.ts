@@ -911,6 +911,19 @@ export const SessionClosed = z.object({
 export type SessionClosed = z.infer<typeof SessionClosed>;
 
 /**
+ * Sets a player's chips to an exact amount, moving the difference to or from the treasury.
+ *
+ * Attributes:
+ *   email: The player's email.
+ *   balance: The chips the player holds after, at least 0.
+ */
+export const SetBalance = z.object({
+  email: z.string(),
+  balance: z.int(),
+});
+export type SetBalance = z.infer<typeof SetBalance>;
+
+/**
  * A seat's turn, in the few fields a decision is made from.
  *
  * Attributes:

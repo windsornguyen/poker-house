@@ -73,6 +73,7 @@ type RequestBody = (
     | request.Reset
     | request.SeatConfig
     | request.Grant
+    | request.SetBalance
     | request.Deal
 )
 

@@ -62,7 +62,8 @@ create table if not exists poker.transfer (
     from_account text not null references poker.account,
     to_account text not null references poker.account,
     amount bigint not null check (amount > 0),
-    reason text not null check (reason in ('grant', 'buy_in', 'cash_out', 'purchase')),
+    reason text not null constraint transfer_reason
+        check (reason in ('grant', 'buy_in', 'cash_out', 'purchase', 'reclaim')),
     created_at timestamptz not null default now()
 );
 
@@ -98,3 +99,9 @@ begin
 end $$;
 
 create index if not exists session_code on poker.session (code, created_at desc);
+
+-- Databases made before reclaims allowed only the first four reasons.
+alter table poker.transfer drop constraint if exists transfer_reason_check;
+alter table poker.transfer drop constraint if exists transfer_reason;
+alter table poker.transfer add constraint transfer_reason
+    check (reason in ('grant', 'buy_in', 'cash_out', 'purchase', 'reclaim'));
