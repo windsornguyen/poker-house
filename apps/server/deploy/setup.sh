@@ -8,8 +8,14 @@ readonly PG_MAJOR=19
 readonly NODE_VERSION=v26.13.1
 readonly UV_VERSION=0.12.1
 readonly PNPM_VERSION=10.30.3
-readonly CADDY_VERSION=2.11.9
-readonly CADDY_SHA512=0e85544340290a16ce4bfb76fe7d65e9de1bf3a6e67f5ccfff30b30d27ea4c73e078077b7bf3e58ae60b6b12e44327705287059c775bca5782e8ee85ea7edd75
+# kamal-proxy ships no release binaries, so it is built with a pinned Go, and Go checks
+# the module against the public checksum database.
+readonly GO_VERSION=1.27.4
+readonly GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
+readonly KAMAL_PROXY_VERSION=v0.10.3
+# How long a deploy lets the old color finish its requests. Event streams never finish
+# on their own, so they are cut here and the browser reconnects to the new color.
+readonly DRAIN_TIMEOUT=10s
 
 readonly APP_USER=doggybank
 readonly APP_DIR=/opt/doggybank
@@ -22,7 +28,6 @@ readonly HOSTS_ENV_FILE=$ETC_DIR/hosts.env
 readonly LIVE_COLOR_FILE=$ETC_DIR/live.color
 readonly PREVIOUS_COLOR_FILE=$ETC_DIR/previous.color
 readonly AUTH_LISTEN_SCRIPT=$ETC_DIR/auth-listen.mjs
-readonly CADDYFILE=/etc/caddy/Caddyfile
 
 game_port() {
   case $1 in
@@ -64,22 +69,21 @@ write_if_changed() {
   return 0
 }
 
-write_caddyfile() {
+# Runs a kamal-proxy command against one proxy: game on 8787 or auth on 8788.
+kamal_proxy() {
+  local proxy=$1
+  shift
+  KAMAL_PROXY_SOCKET=/run/kamal-proxy-$proxy/kamal-proxy.sock /usr/local/bin/kamal-proxy "$@"
+}
+
+# Moves both proxies to a color. Each deploy returns once the color answers /readyz,
+# new requests go to it, and the old color has drained.
+switch_to() {
   local color=$1
-  write_if_changed 644 "$CADDYFILE" <<CADDY || true
-{
-	admin 127.0.0.1:2019
-	auto_https off
-}
-
-:8787 {
-	reverse_proxy 127.0.0.1:$(game_port "$color")
-}
-
-:8788 {
-	reverse_proxy 127.0.0.1:$(auth_port "$color")
-}
-CADDY
+  kamal_proxy game deploy game --target "127.0.0.1:$(game_port "$color")" \
+    --health-check-path /readyz --drain-timeout "$DRAIN_TIMEOUT"
+  kamal_proxy auth deploy auth --target "127.0.0.1:$(auth_port "$color")" \
+    --health-check-path /readyz --drain-timeout "$DRAIN_TIMEOUT"
 }
 
 if [[ $ACTION == retire ]]; then
@@ -113,18 +117,13 @@ if [[ $ACTION == rollback ]]; then
   bad=$(cat "$LIVE_COLOR_FILE" 2>/dev/null || true)
   systemctl enable -q "doggybank@$old.service" "doggybank-auth@$old.service"
   systemctl start "doggybank@$old.service" "doggybank-auth@$old.service"
-  curl -fsS -o /dev/null "http://127.0.0.1:$(game_port "$old")/readyz"
-  curl -fsS -o /dev/null "http://127.0.0.1:$(auth_port "$old")/readyz"
-  write_caddyfile "$old"
-  /usr/local/bin/caddy reload --config "$CADDYFILE"
+  switch_to "$old"
   printf '%s\n' "$old" >"$LIVE_COLOR_FILE"
   rm -f "$PREVIOUS_COLOR_FILE"
   if [[ -n $bad && $bad != "$old" ]]; then
     systemctl disable -q "doggybank@$bad.service" "doggybank-auth@$bad.service" || true
     systemctl stop "doggybank@$bad.service" "doggybank-auth@$bad.service"
   fi
-  curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
-  curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
   echo "Rolled back to $old."
   exit 0
 fi
@@ -204,13 +203,17 @@ if [[ ! -x /opt/node/bin/node ]]; then
 fi
 [[ -x /opt/node/bin/pnpm ]] || /opt/node/bin/npm install -g --silent "pnpm@$PNPM_VERSION"
 
-if [[ ! -x /usr/local/bin/caddy ]] || [[ $(/usr/local/bin/caddy version | awk '{print $1}') != "v$CADDY_VERSION" ]]; then
-  caddy_tmp=$(mktemp -d)
-  curl -fsSL "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}/caddy_${CADDY_VERSION}_linux_amd64.tar.gz" -o "$caddy_tmp/caddy.tar.gz"
-  printf '%s  %s/caddy.tar.gz\n' "$CADDY_SHA512" "$caddy_tmp" | sha512sum -c - >/dev/null
-  tar -xzf "$caddy_tmp/caddy.tar.gz" -C "$caddy_tmp" caddy
-  install -m 755 "$caddy_tmp/caddy" /usr/local/bin/caddy
-  rm -rf "$caddy_tmp"
+if [[ ! -x /usr/local/go/bin/go ]] || [[ $(/usr/local/go/bin/go env GOVERSION) != "go$GO_VERSION" ]]; then
+  go_tmp=$(mktemp -d)
+  curl -fsSL "https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz" -o "$go_tmp/go.tar.gz"
+  printf '%s  %s/go.tar.gz\n' "$GO_SHA256" "$go_tmp" | sha256sum -c - >/dev/null
+  rm -rf /usr/local/go
+  tar -xzf "$go_tmp/go.tar.gz" -C /usr/local
+  rm -rf "$go_tmp"
+fi
+if [[ ! -x /usr/local/bin/kamal-proxy ]] || [[ $(/usr/local/go/bin/go version -m /usr/local/bin/kamal-proxy) != *"$KAMAL_PROXY_VERSION"* ]]; then
+  env GOBIN=/usr/local/bin GOPATH=/var/cache/go HOME=/root /usr/local/go/bin/go install \
+    "github.com/basecamp/kamal-proxy/cmd/kamal-proxy@$KAMAL_PROXY_VERSION"
 fi
 
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/var/lib/$APP_USER" "$APP_USER"
@@ -313,20 +316,30 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 
-write_if_changed 644 /etc/systemd/system/caddy.service <<UNIT && units_changed=1 || true
+write_if_changed 644 "$ETC_DIR/proxy-game.env" <<'ENV' || true
+HTTP_PORT=8787
+ENV
+write_if_changed 644 "$ETC_DIR/proxy-auth.env" <<'ENV' || true
+HTTP_PORT=8788
+ENV
+
+# One proxy per public port, so the Worker keeps its two origins. Each instance has its
+# own socket and saved state. kamal-proxy has no readiness protocol, so the unit is ready
+# once this run's log says the control socket is up. The journal keeps the line, so it is
+# found even when it came before the wait began.
+write_if_changed 644 /etc/systemd/system/kamal-proxy@.service <<UNIT && units_changed=1 || true
 [Unit]
-Description=Caddy
-After=network.target network-online.target
-Requires=network-online.target
+Description=kamal-proxy (%i)
+After=network-online.target
 
 [Service]
-Type=notify
 User=$APP_USER
-Environment=HOME=/var/lib/$APP_USER XDG_DATA_HOME=/var/lib/$APP_USER/.local/share XDG_CONFIG_HOME=/var/lib/$APP_USER/.config
-ExecStart=/usr/local/bin/caddy run --environ --config $CADDYFILE
-ExecReload=/usr/local/bin/caddy reload --config $CADDYFILE --force
-TimeoutStopSec=5s
-LimitNOFILE=1048576
+RuntimeDirectory=kamal-proxy-%i
+StateDirectory=kamal-proxy-%i
+Environment=KAMAL_PROXY_SOCKET=/run/kamal-proxy-%i/kamal-proxy.sock HOME=/var/lib/kamal-proxy-%i
+EnvironmentFile=$ETC_DIR/proxy-%i.env
+ExecStart=/usr/local/bin/kamal-proxy run --http-port \$HTTP_PORT --https-port 0
+ExecStartPost=+/usr/bin/timeout 10 /bin/bash -c 'grep -m1 -q "Server started" < <(journalctl -f -n all -o cat _SYSTEMD_INVOCATION_ID=\$\$INVOCATION_ID)'
 Restart=on-failure
 
 [Install]
@@ -341,27 +354,19 @@ ln -sfn "$release_dir" "$ETC_DIR/$idle.release"
 
 systemctl enable -q "postgresql@$PG_MAJOR-main.service" "doggybank@$idle.service" "doggybank-auth@$idle.service"
 systemctl restart "doggybank@$idle.service" "doggybank-auth@$idle.service"
-curl -fsS -o /dev/null "http://127.0.0.1:$(game_port "$idle")/readyz"
-curl -fsS -o /dev/null "http://127.0.0.1:$(auth_port "$idle")/readyz"
 
-write_caddyfile "$idle"
-if systemctl is-active --quiet caddy.service; then
-  /usr/local/bin/caddy reload --config "$CADDYFILE"
-else
-  for legacy in doggybank.service doggybank-auth.service; do
-    if systemctl is-active --quiet "$legacy"; then
-      systemctl disable --now -q "$legacy"
-    fi
-  done
-  systemctl enable --now -q caddy.service
-fi
+# The first deploy behind the proxies frees ports 8787 and 8788 from the single-copy units.
+for legacy in doggybank.service doggybank-auth.service; do
+  if systemctl is-active --quiet "$legacy"; then
+    systemctl disable --now -q "$legacy"
+  fi
+done
+systemctl enable --now -q kamal-proxy@game.service kamal-proxy@auth.service
+switch_to "$idle"
 
 if [[ -n $live && $live != "$idle" ]]; then
   printf '%s\n' "$live" >"$PREVIOUS_COLOR_FILE"
   systemctl disable -q "doggybank@$live.service" "doggybank-auth@$live.service" || true
 fi
 printf '%s\n' "$idle" >"$LIVE_COLOR_FILE"
-
-curl -fsS -o /dev/null http://127.0.0.1:8787/readyz
-curl -fsS -o /dev/null http://127.0.0.1:8788/readyz
-echo "Doggybank $COMMIT is live on $idle (ports $(game_port "$idle") and $(auth_port "$idle") behind Caddy 8787 and 8788), with Postgres $PG_MAJOR."
+echo "Doggybank $COMMIT is live on $idle (ports $(game_port "$idle") and $(auth_port "$idle") behind kamal-proxy on 8787 and 8788), with Postgres $PG_MAJOR."

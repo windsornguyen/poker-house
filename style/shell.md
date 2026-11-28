@@ -22,7 +22,7 @@ Nothing is pasted into the script's text, so a path with a space or a quote arri
 
 ```bash
 #!/bin/bash
-# Install a release beside the live one and switch Caddy to it. provision.ts runs
+# Install a release beside the live one and switch kamal-proxy to it. provision.ts runs
 # it on the Machine as root.
 #
 #   $1   deploy, retire or rollback. Retire and rollback act on the colors the
