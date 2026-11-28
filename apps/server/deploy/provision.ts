@@ -19,9 +19,9 @@ const ARCHIVE_MAX_BYTES = 64 * 1024 * 1024;
 
 const Action = z.enum(['create', 'deploy', 'retire', 'rollback']);
 const CreateEnv = z.object({
-  DOGGYBANK_MACHINE_ID: z.undefined({
-    error: 'create makes a new Machine; unset DOGGYBANK_MACHINE_ID.',
-  }),
+  DOGGYBANK_MACHINE_ID: z
+    .never({error: 'create makes a new Machine; unset DOGGYBANK_MACHINE_ID.'})
+    .optional(),
 });
 const DeployEnv = z.object({
   DOGGYBANK_SITE_URL: z.url(),
