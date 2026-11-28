@@ -15,6 +15,9 @@
 import type {JSX} from 'react';
 import {useId} from 'react';
 
+import {Input} from '@/components/ui/input';
+import {NativeSelect, NativeSelectOption} from '@/components/ui/native-select';
+
 import type {
   BooleanField,
   Field,
@@ -126,7 +129,7 @@ function FieldRow({
           }}
         />
       ) : (
-        <Input
+        <FieldControl
           field={field}
           control={control}
           draft={String(draft)}
@@ -150,7 +153,7 @@ interface ControlAttributes {
   readonly 'aria-required': boolean;
 }
 
-interface InputProps {
+interface FieldControlProps {
   readonly field: Exclude<Field, BooleanField>;
   readonly control: ControlAttributes;
   readonly draft: string;
@@ -158,31 +161,36 @@ interface InputProps {
 }
 
 // The control of a field whose draft is text.
-function Input({field, control, draft, onChange}: InputProps): JSX.Element {
+function FieldControl({
+  field,
+  control,
+  draft,
+  onChange,
+}: FieldControlProps): JSX.Element {
   if (field.kind === 'choice') {
     return (
-      <select
+      <NativeSelect
         {...control}
-        className="control"
         value={draft}
         onChange={event => {
           onChange(event.currentTarget.value);
         }}
       >
-        {draft === '' && <option value="">Choose…</option>}
+        {draft === '' && (
+          <NativeSelectOption value="">Choose…</NativeSelectOption>
+        )}
         {field.choices.map((choice, index) => (
-          <option key={String(index)} value={String(index)}>
+          <NativeSelectOption key={String(index)} value={String(index)}>
             {String(choice)}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
+      </NativeSelect>
     );
   }
   const numeric = field.kind !== 'string';
   const box = (
-    <input
+    <Input
       {...control}
-      className="control"
       type={numeric ? 'number' : 'text'}
       placeholder={field.required ? 'Required' : undefined}
       min={numeric ? (field.minimum ?? undefined) : undefined}

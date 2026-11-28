@@ -14,6 +14,8 @@
 
 import {type JSX, useId} from 'react';
 
+import {NativeSelect, NativeSelectOption} from '@/components/ui/native-select';
+
 import {
   ANIMATION_SPEEDS,
   ANIMATION_SPEED_LABELS,
@@ -43,9 +45,8 @@ export function AnimationSpeedField(): JSX.Element {
       <section className="view-card" aria-label="Animation">
         <div className="view-field" title={SPEED_HELP}>
           <label htmlFor={id}>Animation speed</label>
-          <select
+          <NativeSelect
             id={id}
-            className="view-field__select"
             value={speed}
             data-testid="animation-speed-select"
             onChange={event => {
@@ -61,11 +62,11 @@ export function AnimationSpeedField(): JSX.Element {
             }}
           >
             {ANIMATION_SPEEDS.map((value: AnimationSpeed) => (
-              <option key={value} value={value}>
+              <NativeSelectOption key={value} value={value}>
                 {ANIMATION_SPEED_LABELS[value]}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
+          </NativeSelect>
         </div>
         <p className="view-note" data-testid="animation-speed-scope">
           {reduced

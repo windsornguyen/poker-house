@@ -15,6 +15,10 @@
 import type {JSX} from 'react';
 import {useId} from 'react';
 
+import {Input} from '@/components/ui/input';
+import {NativeSelect, NativeSelectOption} from '@/components/ui/native-select';
+import {Textarea} from '@/components/ui/textarea';
+
 import type {ParameterSpec} from '../contract/contract.ts';
 import {
   type Draft,
@@ -137,7 +141,6 @@ function Control({
   // Enter is pressed in a one-line field.
   const typed = {
     ...attributes,
-    className: 'setup-input',
     value: String(draft),
     onBlur: onCommit,
     onChange: (event: {currentTarget: {value: string}}): void => {
@@ -149,8 +152,9 @@ function Control({
   };
   if (isNumber(spec)) {
     return (
-      <input
+      <Input
         {...typed}
+        className="min-w-28 flex-1"
         type="number"
         min={spec.minimum ?? undefined}
         max={spec.maximum ?? undefined}
@@ -161,15 +165,22 @@ function Control({
   }
   if (isMultiline(spec)) {
     return (
-      <textarea
+      <Textarea
         {...typed}
+        className="w-full"
         spellCheck={false}
         rows={String(draft).split('\n').length}
       />
     );
   }
   return (
-    <input {...typed} type="text" spellCheck={false} onKeyDown={onKeyDown} />
+    <Input
+      {...typed}
+      className="min-w-28 flex-1"
+      type="text"
+      spellCheck={false}
+      onKeyDown={onKeyDown}
+    />
   );
 }
 
@@ -185,9 +196,9 @@ function ChoiceControl({
     throw new Error(`Parameter ${spec.name} is a choice without options.`);
   }
   return (
-    <select
+    <NativeSelect
       {...attributes}
-      className="setup-input"
+      className="min-w-28 flex-1"
       value={String(draft)}
       onChange={event => {
         onChange(event.currentTarget.value);
@@ -196,11 +207,11 @@ function ChoiceControl({
       {spec.choices.map(choice => {
         const text = formatValue(spec, choice);
         return (
-          <option key={text} value={text}>
+          <NativeSelectOption key={text} value={text}>
             {choiceLabel(spec, choice)}
-          </option>
+          </NativeSelectOption>
         );
       })}
-    </select>
+    </NativeSelect>
   );
 }
