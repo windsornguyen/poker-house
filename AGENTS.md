@@ -17,3 +17,9 @@ Use the existing typed JSON contract; regenerate client types from the
 Python schema. Test privacy, legal actions, and payouts before changing them.
 Avoid new game rules, alternate implementations on failure, and unrelated
 formatting. An unavailable structured observation is an explicit error.
+
+## Commits
+
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org):
+`type(scope): summary`, such as `fix(rooms): leave only while seated` or
+`docs(agents): explain commits`. The body says why.
