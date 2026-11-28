@@ -56,8 +56,9 @@ Bots play through the same HTTP API as everyone else: create a key, send it as
 
 ## Hosting
 
-`pnpm deploy:dm` provisions a Dedalus Machine running Postgres, the game server and
-the sign-in service (see `apps/server/README.md`). `pnpm --filter @doggybank/web run
+`pnpm machine:create` makes a Dedalus Machine running Postgres, the game server and
+the sign-in service, and `pnpm machine:deploy` releases to it with no downtime (see
+`apps/server/README.md`). `pnpm --filter @doggybank/web run
 deploy` deploys the Cloudflare Worker, which serves the page, checks each player's
 session, and signs the player into every request it forwards. The game server trusts
 only that signature.

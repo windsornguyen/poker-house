@@ -23,30 +23,30 @@ requires `--host` and, when accessed by a network name, `--allow-host`.
 
 ## Deploy to a Dedalus Machine
 
-`pnpm deploy:dm` provisions one Dedalus Machine that runs Postgres on localhost
-and this server behind a `key_required` port. It deploys the pushed
-`HEAD` commit and can be rerun to update it.
+`pnpm machine:create` makes a Machine and installs Postgres, the tools, the units for two
+colors of the game server and sign-in service, and kamal-proxy on two key-protected ports.
+It prints the Machine ID and each port's access key once, for the Worker's `PORT_KEY` and
+`AUTH_PORT_KEY`.
+
+`pnpm machine:deploy` builds the clean `HEAD` as the idle color and moves traffic to it once
+it answers `/readyz`. The release workflow runs it on every push to `main`, then retires the
+old color after the smoke test passes, or rolls back to it.
 
 ```sh
 export DEDALUS_API_KEY=dsk_...
-export DOGGYBANK_MACHINE_ID=...   # omit to create a Machine
-export DOGGYBANK_SITE_URL=https://...   # the site players sign in on
-pnpm deploy:dm
+pnpm machine:create
+export DOGGYBANK_MACHINE_ID=...           # printed by machine:create
+export DOGGYBANK_SITE_URL=https://...     # the site players sign in on
+pnpm machine:deploy
 ```
 
-Only emails in the `poker.player` table can make an account, and each must be
-confirmed by the link the sign-up emails. To add a player:
-
-1. On the Machine, insert the lowercase email:
-   `psql "$DATABASE_URL" -c "insert into poker.player (email) values ('friend@example.com')"`.
-2. In `apps/web`, run `npx wrangler email routing addresses create friend@example.com`.
-   Cloudflare sends that address a one-time confirmation, and sign-in emails reach it
-   only after the player confirms.
-
+Only emails in the `poker.player` table can make an account, and each must be confirmed by
+the link the sign-up emails. To add a player, insert the lowercase email on the Machine:
+`psql "$DATABASE_URL" -c "insert into poker.player (email) values ('friend@example.com')"`.
 Deleting a player's row deletes their account and sessions.
 
-The first run prints the port's access key once. Keys expire, so issue a new one with `dedalus machines ports access-keys mint`. The key keeps strangers out. Everyone who has it sees every seat's
-cards in the analysis view, so share it only with trusted players.
+The port keys reach the server directly, past the Worker's sign-in, so they live only in
+the Worker's secrets.
 
 [HTTP contract](src/doggybank_server/CONTRACT.md)
 

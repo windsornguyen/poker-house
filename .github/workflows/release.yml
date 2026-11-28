@@ -66,7 +66,7 @@ jobs:
           DEDALUS_API_KEY: ${{ secrets.DEDALUS_API_KEY }}
           DOGGYBANK_MACHINE_ID: ${{ secrets.DOGGYBANK_MACHINE_ID }}
           DOGGYBANK_SITE_URL: https://doggybank.io
-        run: node apps/server/deploy/provision.ts
+        run: node apps/server/deploy/provision.ts deploy
         shell: bash
       - name: Build the site
         run: pnpm --filter @doggybank/web build

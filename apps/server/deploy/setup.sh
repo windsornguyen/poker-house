@@ -1,22 +1,35 @@
 #!/usr/bin/env bash
+# Installs Doggybank on a Machine once, then deploys each release as one of two colors
+# behind kamal-proxy. provision.ts runs it on the Machine as root.
+#
+#   $1        install, deploy, retire or rollback.
+#   deploy:
+#     $2      The commit being released. It names the release directory, so the same
+#             commit cannot be unpacked twice.
+#     $3      The release archive provision.ts uploaded. It is deleted once unpacked.
+#     $4...   The host names requests reach the game server by. Others are refused.
+#     SITE_URL  The site's address. Sign-in links point there, so a wrong one breaks
+#               every email.
 set -euo pipefail
 
-readonly ACTION=${1:-deploy}
-shift || true
+readonly ACTION=$1
+shift
 
+# Pinned tools. kamal-proxy ships no release binaries, so the pinned Go builds it and
+# checks the module against the public checksum database.
 readonly PG_MAJOR=19
 readonly NODE_VERSION=v26.13.1
 readonly UV_VERSION=0.12.1
 readonly PNPM_VERSION=10.30.3
-# kamal-proxy ships no release binaries, so it is built with a pinned Go, and Go checks
-# the module against the public checksum database.
 readonly GO_VERSION=1.27.4
 readonly GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
 readonly KAMAL_PROXY_VERSION=v0.10.3
+
 # How long a deploy lets the old color finish its requests. Event streams never finish
 # on their own, so they are cut here and the browser reconnects to the new color.
 readonly DRAIN_TIMEOUT=10s
 
+# Where the app, its releases, its settings and its secrets live.
 readonly APP_USER=doggybank
 readonly APP_DIR=/opt/doggybank
 readonly RELEASES_DIR=$APP_DIR/releases
@@ -24,60 +37,50 @@ readonly ETC_DIR=/etc/doggybank
 readonly ENV_FILE=$ETC_DIR/db.env
 readonly AUTH_ENV_FILE=$ETC_DIR/auth.env
 readonly GAME_ENV_FILE=$ETC_DIR/game.env
+readonly SITE_ENV_FILE=$ETC_DIR/site.env
 readonly HOSTS_ENV_FILE=$ETC_DIR/hosts.env
 readonly LIVE_COLOR_FILE=$ETC_DIR/live.color
 readonly PREVIOUS_COLOR_FILE=$ETC_DIR/previous.color
 readonly AUTH_LISTEN_SCRIPT=$ETC_DIR/auth-listen.mjs
 
+# Print the loopback port a color's game server listens on.
 game_port() {
   case $1 in
     blue) echo 8801 ;;
     green) echo 8802 ;;
-    *) exit 1 ;;
   esac
 }
 
+# Print the loopback port a color's sign-in service listens on.
 auth_port() {
   case $1 in
     blue) echo 8811 ;;
     green) echo 8812 ;;
-    *) exit 1 ;;
   esac
 }
 
+# Print the color that is not $1.
 other_color() {
   case $1 in
     blue) echo green ;;
     green) echo blue ;;
-    *) echo blue ;;
   esac
 }
 
-write_if_changed() {
-  local mode=$1
-  local target=$2
-  local tmp
-  tmp=$(mktemp)
-  cat >"$tmp"
-  if [[ -f $target ]] && cmp -s "$tmp" "$target"; then
-    rm -f "$tmp"
-    return 1
-  fi
-  install -d -m 755 "$(dirname "$target")"
-  install -m "$mode" "$tmp" "$target"
-  rm -f "$tmp"
-  return 0
+# Run a command as the app user, with the tools install put on the path.
+as_app() {
+  runuser -u "$APP_USER" -- env HOME="/var/lib/$APP_USER" PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin" "$@"
 }
 
-# Runs a kamal-proxy command against one proxy: game on 8787 or auth on 8788.
+# Run a kamal-proxy command against one proxy: game on 8787 or auth on 8788.
 kamal_proxy() {
   local proxy=$1
   shift
   KAMAL_PROXY_SOCKET=/run/kamal-proxy-$proxy/kamal-proxy.sock /usr/local/bin/kamal-proxy "$@"
 }
 
-# Moves both proxies to a color. Each deploy returns once the color answers /readyz,
-# new requests go to it, and the old color has drained.
+# Move both proxies to a color. Each deploy returns once the color answers /readyz, new
+# requests go to it, and the old color has drained.
 switch_to() {
   local color=$1
   kamal_proxy game deploy game --target "127.0.0.1:$(game_port "$color")" \
@@ -86,93 +89,21 @@ switch_to() {
     --health-check-path /readyz --drain-timeout "$DRAIN_TIMEOUT"
 }
 
-if [[ $ACTION == retire ]]; then
-  live=$(cat "$LIVE_COLOR_FILE")
-  if [[ -f $PREVIOUS_COLOR_FILE ]]; then
-    old=$(cat "$PREVIOUS_COLOR_FILE")
-    if [[ -n $old && $old != "$live" ]]; then
-      systemctl stop "doggybank@$old.service" "doggybank-auth@$old.service"
-    fi
-    rm -f "$PREVIOUS_COLOR_FILE"
-  fi
-  keep_blue=$(readlink -f "$ETC_DIR/blue.release" 2>/dev/null || true)
-  keep_green=$(readlink -f "$ETC_DIR/green.release" 2>/dev/null || true)
-  for dir in "$RELEASES_DIR"/*; do
-    [[ -d $dir ]] || continue
-    real=$(readlink -f "$dir")
-    if [[ $real != "$keep_blue" && $real != "$keep_green" ]]; then
-      rm -rf "$dir"
-    fi
-  done
-  echo "Retired old color. $live is serving."
-  exit 0
-fi
-
-if [[ $ACTION == rollback ]]; then
-  if [[ ! -f $PREVIOUS_COLOR_FILE ]]; then
-    echo "No previous color to roll back to." >&2
+# Install Postgres, the tools, the secrets and the units on a new Machine.
+install_machine() {
+  # A second install would replace the secrets every session and signature depends on.
+  if [[ -e $ETC_DIR ]]; then
+    echo "already installed: $ETC_DIR exists" >&2
     exit 1
   fi
-  old=$(cat "$PREVIOUS_COLOR_FILE")
-  bad=$(cat "$LIVE_COLOR_FILE" 2>/dev/null || true)
-  systemctl enable -q "doggybank@$old.service" "doggybank-auth@$old.service"
-  systemctl start "doggybank@$old.service" "doggybank-auth@$old.service"
-  switch_to "$old"
-  printf '%s\n' "$old" >"$LIVE_COLOR_FILE"
-  rm -f "$PREVIOUS_COLOR_FILE"
-  if [[ -n $bad && $bad != "$old" ]]; then
-    systemctl disable -q "doggybank@$bad.service" "doggybank-auth@$bad.service" || true
-    systemctl stop "doggybank@$bad.service" "doggybank-auth@$bad.service"
-  fi
-  echo "Rolled back to $old."
-  exit 0
-fi
 
-if [[ $ACTION != deploy ]]; then
-  echo "Unknown action: $ACTION" >&2
-  exit 1
-fi
-
-readonly COMMIT=$1
-readonly ARCHIVE=$2
-shift 2
-readonly HOSTS=("$@")
-
-export DEBIAN_FRONTEND=noninteractive
-export PATH="/opt/node/bin:$PATH"
-
-if ! dpkg -s "postgresql-$PG_MAJOR" curl xz-utils ca-certificates >/dev/null 2>&1; then
+  # Postgres from its own repository, tuned for one small Machine.
+  export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq
   apt-get install -y -qq postgresql-common curl xz-utils ca-certificates >/dev/null
-  if ! dpkg -s "postgresql-$PG_MAJOR" >/dev/null 2>&1; then
-    /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
-    apt-get install -y -qq "postgresql-$PG_MAJOR" >/dev/null
-  fi
-fi
-
-install -d -m 755 "$ETC_DIR"
-chmod 755 "$ETC_DIR"
-
-if [[ ! -f $ENV_FILE ]]; then
-  password=$(openssl rand -hex 24)
-  printf 'DATABASE_URL=postgresql://doggybank:%s@localhost/doggybank\n' "$password" >"$ENV_FILE"
-  chmod 600 "$ENV_FILE"
-fi
-if [[ ! -f $AUTH_ENV_FILE ]]; then
-  printf 'BETTER_AUTH_SECRET=%s\n' "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
-  chmod 600 "$AUTH_ENV_FILE"
-fi
-if [[ ! -f $GAME_ENV_FILE ]]; then
-  printf 'DOGGYBANK_PLAYER_KEY=%s\n' "$(openssl rand -hex 32)" >"$GAME_ENV_FILE"
-  chmod 600 "$GAME_ENV_FILE"
-fi
-grep -q '^MAIL_KEY=' "$AUTH_ENV_FILE" || printf 'MAIL_KEY=%s\n' "$(openssl rand -hex 32)" >>"$AUTH_ENV_FILE"
-sed -i '/^BETTER_AUTH_URL=/d' "$AUTH_ENV_FILE"
-printf 'BETTER_AUTH_URL=%s\n' "$SITE_URL" >>"$AUTH_ENV_FILE"
-chmod 600 "$ENV_FILE" "$AUTH_ENV_FILE" "$GAME_ENV_FILE"
-
-password=$(sed -n 's|^DATABASE_URL=postgresql://doggybank:\([^@]*\)@.*|\1|p' "$ENV_FILE")
-if write_if_changed 644 "/etc/postgresql/$PG_MAJOR/main/conf.d/doggybank.conf" <<CONF; then
+  /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+  apt-get install -y -qq "postgresql-$PG_MAJOR" >/dev/null
+  cat >"/etc/postgresql/$PG_MAJOR/main/conf.d/doggybank.conf" <<'CONF'
 shared_buffers = 512MB
 effective_cache_size = 1GB
 synchronous_commit = off
@@ -183,86 +114,51 @@ random_page_cost = 1.1
 jit = off
 max_connections = 20
 CONF
-  systemctl restart "postgresql@$PG_MAJOR-main"
-elif ! systemctl is-active --quiet "postgresql@$PG_MAJOR-main"; then
-  systemctl start "postgresql@$PG_MAJOR-main"
-fi
+  systemctl enable -q "postgresql@$PG_MAJOR-main.service"
+  systemctl restart "postgresql@$PG_MAJOR-main.service"
 
-runuser -u postgres -- psql -v ON_ERROR_STOP=1 -q <<SQL
-SELECT 'CREATE ROLE doggybank LOGIN' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'doggybank')\gexec
-ALTER ROLE doggybank PASSWORD '$password';
-SELECT 'CREATE DATABASE doggybank OWNER doggybank' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'doggybank')\gexec
+  # The secrets, made once: the database password, the sign-in secret and mail key, and
+  # the key the Worker signs each player with.
+  install -d -m 755 "$ETC_DIR"
+  local db_password
+  db_password=$(openssl rand -hex 24)
+  printf 'DATABASE_URL=postgresql://doggybank:%s@localhost/doggybank\n' "$db_password" >"$ENV_FILE"
+  printf 'BETTER_AUTH_SECRET=%s\nMAIL_KEY=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" >"$AUTH_ENV_FILE"
+  printf 'DOGGYBANK_PLAYER_KEY=%s\n' "$(openssl rand -hex 32)" >"$GAME_ENV_FILE"
+  chmod 600 "$ENV_FILE" "$AUTH_ENV_FILE" "$GAME_ENV_FILE"
+
+  # The database and the role that owns it.
+  runuser -u postgres -- psql -v ON_ERROR_STOP=1 -q <<SQL
+CREATE ROLE doggybank LOGIN PASSWORD '$db_password';
+CREATE DATABASE doggybank OWNER doggybank;
 SQL
 
-if [[ ! -x /usr/local/bin/uv ]]; then
+  # uv, Node and pnpm build and run releases. Go builds kamal-proxy.
   curl -LsSf "https://astral.sh/uv/$UV_VERSION/install.sh" | env UV_INSTALL_DIR=/usr/local/bin UV_NO_MODIFY_PATH=1 sh >/dev/null
-fi
-if [[ ! -x /opt/node/bin/node ]]; then
   install -d /opt/node
   curl -fsSL "https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.xz" | tar -xJ -C /opt/node --strip-components=1
-fi
-[[ -x /opt/node/bin/pnpm ]] || /opt/node/bin/npm install -g --silent "pnpm@$PNPM_VERSION"
-
-if [[ ! -x /usr/local/go/bin/go ]] || [[ $(/usr/local/go/bin/go env GOVERSION) != "go$GO_VERSION" ]]; then
+  /opt/node/bin/npm install -g --silent "pnpm@$PNPM_VERSION"
+  local go_tmp
   go_tmp=$(mktemp -d)
   curl -fsSL "https://go.dev/dl/go$GO_VERSION.linux-amd64.tar.gz" -o "$go_tmp/go.tar.gz"
   printf '%s  %s/go.tar.gz\n' "$GO_SHA256" "$go_tmp" | sha256sum -c - >/dev/null
-  rm -rf /usr/local/go
   tar -xzf "$go_tmp/go.tar.gz" -C /usr/local
   rm -rf "$go_tmp"
-fi
-if [[ ! -x /usr/local/bin/kamal-proxy ]] || [[ $(/usr/local/go/bin/go version -m /usr/local/bin/kamal-proxy) != *"$KAMAL_PROXY_VERSION"* ]]; then
   env GOBIN=/usr/local/bin GOPATH=/var/cache/go HOME=/root /usr/local/go/bin/go install \
     "github.com/basecamp/kamal-proxy/cmd/kamal-proxy@$KAMAL_PROXY_VERSION"
-fi
 
-id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/var/lib/$APP_USER" "$APP_USER"
-install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR" "$RELEASES_DIR"
-as_app() {
-  runuser -u "$APP_USER" -- env HOME="/var/lib/$APP_USER" PATH="/opt/node/bin:/usr/local/bin:/usr/bin:/bin" "$@"
-}
+  # The app user and where its releases go.
+  useradd --system --create-home --home-dir "/var/lib/$APP_USER" "$APP_USER"
+  install -d -o "$APP_USER" -g "$APP_USER" "$APP_DIR" "$RELEASES_DIR"
 
-release_dir=$RELEASES_DIR/$COMMIT
-if [[ ! -f $release_dir/.ready ]]; then
-  rm -rf "$release_dir"
-  install -d -o "$APP_USER" -g "$APP_USER" "$release_dir"
-  tar -xzf "$ARCHIVE" -C "$release_dir"
-  chown -R "$APP_USER:$APP_USER" "$release_dir"
-  (
-    cd "$release_dir"
-    as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
-    as_app pnpm install --frozen-lockfile --silent
-    as_app pnpm build >/dev/null
-  )
-  touch "$release_dir/.ready"
-fi
-rm -f "$ARCHIVE"
+  # Each color's ports, and each proxy's public port.
+  printf 'GAME_PORT=%s\nPORT=%s\n' "$(game_port blue)" "$(auth_port blue)" >"$ETC_DIR/blue.env"
+  printf 'GAME_PORT=%s\nPORT=%s\n' "$(game_port green)" "$(auth_port green)" >"$ETC_DIR/green.env"
+  echo 'HTTP_PORT=8787' >"$ETC_DIR/proxy-game.env"
+  echo 'HTTP_PORT=8788' >"$ETC_DIR/proxy-auth.env"
 
-db_url=$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")
-psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/server/schema.sql"
-# shellcheck source=/dev/null
-(set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && cd "$release_dir/apps/auth" && as_app node migrate.ts)
-psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/auth/players.sql"
-
-write_if_changed 644 "$ETC_DIR/blue.env" <<'ENV' || true
-GAME_PORT=8801
-PORT=8811
-ENV
-write_if_changed 644 "$ETC_DIR/green.env" <<'ENV' || true
-GAME_PORT=8802
-PORT=8812
-ENV
-
-allow_hosts=()
-for host in "${HOSTS[@]}"; do
-  allow_hosts+=(--allow-host "$host")
-done
-write_if_changed 644 "$HOSTS_ENV_FILE" <<ENV || true
-ALLOW_HOSTS=${allow_hosts[*]}
-ENV
-
-# Binds apps/auth/server.ts to 127.0.0.1:$PORT without altering apps/auth.
-write_if_changed 644 "$AUTH_LISTEN_SCRIPT" <<'MJS' || true
+  # Bind apps/auth/server.ts to its color's loopback port without changing apps/auth.
+  cat >"$AUTH_LISTEN_SCRIPT" <<'MJS'
 import net from 'node:net';
 
 const listen = net.Server.prototype.listen;
@@ -271,8 +167,8 @@ net.Server.prototype.listen = function (_port, _host, callback) {
 };
 MJS
 
-units_changed=0
-write_if_changed 644 /etc/systemd/system/doggybank@.service <<UNIT && units_changed=1 || true
+  # One game server and one sign-in service per color, each ready when it says so.
+  cat >/etc/systemd/system/doggybank@.service <<UNIT
 [Unit]
 Description=Doggybank (%i)
 Requires=postgresql@$PG_MAJOR-main.service
@@ -294,8 +190,7 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 UNIT
-
-write_if_changed 644 /etc/systemd/system/doggybank-auth@.service <<UNIT && units_changed=1 || true
+  cat >/etc/systemd/system/doggybank-auth@.service <<UNIT
 [Unit]
 Description=Doggybank sign-in (%i)
 Requires=postgresql@$PG_MAJOR-main.service
@@ -308,6 +203,7 @@ User=$APP_USER
 WorkingDirectory=$ETC_DIR/%i.release/apps/auth
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$AUTH_ENV_FILE
+EnvironmentFile=$SITE_ENV_FILE
 EnvironmentFile=$ETC_DIR/%i.env
 ExecStart=/opt/node/bin/node --import $AUTH_LISTEN_SCRIPT server.ts
 Restart=on-failure
@@ -316,18 +212,11 @@ Restart=on-failure
 WantedBy=multi-user.target
 UNIT
 
-write_if_changed 644 "$ETC_DIR/proxy-game.env" <<'ENV' || true
-HTTP_PORT=8787
-ENV
-write_if_changed 644 "$ETC_DIR/proxy-auth.env" <<'ENV' || true
-HTTP_PORT=8788
-ENV
-
-# One proxy per public port, so the Worker keeps its two origins. Each instance has its
-# own socket and saved state. kamal-proxy has no readiness protocol, so the unit is ready
-# once this run's log says the control socket is up. The journal keeps the line, so it is
-# found even when it came before the wait began.
-write_if_changed 644 /etc/systemd/system/kamal-proxy@.service <<UNIT && units_changed=1 || true
+  # One proxy per public port, so the Worker keeps its two origins. Each has its own socket
+  # and saved state. kamal-proxy has no readiness protocol, so the unit is ready once this
+  # run's log says the control socket is up. The journal keeps the line, so it is found even
+  # when it came before the wait began.
+  cat >/etc/systemd/system/kamal-proxy@.service <<UNIT
 [Unit]
 Description=kamal-proxy (%i)
 After=network-online.target
@@ -345,22 +234,130 @@ Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 UNIT
+  systemctl daemon-reload
+  systemctl enable --now -q kamal-proxy@game.service kamal-proxy@auth.service
+  echo "Installed Postgres $PG_MAJOR and kamal-proxy $KAMAL_PROXY_VERSION on 8787 and 8788."
+}
 
-(( units_changed )) && systemctl daemon-reload
+# Build a release, start it as the idle color and move traffic to it.
+deploy_release() {
+  local commit=$1
+  local archive=$2
+  shift 2
+  : "${SITE_URL:?provision.ts passes SITE_URL}"
 
-live=$(cat "$LIVE_COLOR_FILE" 2>/dev/null || true)
-idle=$(other_color "$live")
-ln -sfn "$release_dir" "$ETC_DIR/$idle.release"
+  # Deploys need what install made.
+  if [[ ! -f $ENV_FILE || ! -x /usr/local/bin/kamal-proxy ]]; then
+    echo "not installed: run provision.ts create first" >&2
+    exit 1
+  fi
 
-systemctl enable -q "postgresql@$PG_MAJOR-main.service" "doggybank@$idle.service" "doggybank-auth@$idle.service"
-systemctl restart "doggybank@$idle.service" "doggybank-auth@$idle.service"
+  # The site address and the host names this release answers to.
+  echo "BETTER_AUTH_URL=$SITE_URL" >"$SITE_ENV_FILE"
+  local -a allow_hosts=()
+  local host
+  for host in "$@"; do
+    allow_hosts+=(--allow-host "$host")
+  done
+  echo "ALLOW_HOSTS=${allow_hosts[*]}" >"$HOSTS_ENV_FILE"
 
-systemctl enable --now -q kamal-proxy@game.service kamal-proxy@auth.service
-switch_to "$idle"
+  # Unpack and build the release in its own directory, beside the live one.
+  local release_dir=$RELEASES_DIR/$commit
+  if [[ -e $release_dir ]]; then
+    echo "release $commit is already unpacked" >&2
+    exit 1
+  fi
+  install -d -o "$APP_USER" -g "$APP_USER" "$release_dir"
+  tar -xzf "$archive" -C "$release_dir"
+  rm -f "$archive"
+  chown -R "$APP_USER:$APP_USER" "$release_dir"
+  (
+    cd "$release_dir"
+    as_app env UV_COMPILE_BYTECODE=1 uv sync -q --frozen --package doggybank-server
+    as_app pnpm install --frozen-lockfile --silent
+    as_app pnpm build >/dev/null
+  )
 
-if [[ -n $live && $live != "$idle" ]]; then
-  printf '%s\n' "$live" >"$PREVIOUS_COLOR_FILE"
-  systemctl disable -q "doggybank@$live.service" "doggybank-auth@$live.service" || true
-fi
-printf '%s\n' "$idle" >"$LIVE_COLOR_FILE"
-echo "Doggybank $COMMIT is live on $idle (ports $(game_port "$idle") and $(auth_port "$idle") behind kamal-proxy on 8787 and 8788), with Postgres $PG_MAJOR."
+  # Bring the database up to this release's schema and sign-in tables.
+  local db_url
+  db_url=$(sed -n 's/^DATABASE_URL=//p' "$ENV_FILE")
+  psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/server/schema.sql"
+  # shellcheck source=/dev/null
+  (set -a && source "$ENV_FILE" && source "$AUTH_ENV_FILE" && source "$SITE_ENV_FILE" && cd "$release_dir/apps/auth" && as_app /opt/node/bin/node migrate.ts)
+  psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$release_dir/apps/auth/players.sql"
+
+  # The first release after install starts blue. Later ones take the color not serving.
+  local live=""
+  local idle=blue
+  if [[ -f $LIVE_COLOR_FILE ]]; then
+    live=$(cat "$LIVE_COLOR_FILE")
+    idle=$(other_color "$live")
+  fi
+
+  # Start the release as the idle color, then move traffic to it.
+  ln -sfn "$release_dir" "$ETC_DIR/$idle.release"
+  systemctl enable -q "doggybank@$idle.service" "doggybank-auth@$idle.service"
+  systemctl restart "doggybank@$idle.service" "doggybank-auth@$idle.service"
+  switch_to "$idle"
+
+  # The old color keeps running until retire, so a rollback is one switch away.
+  if [[ -n $live ]]; then
+    echo "$live" >"$PREVIOUS_COLOR_FILE"
+    systemctl disable -q "doggybank@$live.service" "doggybank-auth@$live.service"
+  fi
+  echo "$idle" >"$LIVE_COLOR_FILE"
+  echo "Doggybank $commit is live on $idle (ports $(game_port "$idle") and $(auth_port "$idle"))."
+}
+
+# Stop the color a deploy left running, and delete releases the live color does not use.
+retire_color() {
+  local live old
+  live=$(cat "$LIVE_COLOR_FILE")
+  if [[ ! -f $PREVIOUS_COLOR_FILE ]]; then
+    echo "nothing to retire: $live is the only color" >&2
+    exit 1
+  fi
+  old=$(cat "$PREVIOUS_COLOR_FILE")
+  systemctl stop "doggybank@$old.service" "doggybank-auth@$old.service"
+  rm -f "$PREVIOUS_COLOR_FILE"
+
+  local keep dir
+  keep=$(readlink -f "$ETC_DIR/$live.release")
+  for dir in "$RELEASES_DIR"/*; do
+    if [[ $(readlink -f "$dir") != "$keep" ]]; then
+      rm -rf "$dir"
+    fi
+  done
+  echo "Retired $old. $live is serving."
+}
+
+# Move traffic back to the color the last deploy replaced, and stop the new one.
+roll_back() {
+  if [[ ! -f $PREVIOUS_COLOR_FILE ]]; then
+    echo "nothing to roll back to: no previous color" >&2
+    exit 1
+  fi
+  local old bad
+  old=$(cat "$PREVIOUS_COLOR_FILE")
+  bad=$(cat "$LIVE_COLOR_FILE")
+  systemctl enable -q "doggybank@$old.service" "doggybank-auth@$old.service"
+  systemctl start "doggybank@$old.service" "doggybank-auth@$old.service"
+  switch_to "$old"
+
+  systemctl disable -q "doggybank@$bad.service" "doggybank-auth@$bad.service"
+  systemctl stop "doggybank@$bad.service" "doggybank-auth@$bad.service"
+  echo "$old" >"$LIVE_COLOR_FILE"
+  rm -f "$PREVIOUS_COLOR_FILE"
+  echo "Rolled back to $old."
+}
+
+case $ACTION in
+  install) install_machine ;;
+  deploy) deploy_release "$@" ;;
+  retire) retire_color ;;
+  rollback) roll_back ;;
+  *)
+    echo "unknown action: $ACTION (install, deploy, retire or rollback)" >&2
+    exit 1
+    ;;
+esac

@@ -5,9 +5,6 @@
   "description": "Provisions Doggybank on a Dedalus Machine.",
   "license": "Apache-2.0",
   "type": "module",
-  "scripts": {
-    "provision": "node provision.ts"
-  },
   "dependencies": {
     "dedalus": "0.8.0",
     "zod": "4.6.7"

@@ -23,14 +23,8 @@ function pause(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Returns the given Machine's ID, or creates a Machine when none is given. */
-export async function ensureMachine(
-  machineId: string | undefined,
-): Promise<string> {
-  if (machineId) {
-    const machine = await client.machines.retrieve({machine_id: machineId});
-    return machine.machine_id;
-  }
+/** Creates a Machine sized for Postgres, the game server and sign-in, and returns its ID. */
+export async function createMachine(): Promise<string> {
   const machine = await client.machines.create({
     vcpu: 1,
     memory_mib: 2048,
@@ -93,24 +87,17 @@ export async function run(
 }
 
 /**
- * Returns the Machine's port for `port`. A port it creates gets a minted access key,
- * printed once as `name` for the Worker's secret.
+ * Opens `port` on the Machine and prints a minted access key for it once, labeled
+ * `name`, for the Worker's secret.
  */
-export async function ensurePort(
+export async function createPort(
   machineId: string,
   port: number,
   name: string,
 ): Promise<Port> {
-  for await (const existing of client.machines.ports.list({
-    machine_id: machineId,
-  })) {
-    if (existing.port === port) {
-      return existing;
-    }
-  }
   // The API requires a sharing password for a key-protected port, which this SDK
-  // version does not type yet. Callers authenticate with a minted access key
-  // instead, so the password is random and never kept.
+  // version does not type yet. The Worker authenticates with a minted access key,
+  // so the password is random and never kept.
   const password = randomBytes(6)
     .toString('base64url')
     .replace(/[-_]/g, '0')
@@ -120,6 +107,20 @@ export async function ensurePort(
   });
   console.log(`${name}: ${await mintAccessKey(machineId, created)}`);
   return created;
+}
+
+/** Returns the Machine's open `port`. */
+export async function findPort(machineId: string, port: number): Promise<Port> {
+  for await (const open of client.machines.ports.list({
+    machine_id: machineId,
+  })) {
+    if (open.port === port) {
+      return open;
+    }
+  }
+  throw new Error(
+    `Machine ${machineId} has no port ${port}. Create the Machine with \`provision.ts create\`.`,
+  );
 }
 
 // The longest lifetime the API allows, about 68 years: the Worker's keys never expire.

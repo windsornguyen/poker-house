@@ -117,7 +117,7 @@ export const release = workflow({
           id: 'switch',
           name: 'Deploy the Machine',
           env: {...machine, DOGGYBANK_SITE_URL: site},
-          run: run('node', 'apps/server/deploy/provision.ts'),
+          run: run('node', 'apps/server/deploy/provision.ts', 'deploy'),
         },
         {name: 'Build the site', run: web('build')},
         {
