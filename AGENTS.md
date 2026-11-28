@@ -7,7 +7,7 @@ observations and return engine-supplied legal action IDs.
 ## Layout
 
 - `apps/web`: React browser client and poker renderer.
-- `apps/server`: Python HTTP server and remote bot protocol.
+- `apps/server`: Python HTTP API (FastAPI), sessions and the chip ledger.
 - `packages/python/engine`: OpenSpiel adapter around PokerKit.
 
 Preserve upstream Apache-2.0 notices and record copied code in `NOTICE`.
