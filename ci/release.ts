@@ -133,6 +133,10 @@ export const release = workflow({
           ),
         },
         {
+          name: 'Smoke the page',
+          run: run('curl', '-fsS', '-o', '/dev/null', `${site}/`),
+        },
+        {
           name: 'Smoke the site',
           run: run(
             'curl',

@@ -85,6 +85,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm --filter @doggybank/web exec wrangler deploy --config ../../docs/wrangler.jsonc
         shell: bash
+      - name: Smoke the page
+        run: curl -fsS -o /dev/null https://doggybank.io/
+        shell: bash
       - name: Smoke the site
         run: curl -fsS -o /dev/null https://doggybank.io/api/auth/get-session
         shell: bash
